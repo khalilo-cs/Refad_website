@@ -1,0 +1,70 @@
+# ==========================================================
+# منصة رِفاد — تشغيل الإنتاج عبر Docker Compose
+# ----------------------------------------------------------
+#   1) cp .env.production.example .env.production   ثم عدّل القيم
+#   2) docker compose up -d --build
+#   3) docker compose logs -f
+# ==========================================================
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: rifad-platform:latest
+    container_name: rifad-app
+    restart: unless-stopped
+    env_file:
+      - .env.production
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      # المسار داخل الحاوية — البيانات محفوظة في مجلد مُثبَّت أدناه.
+      SQLITE_DIR: /app/data
+      DATABASE_FILE: rifad.db
+    volumes:
+      # البيانات الدائمة: لا تُفقد عند إعادة بناء الحاوية.
+      - rifad-data:/app/data
+    ports:
+      # يُفضّل ربطه على 127.0.0.1 فقط عندما يكون Nginx على نفس الخادم.
+      - "127.0.0.1:3000:3000"
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # وكيل عكسي: يستقبل الطلبات على 80/443 ويوجّهها للتطبيق.
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: rifad-nginx
+    restart: unless-stopped
+    depends_on:
+      app:
+        condition: service_healthy
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./deploy/certs:/etc/nginx/certs:ro
+      - nginx-cache:/var/cache/nginx
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  rifad-data:
+  nginx-cache:

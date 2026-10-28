@@ -1,0 +1,644 @@
+// منصة رِفاد للمتابعة والجودة المدرسية — نموذج بيانات
+// ملاحظة نشر: يعمل هذا المخطط على SQLite في بيئة التطوير والعرض التوضيحي.
+// للنشر الإنتاجي على PostgrePal/PostgreSQL: غير provider إلى "postgresql" وحدد
+// DATABASE_URL في متغيرات البيئة (انظر .env.example). المخطط متوافق مع كلا القاعدتين.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// -------------------------------------------------------
+// الهيكلة التنظيمية والمواقع
+// -------------------------------------------------------
+model Governorate {
+  id        String   @id @default(uuid())
+  name      String
+  code      String   @unique
+  createdAt DateTime @default(now())
+
+  directorates Directorate[]
+}
+
+model Directorate {
+  id            String   @id @default(uuid())
+  name          String
+  code          String   @unique
+  governorateId String
+  governorate   Governorate @relation(fields: [governorateId], references: [id], onDelete: Cascade)
+  createdAt     DateTime   @default(now())
+
+  schools       School[]
+  users         User[]
+  directorateId String?    @unique //自我参照 غير مستخدم حاليًا؛ محجوز للمديريات الفرعية
+  parent        Directorate? @relation("DirectorateHierarchy", fields: [directorateId], references: [id])
+  children      Directorate[] @relation("DirectorateHierarchy")
+
+  @@index([governorateId])
+}
+
+// -------------------------------------------------------
+// المستخدمون والأدوار والصلاحيات
+// -------------------------------------------------------
+model Role {
+  id          String   @id @default(uuid())
+  key         String   @unique // SUPER_ADMIN, EDUCATION_DIRECTOR, INSPECTOR, SCHOOL_PRINCIPAL, QUALITY_COORDINATOR, TEACHER, PARENT, GUEST
+  name        String
+  description String?
+  scope       String   @default("system") // system | directorate | school | personal
+  permissions Json     @default("{}") // خريطة الصلاحيات الدقيقة
+  isSystem    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  users User[]
+  @@index([key])
+}
+
+model User {
+  id            String      @id @default(uuid())
+  name          String
+  email         String      @unique
+  emailVerified DateTime?
+  passwordHash  String
+  phone         String?
+  avatarUrl     String?
+
+  roleId        String
+  role          Role        @relation(fields: [roleId], references: [id], onDelete: Restrict)
+
+  directorateId String?
+  directorate   Directorate? @relation(fields: [directorateId], references: [id])
+
+  schoolId      String?
+  school        School?      @relation(fields: [schoolId], references: [id], onDelete: SetNull)
+
+  isActive      Boolean     @default(true)
+  isLocked      Boolean     @default(false)
+  lockedReason  String?
+  failedLogin   Int         @default(0)
+  tokenVersion  Int         @default(1) // يُ aument عند تغيير كلمة المرور لإبطال الجلسات القديمة
+  twoFactorEnabled Boolean @default(false)
+  twoFactorSecret String?
+  lastLoginAt   DateTime?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  schoolsManaged School[]   @relation("SchoolPrincipal")
+  visitsCreated Visit[]     @relation("VisitInspector")
+  evaluations   Evaluation[] @relation("EvaluationRater")
+  evidenceUploaded Evidence[] @relation("EvidenceUploader")
+  reportsGenerated Report[] @relation("ReportGenerator")
+  reportsApproved Report[]   @relation("ReportApprover")
+  improvementPlans ImprovementPlan[] @relation("PlanAuthor")
+  correctiveActions CorrectiveAction[] @relation("ActionResponsible")
+  actionsVerified CorrectiveAction[] @relation("ActionVerifier")
+  messagesSent Message[]    @relation("MessageSender")
+  announcements Announcement[] @relation("AnnouncementAuthor")
+  notifications Notification[]
+  auditLogs     AuditLog[]
+  parentLinks   ParentStudent[] @relation("ParentLink")
+  exportLogs    ExportLog[]
+
+  @@index([email])
+  @@index([roleId])
+  @@index([directorateId])
+  @@index([schoolId])
+}
+
+// -------------------------------------------------------
+// المدارس
+// -------------------------------------------------------
+model School {
+  id            String   @id @default(uuid())
+  code          String   @unique // رمز مدرسي فريد
+  name          String
+  governorateId String
+  directorateId String
+  areaId        String?
+  address       String?
+  latitude      Float?
+  longitude     Float?
+  type          String   // حكومية، أهلية، إلخ
+  stage         String   // أساسي، ثانوي، إلخ
+  contactPhone  String?
+  contactEmail  String?
+  principalName String?
+  dataSource    String   @default("MANUAL") // MANUAL | EXCEL_IMPORT | OFFICIAL
+  status        String   @default("ACTIVE") // ACTIVE | INACTIVE | SUSPENDED
+  notes         String?
+  lastUpdatedAt DateTime @default(now())
+  createdAt     DateTime @default(now())
+
+  governorate Governorate @relation(fields: [governorateId], references: [id])
+  directorate Directorate @relation(fields: [directorateId], references: [id])
+  area        Area?       @relation(fields: [areaId], references: [id])
+
+  principal     User?      @relation("SchoolPrincipal", fields: [principalUserId], references: [id])
+  principalUserId String?
+
+  visits        Visit[]
+  evidence      Evidence[]
+  improvementPlans ImprovementPlan[]
+  conversations Conversation[]
+  students      Student[]
+  reports       Report[]
+
+  @@index([code])
+  @@index([directorateId])
+  @@index([status])
+}
+
+model Area {
+  id          String   @id @default(uuid())
+  name        String
+  directorateId String
+  directorate Directorate @relation(fields: [directorateId], references: [id], onDelete: Cascade)
+  schools     School[]
+  @@index([directorateId])
+}
+
+// -------------------------------------------------------
+// المعايير والمؤشرات (من استمارة التقييم الذاتي)
+// -------------------------------------------------------
+model Criterion {
+  id          String   @id @default(uuid())
+  code        String   @unique // 1..7
+  title       String
+  weight      Int      @default(0) // الوزن النسبي من 100
+  order       Int      @default(0)
+
+  subCriteria SubCriterion[]
+  indicators  Indicator[]
+
+  @@index([code])
+  @@index([order])
+}
+
+model SubCriterion {
+  id          String   @id @default(uuid())
+  code        String   @unique // 1-1, 1-2, إلخ
+  title       String
+  weight      Int      @default(0)
+  order       Int      @default(0)
+
+  criterionId String
+  criterion   Criterion @relation(fields: [criterionId], references: [id], onDelete: Cascade)
+
+  indicators Indicator[]
+
+  @@index([criterionId])
+  @@index([code])
+  @@index([criterionId, order])
+}
+
+model Indicator {
+  id             String   @id @default(uuid())
+  code           String   @unique // 1-1-1 إلخ
+  title          String
+  evidence       Json     // قائمة أدلة التحقق (نصوص من الاستمارة)
+  verificationTools Json // ["فحص وثائق","ملاحظة","مقابلة"]
+  order          Int      @default(0)
+
+  criterionId    String?
+  criterion      Criterion? @relation(fields: [criterionId], references: [id], onDelete: Cascade)
+  subCriterionId String?
+  subCriterion   SubCriterion? @relation(fields: [subCriterionId], references: [id], onDelete: Cascade)
+
+  evaluations    Evaluation[]
+  correctiveActions CorrectiveAction[]
+
+  @@index([code])
+  @@index([criterionId])
+  @@index([subCriterionId])
+  @@index([criterionId, subCriterionId, order])
+}
+
+// -------------------------------------------------------
+// درجات التقدير القابلة للتعديل من لوحة الإدارة
+// -------------------------------------------------------
+model RatingScale {
+  id       String @id @default(uuid())
+  key      String @unique // NOT_MET, WEAK, MEDIUM, MET
+  labelAr  String
+  labelEn  String?
+  score    Int    // 0,1,2,3
+  order    Int
+  isActive Boolean @default(true)
+
+  @@index([key])
+  @@index([order])
+}
+
+// -------------------------------------------------------
+// الزيارات الميدانية
+// -------------------------------------------------------
+model Visit {
+  id          String   @id @default(uuid())
+  schoolId    String
+  inspectorId String
+  type        String   @default("PERIODIC") // PERIODIC, FOLLOW_UP, COMPLAINT, EMERGENCY
+  purpose     String?
+  scheduledAt DateTime?
+  startedAt   DateTime?
+  endedAt     DateTime?
+  status      String   @default("SCHEDULED") // SCHEDULED, IN_PROGRESS, COMPLETED, CANCELLED, POSTPONED
+  notes       String?
+  completion  Int      @default(0) // نسبة الإكمال 0-100
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  school      School   @relation(fields: [schoolId], references: [id])
+  inspector   User     @relation("VisitInspector", fields: [inspectorId], references: [id])
+  evaluations Evaluation[]
+  reports     Report[]
+
+  @@index([schoolId])
+  @@index([inspectorId])
+  @@index([status])
+  @@index([scheduledAt])
+}
+
+// -------------------------------------------------------
+// التقييمات الميدانية للمؤشرات
+// -------------------------------------------------------
+model Evaluation {
+  id          String   @id @default(uuid())
+  visitId     String
+  indicatorId String
+  status      String   @default("NOT_EVALUATED") // NOT_EVALUATED, NOT_MET, WEAK, MEDIUM, MET
+  score       Int      @default(0) // الدرجة المحسوبة حسب مقياس RatingScale
+  notes       String?
+  ratedById   String?
+  ratedBy     User?    @relation("EvaluationRater", fields: [ratedById], references: [id])
+  ratedAt     DateTime?
+  updatedAt   DateTime @updatedAt
+  version     Int      @default(1) // لكشف التعارضات عند المزامنة
+
+  visit       Visit    @relation(fields: [visitId], references: [id])
+  indicator   Indicator @relation(fields: [indicatorId], references: [id])
+  evidence    Evidence[]
+  correctiveActions CorrectiveAction[]
+  history     EvaluationHistory[]
+
+  @@index([visitId])
+  @@index([indicatorId])
+  @@index([visitId, indicatorId], { unique: true })
+  @@index([status])
+}
+
+// -------------------------------------------------------
+// سجل تعديل التقييم (تدقيق)
+// -------------------------------------------------------
+model EvaluationHistory {
+  id          String   @id @default(uuid())
+  evaluationId String
+  field       String   // status | score | notes
+  oldValue    String?
+  newValue    String?
+  changedById String?
+  changedBy   User?    @relation(fields: [changedById], references: [id])
+  changedAt   DateTime @default(now())
+
+  evaluation Evaluation @relation(fields: [evaluationId], references: [id], onDelete: Cascade)
+
+  @@index([evaluationId])
+}
+
+// -------------------------------------------------------
+// الأدلة والشواهد والملفات المرفقة
+// -------------------------------------------------------
+model Evidence {
+  id             String   @id @default(uuid())
+  name           String   // اسم الملف المعروض
+  originalName   String
+  mimeType       String
+  size           Int
+  storageKey     String   // اسم الملف المخزن على القرص
+  url            String   // مسار الوصول المقيد الصلاحية
+  schoolId       String
+  visitId        String?
+  evaluationId   String?
+  subCriterionId String?
+  uploadedById   String
+  reviewStatus   String   @default("PENDING") // PENDING, ACCEPTED, REJECTED
+  reviewNotes    String?
+  reviewedById   String?
+  reviewedAt     DateTime?
+  version        Int      @default(1)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  school         School   @relation(fields: [schoolId], references: [id])
+  visit          Visit?   @relation(fields: [visitId], references: [id], onDelete: SetNull)
+  evaluation     Evaluation? @relation(fields: [evaluationId], references: [id], onDelete: SetNull)
+  uploadedBy     User     @relation("EvidenceUploader", fields: [uploadedById], references: [id])
+  reviewedBy     User?    @relation(fields: [reviewedById], references: [id])
+
+  @@index([schoolId])
+  @@index([visitId])
+  @@index([evaluationId])
+  @@index([uploadedById])
+  @@index([reviewStatus])
+}
+
+// -------------------------------------------------------
+// التقارير ومسارات الاعتماد
+// -------------------------------------------------------
+model Report {
+  id             String   @id @default(uuid())
+  number         String   @unique // رقم تقرير فريد
+  title          String
+  type           String   // VISIT_DAILY, MANAGEMENT_DAILY, SCHOOL_PERIODIC, QUALITY_DETAIL, ADMIN_SPECIAL
+  schoolId       String?
+  directorateId  String?
+  periodStart    DateTime?
+  periodEnd      DateTime?
+  status         String   @default("DRAFT") // DRAFT, UNDER_REVIEW, APPROVED, REJECTED
+  rejectionReason String?
+  generatedById  String
+  approvedById   String?
+  approvedAt     DateTime?
+  pdfUrl         String?
+  verificationCode String @unique // رمز التحقق / QR
+  summary        Json?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  school         School?   @relation(fields: [schoolId], references: [id])
+  generatedBy    User      @relation("ReportGenerator", fields: [generatedById], references: [id])
+  approvedBy     User?     @relation("ReportApprover", fields: [approvedById], references: [id])
+  visits         Visit[]
+
+  @@index([number])
+  @@index([status])
+  @@index([schoolId])
+  @@index([directorateId])
+  @@index([verificationCode])
+  @@index([type, status])
+}
+
+// -------------------------------------------------------
+// خطط التحسين والإجراءات التصحيحية
+// -------------------------------------------------------
+model ImprovementPlan {
+  id          String   @id @default(uuid())
+  schoolId    String
+  title       String
+  description String?
+  status      String   @default("ACTIVE") // ACTIVE, COMPLETED, SUSPENDED
+  createdById String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  school       School         @relation(fields: [schoolId], references: [id])
+  createdBy    User           @relation("PlanAuthor", fields: [createdById], references: [id])
+  correctiveActions CorrectiveAction[]
+
+  @@index([schoolId])
+  @@index([status])
+}
+
+model CorrectiveAction {
+  id             String   @id @default(uuid())
+  planId         String
+  evaluationId   String?
+  indicatorId    String?
+  problemDescription String
+  rootCause      String?
+  priority       String   @default("MEDIUM") // LOW, MEDIUM, HIGH, CRITICAL
+  proposedAction String
+  responsibleId  String
+  dueDate        DateTime
+  resources      String?
+  successIndicator String?
+  status         String   @default("NEW") // NEW, IN_PROGRESS, OVERDUE, COMPLETED, PENDING_VERIFICATION, CLOSED_VERIFIED, CLOSED_REJECTED
+  verificationNotes String?
+  verifiedById   String?
+  verifiedAt     DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  plan      ImprovementPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  evaluation Evaluation?     @relation(fields: [evaluationId], references: [id], onDelete: SetNull)
+  indicator Indicator?      @relation(fields: [indicatorId], references: [id], onDelete: SetNull)
+  responsible User          @relation("ActionResponsible", fields: [responsibleId], references: [id])
+  verifiedBy  User?         @relation("ActionVerifier", fields: [verifiedById], references: [id])
+
+  @@index([planId])
+  @@index([status])
+  @@index([dueDate])
+  @@index([responsibleId])
+}
+
+// -------------------------------------------------------
+// التواصل الإلكتروني
+// -------------------------------------------------------
+model Conversation {
+  id          String   @id @default(uuid())
+  schoolId    String?
+  title       String
+  isOfficial  Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  school      School?    @relation(fields: [schoolId], references: [id])
+  participants ConversationParticipant[]
+  messages    Message[]
+
+  @@index([schoolId])
+  @@index([updatedAt])
+}
+
+model ConversationParticipant {
+  id           String   @id @default(uuid())
+  conversationId String
+  userId       String
+  joinedAt     DateTime @default(now())
+  lastReadAt   DateTime?
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([conversationId, userId])
+  @@index([userId])
+}
+
+model Message {
+  id          String   @id @default(uuid())
+  conversationId String
+  senderId    String
+  body        String
+  isRead      Boolean  @default(false)
+  readAt      DateTime?
+  createdAt   DateTime @default(now())
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender       User         @relation("MessageSender", fields: [senderId], references: [id])
+
+  @@index([conversationId])
+  @@index([createdAt])
+}
+
+model Announcement {
+  id          String   @id @default(uuid())
+  title       String
+  content     String
+  audienceRoles Json   @default("[]") // قائمة بالأدوار المستهدفة
+  directorateIds Json @default("[]")
+  schoolIds   Json   @default("[]")
+  publishedAt DateTime?
+  expiresAt   DateTime?
+  createdById String
+  createdAt   DateTime @default(now())
+
+  author User @relation("AnnouncementAuthor", fields: [createdById], references: [id])
+
+  @@index([publishedAt])
+  @@index([createdAt])
+}
+
+// -------------------------------------------------------
+// أولياء الأمور والمتعلمون (وحدة إضافية منفصلة عن التقييم الرسمي)
+// -------------------------------------------------------
+model Parent {
+  id          String   @id @default(uuid())
+  nationalId  String? @unique
+  name        String
+  phone       String?
+  email       String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  children    ParentStudent[]
+  userId      String? @unique
+  user        User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+}
+
+model Student {
+  id          String   @id @default(uuid())
+  schoolId    String
+  nationalId  String? @unique
+  name        String
+  grade       String?
+  section     String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  school      School @relation(fields: [schoolId], references: [id])
+  parents     ParentStudent[]
+
+  @@index([schoolId])
+  @@index([nationalId])
+}
+
+model ParentStudent {
+  id        String   @id @default(uuid())
+  parentId  String
+  studentId String
+  relationship String @default("أب/أم") // أبو، أم، ولي، إلخ
+
+  parent   Parent  @relation("ParentLink", fields: [parentId], references: [id], onDelete: Cascade)
+  student  Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([parentId, studentId])
+}
+
+// -------------------------------------------------------
+// التعميمات والإشعارات والسجلات
+// -------------------------------------------------------
+model Notification {
+  id          String   @id @default(uuid())
+  userId      String
+  title       String
+  body        String
+  type        String   @default("INFO") // INFO, WARNING, SUCCESS, ERROR, VISIT, REPORT, ACTION
+  link        String?
+  isRead      Boolean  @default(false)
+  readAt      DateTime?
+  createdAt   DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([isRead])
+  @@index([createdAt])
+}
+
+model AuditLog {
+  id          String   @id @default(uuid())
+  userId      String?
+  user        User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  action      String   // CREATE, UPDATE, DELETE, LOGIN, LOGOUT, APPROVE, REJECT, EXPORT
+  entityType  String
+  entityId    String?
+  oldValues   Json?
+  newValues   Json?
+  ipAddress   String?
+  userAgent   String?
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
+  @@index([entityType, entityId])
+  @@index([action])
+  @@index([createdAt])
+}
+
+model Setting {
+  key   String @id
+  value Json
+  updatedAt DateTime @updatedAt
+  updatedBy String?
+}
+
+model ExportLog {
+  id          String   @id @default(uuid())
+  type        String   // PDF, EXCEL, CSV
+  filters     Json?
+  fileUrl     String?
+  createdById String
+  createdAt   DateTime @default(now())
+
+  creator User @relation(fields: [createdById], references: [id])
+
+  @@index([createdById])
+  @@index([createdAt])
+}
+
+// -------------------------------------------------------
+// الحضور والنتائج الدراسية (وحدة إضافية — منفصلة عن استمارة التقييم)
+// -------------------------------------------------------
+model AttendanceRecord {
+  id        String   @id @default(uuid())
+  studentId String
+  date      DateTime
+  status    String   // PRESENT, ABSENT, LATE, EXCUSED
+  note      String?
+  createdBy String?
+
+  student Student @relation(fields: [studentId], references: [id])
+
+  @@unique([studentId, date])
+  @@index([date])
+}
+
+model AcademicResult {
+  id        String   @id @default(uuid())
+  studentId String
+  subject   String
+  term      String
+  score     Float
+  maxScore  Float
+  note      String?
+  recordedAt DateTime @default(now())
+
+  student Student @relation(fields: [studentId], references: [id])
+
+  @@index([studentId])
+  @@index([term])
+}

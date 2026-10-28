@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>رِفاد — نظام التصميم</title>
+<style>
+  @font-face{font-family:"Amiri";font-weight:400;font-display:swap}
+  @font-face{font-family:"Amiri";font-weight:700;font-display:swap}
+  :root{
+    --navy:#0B2545;--navy-soft:#133A63;--navy-deep:#061729;
+    --turquoise:#17A89A;--turquoise-soft:#E4F5F2;--emerald:#0E7C66;
+    --gold:#C9A227;--gold-bright:#E8C547;--gold-soft:#FAF3DC;
+    --bg:#F7F5F0;--warm:#FBFAF7;--ink:#0B1F33;
+    --g900:#16232F;--g700:#3D4F5E;--g600:#5A6B7B;--g400:#94A3B0;--g200:#E2E5E9;--g100:#EFF1F4;
+    --danger:#B42318;--danger-soft:#FBEDEB;--warning:#C2760B;--warning-soft:#FDF3E3;
+    --success:#0F7B4F;--success-soft:#E7F5EE;--info:#1D6FB8;--info-soft:#EAF3FB;
+    --radius:14px;--radius-lg:20px;--radius-xl:28px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--ink);font-family:"Segoe UI",system-ui,-apple-system,sans-serif;
+       direction:rtl;text-align:right;padding:0 0 60px;line-height:1.6}
+  .wrap{max-width:1180px;margin:0 auto;padding:0 24px}
+  h1,h2,h3,h4,.serif{font-family:"Amiri","Times New Roman",serif;font-weight:700;line-height:1.4}
+
+  /* غلاف */
+  .hero{background:linear-gradient(135deg,#061729 0%,#0B2545 45%,#133A63 100%);color:#fff;
+        padding:56px 0 64px;position:relative;overflow:hidden}
+  .hero::before{content:"";position:absolute;inset:0;
+    background-image:radial-gradient(circle at 1px 1px,rgba(255,255,255,.14) 1px,transparent 0);
+    background-size:22px 22px;opacity:.5}
+  .hero::after{content:"";position:absolute;top:-120px;left:-60px;width:380px;height:380px;
+    border-radius:50%;background:radial-gradient(circle,rgba(23,168,154,.30),transparent 68%)}
+  .hero .wrap{position:relative;z-index:1}
+  .eyebrow{display:inline-flex;align-items:center;gap:8px;border:1px solid rgba(201,162,39,.35);
+    background:rgba(201,162,39,.12);color:#E8C547;padding:5px 14px;border-radius:999px;
+    font-size:11.5px;font-weight:600;letter-spacing:.02em}
+  .hero h1{font-size:44px;margin-top:18px;letter-spacing:-.01em}
+  .hero h1 em{font-style:normal;display:block;
+    background:linear-gradient(100deg,#E8C547,#F2DA7A 45%,#C9A227);
+    -webkit-background-clip:text;background-clip:text;color:transparent}
+  .hero p{color:rgba(255,255,255,.66);max-width:600px;margin-top:14px;font-size:14px;line-height:1.95}
+
+  section{padding:44px 0 0}
+  .sec-head{display:flex;align-items:baseline;gap:12px;margin-bottom:18px;padding-bottom:10px;
+    border-bottom:1px solid var(--g200)}
+  .sec-head h2{font-size:24px;color:var(--navy)}
+  .sec-head span{font-size:11px;color:var(--g400);font-family:ui-monospace,monospace;letter-spacing:.06em}
+
+  .grid{display:grid;gap:14px}
+  .g2{grid-template-columns:repeat(2,1fr)}
+  .g3{grid-template-columns:repeat(3,1fr)}
+  .g4{grid-template-columns:repeat(4,1fr)}
+  .g6{grid-template-columns:repeat(6,1fr)}
+  @media(max-width:860px){.g2,.g3,.g4,.g6{grid-template-columns:repeat(2,1fr)}}
+
+  /* بطاقات الألوان */
+  .sw{border-radius:var(--radius);overflow:hidden;background:#fff;
+      box-shadow:0 2px 10px -4px rgba(11,37,69,.16);border:1px solid rgba(11,37,69,.06)}
+  .sw .chip{height:86px;display:flex;align-items:flex-end;justify-content:flex-start;padding:8px 10px;
+    font-family:ui-monospace,monospace;font-size:10px;font-weight:600}
+  .sw .meta{padding:9px 11px 11px}
+  .sw .meta b{display:block;font-size:12.5px;color:var(--navy);margin-bottom:1px}
+  .sw .meta small{font-size:10px;color:var(--g400);font-family:ui-monospace,monospace;display:block}
+  .sw .meta em{font-size:10.5px;color:var(--g600);font-style:normal;display:block;margin-top:4px;line-height:1.5}
+
+  /* بطاقات عامة */
+  .card{background:#fff;border-radius:var(--radius-lg);padding:18px;
+    box-shadow:0 4px 18px -8px rgba(11,37,69,.16);border:1px solid rgba(11,37,69,.055)}
+  .card h3{font-size:15px;color:var(--navy);margin-bottom:10px}
+
+  /* مقياس الطباعة */
+  .type-row{display:flex;align-items:baseline;gap:16px;padding:9px 0;border-bottom:1px dashed var(--g200)}
+  .type-row:last-child{border:0}
+  .type-row .tag{font-family:ui-monospace,monospace;font-size:10px;color:var(--g400);min-width:88px;direction:ltr}
+
+  /* أزرار */
+  .btn-row{display:flex;flex-wrap:wrap;gap:9px;align-items:center}
+  .b{display:inline-flex;align-items:center;gap:7px;border:0;cursor:pointer;font-family:inherit;
+     font-size:13px;font-weight:700;padding:10px 20px;border-radius:12px;transition:.2s}
+  .b-primary{background:linear-gradient(135deg,#0B2545,#133A63);color:#fff;
+    box-shadow:0 6px 18px -8px rgba(11,37,69,.7)}
+  .b-gold{background:linear-gradient(135deg,#E8C547,#C9A227);color:#2A1F00;
+    box-shadow:0 6px 18px -8px rgba(201,162,39,.75)}
+  .b-teal{background:linear-gradient(135deg,#17A89A,#0E7C66);color:#fff;
+    box-shadow:0 6px 18px -8px rgba(23,168,154,.72)}
+  .b-ghost{background:#fff;color:var(--navy);border:1px solid var(--g200);
+    box-shadow:0 1px 2px rgba(11,37,69,.05)}
+  .b-danger{background:var(--danger);color:#fff}
+  .b-sm{font-size:11.5px;padding:7px 13px;border-radius:9px}
+
+  /* شارات */
+  .badge{display:inline-flex;align-items:center;gap:5px;font-size:10.5px;font-weight:700;
+    padding:3.5px 9px;border-radius:999px;border:1px solid transparent}
+  .bd-success{background:var(--success-soft);color:var(--success);border-color:rgba(15,123,79,.22)}
+  .bd-warning{background:var(--warning-soft);color:var(--warning);border-color:rgba(194,118,11,.22)}
+  .bd-danger{background:var(--danger-soft);color:var(--danger);border-color:rgba(180,35,24,.22)}
+  .bd-info{background:var(--info-soft);color:var(--info);border-color:rgba(29,111,184,.22)}
+  .bd-gold{background:var(--gold-soft);color:#8A6D0B;border-color:rgba(201,162,39,.3)}
+  .bd-neutral{background:var(--g100);color:var(--g600);border-color:var(--g200)}
+
+  /* ظلال */
+  .sh{display:flex;flex-direction:column;align-items:center;gap:8px}
+  .sh i{display:block;width:100%;height:66px;border-radius:var(--radius);background:#fff}
+  .sh small{font-size:10.5px;color:var(--g400);font-family:ui-monospace,monospace;direction:ltr}
+
+  /* شريط تقدم */
+  .prog{height:7px;border-radius:999px;background:var(--g100);overflow:hidden}
+  .prog span{display:block;height:100%;border-radius:999px;
+    background:linear-gradient(90deg,#17A89A,#0E7C66)}
+  .prog.gold span{background:linear-gradient(90deg,#E8C547,#C9A227)}
+
+  table{width:100%;border-collapse:collapse;font-size:12px}
+  thead th{background:#F6F8FA;color:var(--g600);font-size:10.5px;font-weight:700;
+    text-align:right;padding:8px 10px;border-bottom:1px solid var(--g200)}
+  tbody td{padding:9px 10px;border-bottom:1px solid var(--g100);color:var(--g700)}
+  tbody tr:hover{background:#FAFBFC}
+
+  .note{background:var(--gold-soft);border:1px solid rgba(201,162,39,.28);border-radius:12px;
+    padding:11px 14px;font-size:11.5px;color:#7A5F00;line-height:1.75}
+
+  .foot{margin-top:52px;padding-top:20px;border-top:1px solid var(--g200);
+    display:flex;justify-content:space-between;gap:14px;flex-wrap:wrap;
+    font-size:10.5px;color:var(--g400)}
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="wrap">
+    <span class="eyebrow">◆ RIFAD DESIGN SYSTEM · الإصدار 1.0</span>
+    <h1>نظام تصميم منصة رِفاد
+      <em>هوية بصرية مستوحاة من العمارة اليمنية</em>
+    </h1>
+    <p>لوحة ألوان مشتقّة من الأزرق الليلي والأخضر الزمردي والذهبي العتيق، مع شبكة قياس طباعية
+       عربية (خط أميري للعناوين) ومسافات وحواف موحّدة. كل مكوّن في هذا الملف هو المرجع البصري
+       لتطبيق الويب.</p>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <section>
+    <div class="sec-head"><h2>لوحة الألوان الأساسية</h2><span>CORE PALETTE</span></div>
+    <div class="grid g4">
+      <div class="sw"><div class="chip" style="background:#0B2545;color:#E8C547">#0B2545</div>
+        <div class="meta"><b>أزرق ليلي</b><small>navy</small><em>الهوية، الرؤوس، الشريط الجانبي</em></div></div>
+      <div class="sw"><div class="chip" style="background:#133A63;color:#fff">#133A63</div>
+        <div class="meta"><b>أزرق متوسط</b><small>navy-soft</small><em>الاشتقاق الضوئي للتدرّجات</em></div></div>
+      <div class="sw"><div class="chip" style="background:#17A89A;color:#fff">#17A89A</div>
+        <div class="meta"><b>فيروزي</b><small>turquoise</small><em>التفاعل، الروابط، الحالات النشطة</em></div></div>
+      <div class="sw"><div class="chip" style="background:#0E7C66;color:#fff">#0E7C66</div>
+        <div class="meta"><b>زمردي</b><small>emerald</small><em>النجاح، أشرطة التقدم</em></div></div>
+    </div>
+    <div class="grid g4" style="margin-top:14px">
+      <div class="sw"><div class="chip" style="background:#C9A227;color:#2A1F00">#C9A227</div>
+        <div class="meta"><b>ذهبي عتيق</b><small>gold</small><em>التمييز، الشارات الخاصة</em></div></div>
+      <div class="sw"><div class="chip" style="background:#E8C547;color:#2A1F00">#E8C547</div>
+        <div class="meta"><b>ذهبي لامع</b><small>gold-bright</small><em>أزرار الإجراء الرئيسي</em></div></div>
+      <div class="sw"><div class="chip" style="background:#F7F5F0;color:#5A6B7B;border-bottom:1px solid #E2E5E9">#F7F5F0</div>
+        <div class="meta"><b>خلفية دافئة</b><small>background</small><em>خلفية الصفحات</em></div></div>
+      <div class="sw"><div class="chip" style="background:#061729;color:#E8C547">#061729</div>
+        <div class="meta"><b>ليلي عميق</b><small>navy-deep</small><em>الطبقات الخلفية للنوافذ</em></div></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head"><h2>ألوان الحالة</h2><span>SEMANTIC</span></div>
+    <div class="grid g4">
+      <div class="sw"><div class="chip" style="background:#0F7B4F;color:#fff">#0F7B4F</div>
+        <div class="meta"><b>نجاح</b><small>success</small><em>معتمد، مكتمل، مقبول</em></div></div>
+      <div class="sw"><div class="chip" style="background:#C2760B;color:#fff">#C2760B</div>
+        <div class="meta"><b>تحذير</b><small>warning</small><em>قيد المراجعة، متأخر قليلاً</em></div></div>
+      <div class="sw"><div class="chip" style="background:#B42318;color:#fff">#B42318</div>
+        <div class="meta"><b>خطر</b><small>danger</small><em>مرفوض، متأخر، حذف</em></div></div>
+      <div class="sw"><div class="chip" style="background:#1D6FB8;color:#fff">#1D6FB8</div>
+        <div class="meta"><b>معلومات</b><small>info</small><em>ملاحظات، حالات جارية</em></div></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head"><h2>السلّم الطباعي</h2><span>TYPOGRAPHY · AMIRI + SYSTEM SANS</span></div>
+    <div class="card">
+      <div class="type-row"><span class="tag">H1 / 44</span>
+        <span class="serif" style="font-size:44px;color:#0B2545">جودة المدارس تُقاس بالأثر</span></div>
+      <div class="type-row"><span class="tag">H2 / 30</span>
+        <span class="serif" style="font-size:30px;color:#0B2545">لوحة التحكم الرئيسية</span></div>
+      <div class="type-row"><span class="tag">H3 / 20</span>
+        <span class="serif" style="font-size:20px;color:#0B2545">معايير التقييم السبعة</span></div>
+      <div class="type-row"><span class="tag">H4 / 15.5</span>
+        <span class="serif" style="font-size:15.5px;color:#0B2545">الإدارة المدرسية — 15%</span></div>
+      <div class="type-row"><span class="tag">BODY / 13</span>
+        <span style="font-size:13px;color:#3D4F5E">نص المتن: يوضح المؤشر وإجراء التحقق والدليل المطلوب لكل بند من بنود الاستمارة.</span></div>
+      <div class="type-row"><span class="tag">SMALL / 11.5</span>
+        <span style="font-size:11.5px;color:#5A6B7B">نص مساعد: تلميحات الحقول وشروط الإدخال والملاحظات الثانوية.</span></div>
+      <div class="type-row"><span class="tag">MONO / 11</span>
+        <span style="font-size:11px;color:#5A6B7B;font-family:ui-monospace,monospace;direction:ltr">1-1-03 · RIF-2026-0001 · 2026-10-28</span></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head"><h2>الأزرار</h2><span>BUTTONS</span></div>
+    <div class="card">
+      <div class="btn-row">
+        <button class="b b-primary">إجراء رئيسي</button>
+        <button class="b b-gold">اعتماد التقرير</button>
+        <button class="b b-teal">حفظ</button>
+        <button class="b b-ghost">إلغاء</button>
+        <button class="b b-danger">حذف</button>
+      </div>
+      <div class="btn-row" style="margin-top:12px">
+        <button class="b b-primary b-sm">صغير رئيسي</button>
+        <button class="b b-ghost b-sm">صغير ثانوي</button>
+        <button class="b b-teal b-sm">صغير محفوظ</button>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head"><h2>الشارات والحالات</h2><span>BADGES</span></div>
+    <div class="card">
+      <div class="btn-row">
+        <span class="badge bd-success">✓ معتمد</span>
+        <span class="badge bd-warning">◷ قيد المراجعة</span>
+        <span class="badge bd-danger">✕ مرفوض</span>
+        <span class="badge bd-info">● جارية</span>
+        <span class="badge bd-gold">★ مميز</span>
+        <span class="badge bd-neutral">مسودة</span>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head"><h2>الظلال والحواف</h2><span>ELEVATION & RADII</span></div>
+    <div class="grid g4">
+      <div class="sh"><i style="box-shadow:0 1px 2px rgba(11,37,69,.06)"></i><small>xs</small></div>
+      <div class="sh"><i style="box-shadow:0 2px 8px -2px rgba(11,37,69,.10)"></i><small>sm</small></div>
+      <div class="sh"><i style="box-shadow:0 6px 24px -8px rgba(11,37,69,.18)"></i><small>base</small></div>
+      <div class="sh"><i style="box-shadow:0 24px 56px -20px rgba(11,37,69,.30)"></i><small>lg</small></div>
+    </div>
+    <div class="grid g3" style="margin-top:14px">
+      <div class="card" style="border-radius:14px;text-align:center;font-size:11px;color:#5A6B7B">14px — حقول وأزرار</div>
+      <div class="card" style="border-radius:20px;text-align:center;font-size:11px;color:#5A6B7B">20px — بطاقات</div>
+      <div class="card" style="border-radius:28px;text-align:center;font-size:11px;color:#5A6B7B">28px — أقسام كبيرة</div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head"><h2>مكوّنات البيانات</h2><span>DATA COMPONENTS</span></div>
+    <div class="grid g2">
+      <div class="card">
+        <h3>بطاقة إحصائية</h3>
+        <div style="display:flex;align-items:center;gap:12px;padding:12px;border-radius:14px;background:#F6F8FA">
+          <span style="width:40px;height:40px;border-radius:12px;background:rgba(11,37,69,.08);
+            display:grid;place-items:center;color:#0B2545;font-size:16px">▣</span>
+          <div><div class="serif" style="font-size:24px;color:#0B2545">109</div>
+            <div style="font-size:10.5px;color:#94A3B0">مؤشراً موثّقاً</div></div>
+        </div>
+      </div>
+      <div class="card">
+        <h3>أشرطة التقدم</h3>
+        <div style="margin-bottom:9px">
+          <div style="display:flex;justify-content:space-between;font-size:11px;color:#5A6B7B;margin-bottom:4px">
+            <span>تغطية الأدلة</span><span style="font-family:ui-monospace,monospace">72%</span></div>
+          <div class="prog"><span style="width:72%"></span></div>
+        </div>
+        <div>
+          <div style="display:flex;justify-content:space-between;font-size:11px;color:#5A6B7B;margin-bottom:4px">
+            <span>الزيارات المكتملة</span><span style="font-family:ui-monospace,monospace">41%</span></div>
+          <div class="prog gold"><span style="width:41%"></span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:14px;padding:0;overflow:hidden">
+      <table>
+        <thead><tr><th>المدرسة</th><th>المديرية</th><th>نسبة التحقق</th><th>الحالة</th></tr></thead>
+        <tbody>
+          <tr><td style="font-weight:600;color:#0B2545">مدرسة النموذج</td><td>الجراحي</td>
+            <td><div style="display:flex;align-items:center;gap:8px">
+              <div class="prog" style="width:90px"><span style="width:84%"></span></div>
+              <span style="font-family:ui-monospace,monospace;font-size:11px">84%</span></div></td>
+            <td><span class="badge bd-success">معتمد</span></td></tr>
+          <tr><td style="font-weight:600;color:#0B2545">مدرسة الأمل</td><td>الجراحي</td>
+            <td><div style="display:flex;align-items:center;gap:8px">
+              <div class="prog" style="width:90px"><span style="width:56%"></span></div>
+              <span style="font-family:ui-monospace,monospace;font-size:11px">56%</span></div></td>
+            <td><span class="badge bd-warning">قيد المراجعة</span></td></tr>
+          <tr><td style="font-weight:600;color:#0B2545">مدرسة السلام</td><td>الجراحي</td>
+            <td><div style="display:flex;align-items:center;gap:8px">
+              <div class="prog" style="width:90px"><span style="width:31%"></span></div>
+              <span style="font-family:ui-monospace,monospace;font-size:11px">31%</span></div></td>
+            <td><span class="badge bd-danger">مرفوض</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head"><h2>قواعد الاستخدام</h2><span>USAGE RULES</span></div>
+    <div class="grid g2">
+      <div class="card">
+        <h3>افعل</h3>
+        <ul style="list-style:none;font-size:12px;color:#3D4F5E;line-height:2">
+          <li>✓ استخدم الأميري للعناوين فقط — المتن بخط النظام لضمان القراءة.</li>
+          <li>✓ اجعل الذهبي للتمييز والإجراء الأهم فقط، لا لكل زر.</li>
+          <li>✓ حافظ على اتجاه RTL في كل المكوّنات مع محاذاة يمين.</li>
+          <li>✓ استخدم الشارات لنقل الحالة، لا للنصوص التوضيحية.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>لا تفعل</h3>
+        <ul style="list-style:none;font-size:12px;color:#3D4F5E;line-height:2">
+          <li>✕ لا تكتب نصاً فوق الذهبي بغير اللون الداكن.</li>
+          <li>✕ لا تستخدم تدرّجات متعددة الألوان في نفس البطاقة.</li>
+          <li>✕ لا تضع أكثر من إجراء رئيسي واحد في الشاشة.</li>
+          <li>✕ لا تضف أختاماً أو تواقيع حكومية على التقارير.</li>
+        </ul>
+      </div>
+    </div>
+    <div class="note" style="margin-top:14px">
+      <strong>ملاحظة هوية:</strong> هذه المنصة أداة إدارية داخلية للمتابعة والجودة المدرسية.
+      لا تحمل شعارات رسمية لجهات حكومية، ولا تُستخدم لإصدار وثائق رسمية معتمدة.
+    </div>
+  </section>
+
+  <div class="foot">
+    <span>منصة رِفاد — نظام التصميم · مديرية الجراحي، الحديدة</span>
+    <span>RIFAD · Design System v1.0</span>
+  </div>
+</div>
+</body>
+</html>

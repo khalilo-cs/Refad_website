@@ -1,0 +1,585 @@
+@import "tailwindcss";
+
+/* ==========================================================
+   منصة رِفاد — نظام التصميم
+   لوحة ألوان مستوحاة من العمارة اليمنية: أزرق ليلي عميق،
+   أخضر زمردي، ذهبي عتيق، وعاجي دافئ.
+   ========================================================== */
+
+@font-face {
+  font-family: "Amiri";
+  src: url("/fonts/Amiri-Regular.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Amiri";
+  src: url("/fonts/Amiri-Bold.ttf") format("truetype");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  /* --- الأساس --- */
+  --background: #F7F5F0;
+  --warm-white: #FBFAF7;
+  --foreground: #0B1F33;
+
+  /* --- الألوان الأساسية --- */
+  --navy: #0B2545;
+  --navy-soft: #133A63;
+  --navy-deep: #061729;
+  --night: #071528;
+
+  --turquoise: #17A89A;
+  --turquoise-soft: #E4F5F2;
+  --emerald: #0E7C66;
+  --emerald-deep: #095C4C;
+
+  --gold: #C9A227;
+  --gold-soft: #FAF3DC;
+  --gold-bright: #E8C547;
+
+  --white: #FFFFFF;
+
+  /* --- الرمادي --- */
+  --gray-900: #16232F;
+  --gray-700: #3D4F5E;
+  --gray-600: #5A6B7B;
+  --gray-400: #94A3B0;
+  --gray-200: #E2E5E9;
+  --gray-100: #EFF1F4;
+
+  /* --- الحالات --- */
+  --danger: #B42318;
+  --danger-soft: #FBEDEB;
+  --warning: #C2760B;
+  --warning-soft: #FDF3E3;
+  --success: #0F7B4F;
+  --success-soft: #E7F5EE;
+  --info: #1D6FB8;
+  --info-soft: #EAF3FB;
+
+  /* --- الخطوط --- */
+  --font-heading: "Amiri", "Times New Roman", serif;
+  --font-body: "Segoe UI", system-ui, -apple-system, Roboto, "Helvetica Neue", Arial, sans-serif;
+
+  /* --- الحواف والظلال --- */
+  --radius: 14px;
+  --radius-lg: 20px;
+  --radius-xl: 28px;
+
+  --shadow-xs: 0 1px 2px rgba(11, 37, 69, 0.06);
+  --shadow-sm: 0 2px 8px -2px rgba(11, 37, 69, 0.10);
+  --shadow: 0 6px 24px -8px rgba(11, 37, 69, 0.18);
+  --shadow-md: 0 12px 32px -12px rgba(11, 37, 69, 0.24);
+  --shadow-lg: 0 24px 56px -20px rgba(11, 37, 69, 0.30);
+  --shadow-glow: 0 0 0 1px rgba(23, 168, 154, 0.18), 0 8px 32px -8px rgba(23, 168, 154, 0.35);
+  --shadow-gold: 0 8px 32px -10px rgba(201, 162, 39, 0.45);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-warm-white: var(--warm-white);
+
+  --color-navy: var(--navy);
+  --color-navy-soft: var(--navy-soft);
+  --color-navy-deep: var(--navy-deep);
+  --color-night: var(--night);
+
+  --color-turquoise: var(--turquoise);
+  --color-turquoise-soft: var(--turquoise-soft);
+  --color-emerald: var(--emerald);
+  --color-emerald-deep: var(--emerald-deep);
+
+  --color-gold: var(--gold);
+  --color-gold-soft: var(--gold-soft);
+  --color-gold-bright: var(--gold-bright);
+
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-info: var(--info);
+  --color-info-soft: var(--info-soft);
+
+  --color-gray-900: var(--gray-900);
+  --color-gray-700: var(--gray-700);
+  --color-gray-600: var(--gray-600);
+  --color-gray-400: var(--gray-400);
+  --color-gray-200: var(--gray-200);
+  --color-gray-100: var(--gray-100);
+
+  --font-sans: var(--font-body);
+  --font-heading: var(--font-heading);
+
+  --radius: var(--radius);
+  --radius-lg: var(--radius-lg);
+  --radius-xl: var(--radius-xl);
+
+  --shadow-xs: var(--shadow-xs);
+  --shadow-sm: var(--shadow-sm);
+  --shadow: var(--shadow);
+  --shadow-md: var(--shadow-md);
+  --shadow-lg: var(--shadow-lg);
+  --shadow-glow: var(--shadow-glow);
+  --shadow-gold: var(--shadow-gold);
+}
+
+/* ==========================================================
+   الأساس
+   ========================================================== */
+
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-body);
+  direction: rtl;
+  text-align: right;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  min-height: 100vh;
+}
+
+h1, h2, h3, h4, h5, h6, .font-heading {
+  font-family: var(--font-heading);
+  line-height: 1.5;
+  letter-spacing: 0;
+  font-weight: 700;
+}
+
+[dir="rtl"] .rtl-flip { transform: scaleX(-1); }
+
+::selection {
+  background: var(--gold-soft);
+  color: var(--navy);
+}
+
+:focus-visible {
+  outline: 2px solid var(--turquoise);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* ==========================================================
+   الخلفيات المزخرفة
+   ========================================================== */
+
+/* تدرّج الشفق الليلي — لرأس الصفحات واللوحات الداكنة */
+.bg-aurora {
+  background:
+    radial-gradient(1200px 600px at 85% -10%, rgba(23, 168, 154, 0.28), transparent 60%),
+    radial-gradient(900px 500px at 10% 110%, rgba(201, 162, 39, 0.20), transparent 60%),
+    linear-gradient(160deg, #0B2545 0%, #061729 55%, #04101F 100%);
+}
+
+/* تدرّج ذهبي-زمردي للعناوين */
+.text-gradient-gold {
+  background: linear-gradient(100deg, #E8C547 0%, #C9A227 45%, #8FA76B 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.text-gradient-royal {
+  background: linear-gradient(100deg, #0B2545 0%, #133A63 45%, #17A89A 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* نقشة هندسية إسلامية خفيفة كطبقة تعشيق */
+.pattern-geo {
+  position: relative;
+}
+.pattern-geo::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  opacity: 0.06;
+  background-image:
+    linear-gradient(45deg, currentColor 25%, transparent 25%, transparent 75%, currentColor 75%),
+    linear-gradient(45deg, currentColor 25%, transparent 25%, transparent 75%, currentColor 75%);
+  background-size: 28px 28px;
+  background-position: 0 0, 14px 14px;
+  pointer-events: none;
+  border-radius: inherit;
+}
+
+/* شبكة نقطية دقيقة */
+.pattern-dots {
+  background-image: radial-gradient(rgba(11, 37, 69, 0.10) 1px, transparent 1px);
+  background-size: 22px 22px;
+}
+
+/* ==========================================================
+   البطاقات والأسطح
+   ========================================================== */
+
+.card {
+  background: var(--white);
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+}
+
+.card-elevated {
+  background: var(--white);
+  border: 1px solid rgba(226, 229, 233, 0.8);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+  transition: transform 0.25s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.25s ease;
+}
+.card-elevated:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-md);
+}
+
+/* سطح زجاجي فوق الخلفيات الداكنة */
+.glass {
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(16px) saturate(140%);
+  -webkit-backdrop-filter: blur(16px) saturate(140%);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: var(--radius-lg);
+}
+
+.glass-light {
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(18px) saturate(160%);
+  -webkit-backdrop-filter: blur(18px) saturate(160%);
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  border-radius: var(--radius-lg);
+}
+
+/* خط ذهبي رفيع أعلى البطاقة */
+.card-accent {
+  position: relative;
+  overflow: hidden;
+}
+.card-accent::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--turquoise), var(--gold));
+}
+
+/* ==========================================================
+   الأزرار
+   ========================================================== */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.625rem 1.1rem;
+  border-radius: 10px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 1.2;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+  white-space: nowrap;
+  user-select: none;
+}
+.btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.btn:not(:disabled):active {
+  transform: translateY(1px) scale(0.99);
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, var(--navy) 0%, var(--navy-soft) 100%);
+  color: #fff;
+  box-shadow: 0 6px 18px -8px rgba(11, 37, 69, 0.6);
+}
+.btn-primary:not(:disabled):hover {
+  box-shadow: 0 10px 28px -10px rgba(11, 37, 69, 0.7);
+  transform: translateY(-1px);
+}
+
+.btn-gold {
+  background: linear-gradient(135deg, #E8C547 0%, #C9A227 100%);
+  color: #2A1F00;
+  box-shadow: var(--shadow-gold);
+}
+.btn-gold:not(:disabled):hover {
+  filter: brightness(1.06);
+  transform: translateY(-1px);
+}
+
+.btn-teal {
+  background: linear-gradient(135deg, var(--turquoise) 0%, var(--emerald) 100%);
+  color: #fff;
+  box-shadow: var(--shadow-glow);
+}
+.btn-teal:not(:disabled):hover {
+  filter: brightness(1.06);
+  transform: translateY(-1px);
+}
+
+.btn-ghost {
+  background: #fff;
+  color: var(--navy);
+  border-color: var(--gray-200);
+}
+.btn-ghost:not(:disabled):hover {
+  background: var(--gray-100);
+  border-color: var(--gray-400);
+}
+
+.btn-danger {
+  background: var(--danger-soft);
+  color: var(--danger);
+  border-color: rgba(180, 35, 24, 0.2);
+}
+.btn-danger:not(:disabled):hover {
+  background: rgba(180, 35, 24, 0.12);
+}
+
+.btn-sm {
+  padding: 0.4rem 0.75rem;
+  font-size: 0.75rem;
+  border-radius: 8px;
+}
+
+/* ==========================================================
+   الحقول
+   ========================================================== */
+
+.input {
+  width: 100%;
+  padding: 0.625rem 0.875rem;
+  border: 1px solid var(--gray-200);
+  border-radius: 10px;
+  background: #fff;
+  font-size: 0.875rem;
+  color: var(--foreground);
+  transition: border-color 0.18s ease, box-shadow 0.18s ease;
+}
+.input::placeholder {
+  color: var(--gray-400);
+}
+.input:focus {
+  outline: none;
+  border-color: var(--turquoise);
+  box-shadow: 0 0 0 3px rgba(23, 168, 154, 0.14);
+}
+.input:disabled {
+  background: var(--gray-100);
+  color: var(--gray-600);
+}
+
+.label {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--gray-600);
+  margin-bottom: 0.375rem;
+}
+
+/* ==========================================================
+   الشارات
+   ========================================================== */
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  line-height: 1.4;
+  border: 1px solid transparent;
+}
+.badge-success { background: var(--success-soft); color: var(--success); border-color: rgba(15, 123, 79, 0.18); }
+.badge-warning { background: var(--warning-soft); color: var(--warning); border-color: rgba(194, 118, 11, 0.18); }
+.badge-danger  { background: var(--danger-soft);  color: var(--danger);  border-color: rgba(180, 35, 24, 0.18); }
+.badge-info    { background: var(--info-soft);    color: var(--info);    border-color: rgba(29, 111, 184, 0.18); }
+.badge-gold    { background: var(--gold-soft);    color: #7A6112;        border-color: rgba(201, 162, 39, 0.28); }
+.badge-neutral { background: var(--gray-100);     color: var(--gray-600); border-color: var(--gray-200); }
+
+/* ==========================================================
+   الحركات
+   ========================================================== */
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+@keyframes floatSoft {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-10px); }
+}
+@keyframes pulseGlow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(23, 168, 154, 0.35); }
+  50%      { box-shadow: 0 0 0 10px rgba(23, 168, 154, 0); }
+}
+@keyframes drawLine {
+  from { stroke-dashoffset: 400; }
+  to   { stroke-dashoffset: 0; }
+}
+
+.animate-fade-up { animation: fadeUp 0.55s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.animate-fade-in { animation: fadeIn 0.4s ease-out both; }
+.animate-float   { animation: floatSoft 5s ease-in-out infinite; }
+.animate-pulse-glow { animation: pulseGlow 2.4s ease-out infinite; }
+
+.delay-1 { animation-delay: 0.06s; }
+.delay-2 { animation-delay: 0.12s; }
+.delay-3 { animation-delay: 0.18s; }
+.delay-4 { animation-delay: 0.24s; }
+.delay-5 { animation-delay: 0.30s; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ==========================================================
+   عناصر مساعدة
+   ========================================================== */
+
+.skeleton {
+  background: linear-gradient(90deg, #EFF1F4 25%, #E2E5E9 50%, #EFF1F4 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s infinite;
+  border-radius: 8px;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  border: 0;
+}
+
+/* شريط تمرير رقيق */
+::-webkit-scrollbar { width: 9px; height: 9px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: rgba(11, 37, 69, 0.18);
+  border-radius: 6px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover { background: rgba(11, 37, 69, 0.32); background-clip: content-box; }
+
+/* الإشعارات */
+.toast {
+  background: var(--navy);
+  color: #fff;
+  border-radius: 12px;
+  padding: 0.7rem 1rem;
+  box-shadow: var(--shadow-lg);
+  animation: fadeUp 0.3s ease-out;
+  font-size: 0.85rem;
+}
+.toast-success { border-right: 4px solid #34D399; }
+.toast-error   { border-right: 4px solid #F87171; }
+.toast-info    { border-right: 4px solid var(--gold-bright); }
+
+/* جدول نظيف */
+.table-clean {
+  width: 100%;
+  font-size: 0.875rem;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+.table-clean thead th {
+  text-align: right;
+  font-weight: 600;
+  font-size: 0.75rem;
+  text-transform: none;
+  letter-spacing: 0.01em;
+  color: var(--gray-600);
+  background: #FBFCFD;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--gray-200);
+  white-space: nowrap;
+}
+.table-clean tbody td {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--gray-100);
+  vertical-align: middle;
+}
+.table-clean tbody tr {
+  transition: background-color 0.15s ease;
+}
+.table-clean tbody tr:hover {
+  background-color: #FAFBFC;
+}
+.table-clean tbody tr:last-child td {
+  border-bottom: none;
+}
+
+/* شريط تقدم */
+.progress {
+  height: 6px;
+  background: var(--gray-100);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.progress > span {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--turquoise), var(--emerald));
+  transition: width 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.progress-gold > span {
+  background: linear-gradient(90deg, var(--gold-bright), var(--gold));
+}
+
+/* فاصل ذهبي مزخرف */
+.ornament {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  color: var(--gold);
+}
+.ornament::before,
+.ornament::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--gold), transparent);
+}

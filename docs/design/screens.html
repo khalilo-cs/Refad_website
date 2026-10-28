@@ -1,0 +1,693 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>رِفاد — نماذج الشاشات</title>
+<style>
+  @font-face{font-family:"Amiri";font-weight:400;font-display:swap}
+  @font-face{font-family:"Amiri";font-weight:700;font-display:swap}
+  :root{
+    --navy:#0B2545;--navy-soft:#133A63;--navy-deep:#061729;
+    --turq:#17A89A;--emerald:#0E7C66;--gold:#C9A227;--goldB:#E8C547;
+    --bg:#F7F5F0;--warm:#FBFAF7;--ink:#0B1F33;
+    --g600:#5A6B7B;--g400:#94A3B0;--g200:#E2E5E9;--g100:#EFF1F4;
+    --danger:#B42318;--warning:#C2760B;--success:#0F7B4F;--info:#1D6FB8;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);font-family:"Segoe UI",system-ui,sans-serif;color:var(--ink);
+       direction:rtl;text-align:right;line-height:1.6;padding-bottom:60px}
+  .wrap{max-width:1200px;margin:0 auto;padding:0 24px}
+  h1,h2,h3{font-family:"Amiri",serif;font-weight:700}
+
+  header{background:linear-gradient(135deg,#061729,#0B2545 50%,#133A63);color:#fff;
+    padding:52px 0 60px;position:relative;overflow:hidden}
+  header::before{content:"";position:absolute;inset:0;
+    background-image:radial-gradient(circle at 1px 1px,rgba(255,255,255,.13) 1px,transparent 0);
+    background-size:22px 22px;opacity:.5}
+  header::after{content:"";position:absolute;top:-100px;left:-40px;width:340px;height:340px;
+    border-radius:50%;background:radial-gradient(circle,rgba(23,168,154,.28),transparent 68%)}
+  header .wrap{position:relative;z-index:1}
+  .eyebrow{display:inline-block;border:1px solid rgba(201,162,39,.35);background:rgba(201,162,39,.12);
+    color:#E8C547;padding:5px 14px;border-radius:999px;font-size:11px;font-weight:600}
+  header h1{font-size:40px;margin-top:16px}
+  header h1 em{font-style:normal;display:block;background:linear-gradient(100deg,#E8C547,#F2DA7A,#C9A227);
+    -webkit-background-clip:text;background-clip:text;color:transparent}
+  header p{color:rgba(255,255,255,.65);max-width:600px;margin-top:12px;font-size:13.5px;line-height:1.95}
+
+  section{padding:44px 0 0}
+  .sec-head{display:flex;align-items:baseline;gap:12px;margin-bottom:16px;padding-bottom:9px;
+    border-bottom:1px solid var(--g200)}
+  .sec-head h2{font-size:23px;color:var(--navy)}
+  .sec-head span{font-size:10.5px;color:var(--g400);font-family:ui-monospace,monospace;letter-spacing:.06em}
+
+  /* إطار الجهاز */
+  .frame{border-radius:16px;overflow:hidden;background:#fff;border:1px solid rgba(11,37,69,.09);
+    box-shadow:0 20px 60px -26px rgba(11,37,69,.45)}
+  .frame .bar{background:#EDEFF2;padding:6px 10px;display:flex;align-items:center;gap:5px;
+    border-bottom:1px solid #DDE1E6}
+  .frame .bar i{width:8px;height:8px;border-radius:50%;display:block}
+  .frame .bar i:nth-child(1){background:#EF6B5E}
+  .frame .bar i:nth-child(2){background:#F5BF4F}
+  .frame .bar i:nth-child(3){background:#61C554}
+  .frame .bar span{margin-right:auto;font-size:9px;color:#8A97A3;font-family:ui-monospace,monospace;
+    direction:ltr;background:#fff;padding:2px 9px;border-radius:5px;border:1px solid #DDE1E6}
+
+  /* شل التطبيق */
+  .app{display:flex;height:520px;background:var(--bg)}
+  .side{width:200px;flex-shrink:0;color:#fff;padding:14px 10px;display:flex;flex-direction:column;
+    background:linear-gradient(170deg,#061729 0%,#0B2545 50%,#133A63 100%);position:relative;overflow:hidden}
+  .side::after{content:"";position:absolute;top:-40px;right:-30px;width:140px;height:140px;
+    border-radius:50%;background:radial-gradient(circle,rgba(23,168,154,.25),transparent 70%)}
+  .side .brand{display:flex;align-items:center;gap:7px;padding-bottom:12px;margin-bottom:10px;
+    border-bottom:1px solid rgba(255,255,255,.1);position:relative;z-index:1}
+  .side .brand img{width:26px;height:26px}
+  .side .brand b{font-family:Amiri,serif;font-size:15px;color:#fff}
+  .side .brand small{display:block;font-size:7px;color:rgba(255,255,255,.45);font-weight:400}
+  .side .lbl{font-size:8px;color:rgba(255,255,255,.32);padding:0 8px;margin-bottom:5px;
+    letter-spacing:.08em;position:relative;z-index:1}
+  .side .nav{display:flex;flex-direction:column;gap:2px;position:relative;z-index:1}
+  .side .nav a{display:flex;align-items:center;gap:7px;padding:6px 9px;border-radius:8px;
+    font-size:10.5px;color:rgba(255,255,255,.62);text-decoration:none;position:relative}
+  .side .nav a.on{background:rgba(255,255,255,.12);color:#fff;font-weight:600}
+  .side .nav a.on::before{content:"";position:absolute;right:0;top:50%;transform:translateY(-50%);
+    width:2.5px;height:14px;border-radius:2px;background:linear-gradient(#E8C547,#C9A227)}
+  .side .nav a .i{width:13px;height:13px;border-radius:3.5px;background:rgba(255,255,255,.16);flex-shrink:0}
+  .side .nav a.on .i{background:rgba(232,197,71,.55)}
+  .side .admin{margin-top:9px;background:rgba(201,162,39,.18);border:1px solid rgba(201,162,39,.3);
+    border-radius:9px;padding:7px 9px;font-size:10px;color:#E8C547;font-weight:700;
+    display:flex;align-items:center;gap:6px;position:relative;z-index:1}
+  .side .user{margin-top:auto;display:flex;align-items:center;gap:7px;background:rgba(255,255,255,.07);
+    border-radius:9px;padding:7px;position:relative;z-index:1}
+  .side .user .av{width:24px;height:24px;border-radius:50%;background:linear-gradient(135deg,#17A89A,#0E7C66);
+    display:grid;place-items:center;font-size:10px;font-weight:700;color:#fff;flex-shrink:0}
+  .side .user b{font-size:9.5px;display:block;color:#fff;line-height:1.2}
+  .side .user small{font-size:7.5px;color:rgba(255,255,255,.45)}
+
+  .main{flex:1;display:flex;flex-direction:column;min-width:0}
+  .top{height:36px;background:rgba(251,250,247,.9);border-bottom:1px solid var(--g200);
+    display:flex;align-items:center;justify-content:space-between;padding:0 12px;flex-shrink:0}
+  .top .t{font-size:9.5px;font-weight:600;color:var(--navy)}
+  .top .t small{display:block;font-size:7.5px;color:var(--g400);font-weight:400}
+  .top .r{display:flex;align-items:center;gap:6px}
+  .top .r .gold{background:linear-gradient(135deg,#E8C547,#C9A227);color:#2A1F00;font-size:8px;
+    font-weight:700;padding:3px 8px;border-radius:6px}
+  .top .r .av{width:22px;height:22px;border-radius:50%;background:linear-gradient(135deg,#0B2545,#133A63);
+    display:grid;place-items:center;font-family:Amiri,serif;font-size:9px;font-weight:700;color:#E8C547}
+
+  .content{flex:1;overflow:hidden;padding:12px;display:flex;flex-direction:column;gap:9px}
+  .ph{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+  .ph h3{font-size:15px;color:var(--navy);line-height:1.2}
+  .ph p{font-size:8.5px;color:var(--g400);margin-top:1px}
+  .ph .acts{display:flex;gap:5px;flex-shrink:0}
+  .btn{font-size:8.5px;font-weight:700;padding:4px 10px;border-radius:7px;border:0;white-space:nowrap}
+  .btn.pri{background:linear-gradient(135deg,#0B2545,#133A63);color:#fff}
+  .btn.gld{background:linear-gradient(135deg,#E8C547,#C9A227);color:#2A1F00}
+  .btn.gh{background:#fff;color:var(--navy);border:1px solid var(--g200)}
+
+  .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:7px}
+  .kpi{background:#fff;border-radius:10px;padding:8px 9px;border:1px solid rgba(11,37,69,.055);
+    box-shadow:0 2px 8px -4px rgba(11,37,69,.14)}
+  .kpi .n{font-family:Amiri,serif;font-size:17px;font-weight:700;color:var(--navy);line-height:1.15}
+  .kpi .l{font-size:7.5px;color:var(--g400);margin-top:1px}
+  .kpi .h{font-size:7px;margin-top:2px;color:var(--turq)}
+  .kpi .ic{width:20px;height:20px;border-radius:6px;display:grid;place-items:center;
+    font-size:9px;margin-bottom:4px}
+
+  .row{display:grid;gap:8px}
+  .r2{grid-template-columns:1.6fr 1fr}
+  .card{background:#fff;border-radius:10px;border:1px solid rgba(11,37,69,.055);padding:9px;
+    box-shadow:0 2px 8px -4px rgba(11,37,69,.12)}
+  .card h4{font-family:Amiri,serif;font-size:10.5px;color:var(--navy);margin-bottom:5px;
+    display:flex;justify-content:space-between;align-items:center}
+  .card h4 span{font-size:7px;font-weight:400;color:var(--g400);background:var(--g100);
+    padding:1px 6px;border-radius:99px}
+
+  .chart{height:88px;position:relative;border-radius:7px;overflow:hidden;background:
+    repeating-linear-gradient(0deg,transparent 0 21px,var(--g100) 21px 22px)}
+  .chart svg{position:absolute;inset:0;width:100%;height:100%}
+
+  .donut{height:88px;display:grid;place-items:center;position:relative}
+  .donut .ring{width:66px;height:66px;border-radius:50%;
+    background:conic-gradient(#17A89A 0 55%,#C9A227 55% 78%,#0B2545 78% 92%,#C2760B 92% 100%);
+    display:grid;place-items:center;position:relative}
+  .donut .ring::after{content:"";position:absolute;inset:13px;border-radius:50%;background:#fff}
+  .donut .ctr{position:relative;z-index:1;text-align:center;line-height:1}
+  .donut .ctr b{font-family:Amiri,serif;font-size:15px;color:var(--navy);display:block}
+  .donut .ctr small{font-size:6.5px;color:var(--g400)}
+
+  .prog{height:4px;border-radius:99px;background:var(--g100);overflow:hidden}
+  .prog span{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,#17A89A,#0E7C66)}
+  .prog.gold span{background:linear-gradient(90deg,#E8C547,#C9A227)}
+  .prog.red span{background:linear-gradient(90deg,#C2760B,#B42318)}
+
+  .pr{display:flex;justify-content:space-between;font-size:7.5px;color:var(--g600);margin-bottom:2px}
+  .pr b{font-family:ui-monospace,monospace;font-size:7.5px;color:var(--navy)}
+
+  table{width:100%;border-collapse:collapse;font-size:8px}
+  thead th{background:#F6F8FA;color:var(--g600);font-size:7px;font-weight:700;
+    text-align:right;padding:4px 6px;border-bottom:1px solid var(--g200)}
+  tbody td{padding:4.5px 6px;border-bottom:1px solid var(--g100);color:var(--g600)}
+  tbody td.b{font-weight:600;color:var(--navy)}
+
+  .bdg{font-size:6.5px;font-weight:700;padding:1.5px 6px;border-radius:99px;display:inline-block}
+  .bdg.s{background:#E7F5EE;color:#0F7B4F}
+  .bdg.w{background:#FDF3E3;color:#C2760B}
+  .bdg.d{background:#FBEDEB;color:#B42318}
+  .bdg.i{background:#EAF3FB;color:#1D6FB8}
+  .bdg.n{background:var(--g100);color:var(--g600)}
+
+  .note{background:#FAF3DC;border:1px solid rgba(201,162,39,.28);border-radius:10px;
+    padding:9px 12px;font-size:11px;color:#7A5F00;line-height:1.8;margin-top:12px}
+
+  /* محتوى التقييم */
+  .crit{background:#fff;border-radius:9px;border:1px solid var(--g200);overflow:hidden}
+  .crit .hd{display:flex;align-items:center;gap:6px;padding:6px 8px;background:#F6F8FA;
+    border-bottom:1px solid var(--g200)}
+  .crit .hd .cd{width:20px;height:20px;border-radius:5px;background:linear-gradient(135deg,#0B2545,#133A63);
+    color:#E8C547;font-family:ui-monospace,monospace;font-size:8px;font-weight:700;
+    display:grid;place-items:center;flex-shrink:0}
+  .crit .hd .tt{font-size:9px;font-weight:700;color:var(--navy);flex:1}
+  .crit .hd .wt{font-size:7px;background:#fff;border:1px solid var(--g200);
+    padding:1px 6px;border-radius:99px;color:var(--g600)}
+  .ind{display:flex;align-items:center;gap:6px;padding:5.5px 9px;border-bottom:1px solid var(--g100)}
+  .ind:last-child{border:0}
+  .ind .ic{font-family:ui-monospace,monospace;font-size:6.5px;color:var(--g400);width:38px;flex-shrink:0}
+  .ind .tx{font-size:8px;color:var(--g600);flex:1;line-height:1.5}
+  .ind .sc{display:flex;gap:2px;flex-shrink:0}
+  .ind .sc i{width:15px;height:15px;border-radius:4px;display:grid;place-items:center;
+    font-size:7px;font-style:normal;font-weight:700;border:1px solid var(--g200);color:var(--g400)}
+  .ind .sc i.on{background:linear-gradient(135deg,#17A89A,#0E7C66);color:#fff;border-color:transparent}
+  .ind .sc i.on2{background:#FDF3E3;color:#C2760B;border-color:rgba(194,118,11,.3)}
+  .ind .sc i.ne{background:var(--g100);color:var(--g400);border-style:dashed}
+
+  footer{margin-top:48px;padding-top:18px;border-top:1px solid var(--g200);display:flex;
+    justify-content:space-between;gap:14px;flex-wrap:wrap;font-size:10.5px;color:var(--g400)}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap">
+    <span class="eyebrow">◆ RIFAD · UI SCREENS</span>
+    <h1>نماذج الشاشات الرئيسية
+      <em>خمس شاشات من التطبيق الفعلي</em>
+    </h1>
+    <p>نماذج عالية الدقة للشاشات الأساسية: لوحة التحكم، التقييم الميداني، التقارير،
+       لوحة الإدارة الشاملة، وصفحة الدخول. القياسات مطابقة لمقاسات التطبيق الفعلي.</p>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <!-- ============ 1. لوحة التحكم ============ -->
+  <section>
+    <div class="sec-head"><h2>١ — لوحة التحكم</h2><span>DASHBOARD</span></div>
+    <div class="frame">
+      <div class="bar"><i></i><i></i><i></i><span>rifad.local/dashboard</span></div>
+      <div class="app">
+        <aside class="side">
+          <div class="brand"><img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA5NiA5NiIgd2lkdGg9Ijk2IiBoZWlnaHQ9Ijk2IiByb2xlPSJpbWciIGFyaWEtbGFiZWw9Iti02LnYp9ixINmF2YbYtdipINix2ZDZgdin2K8iPgo8ZGVmcz4KICAgIDxsaW5lYXJHcmFkaWVudCBpZD0icmZOYXZ5IiB4MT0iMCIgeTE9IjAiIHgyPSIxIiB5Mj0iMSI+CiAgICAgIDxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iIzEyM0E2NiIvPgogICAgICA8c3RvcCBvZmZzZXQ9IjAuNTUiIHN0b3AtY29sb3I9IiMwQjI1NDUiLz4KICAgICAgPHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjMDYxNzI5Ii8+CiAgICA8L2xpbmVhckdyYWRpZW50PgogICAgPGxpbmVhckdyYWRpZW50IGlkPSJyZkdvbGQiIHgxPSIwIiB5MT0iMCIgeDI9IjAiIHkyPSIxIj4KICAgICAgPHN0b3Agb2Zmc2V0PSIwIiBzdG9wLWNvbG9yPSIjRjBENzdBIi8+CiAgICAgIDxzdG9wIG9mZnNldD0iMC41IiBzdG9wLWNvbG9yPSIjQzlBMjI3Ii8+CiAgICAgIDxzdG9wIG9mZnNldD0iMSIgc3RvcC1jb2xvcj0iIzhFNkYxNiIvPgogICAgPC9saW5lYXJHcmFkaWVudD4KICAgIDxsaW5lYXJHcmFkaWVudCBpZD0icmZUZWFsIiB4MT0iMCIgeTE9IjAiIHgyPSIxIiB5Mj0iMCI+CiAgICAgIDxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iIzE3QTg5QSIvPgogICAgICA8c3RvcCBvZmZzZXQ9IjEiIHN0b3AtY29sb3I9IiMwRTdDNjYiLz4KICAgIDwvbGluZWFyR3JhZGllbnQ+CiAgICA8bGluZWFyR3JhZGllbnQgaWQ9InJmUGFnZSIgeDE9IjAiIHkxPSIwIiB4Mj0iMCIgeTI9IjEiPgogICAgICA8c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9IiNGRkZGRkYiLz4KICAgICAgPHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjRTZFRUY2Ii8+CiAgICA8L2xpbmVhckdyYWRpZW50PgogIDwvZGVmcz4KCiAgPCEtLSDYp9mE2K/Ysdi5INin2YTYs9iv2KfYs9mKIC0tPgogIDxwYXRoIGQ9Ik00OCA0LjUgTDgzLjUgMjQuNiBRODcuNSAyNi45IDg3LjUgMzEuNSBMODcuNSA2MS44IFE4Ny41IDcwLjUgODAuMiA3NS40IEw1Mi4zIDkyLjQgUTQ4IDk1IDQzLjcgOTIuNCBMMTUuOCA3NS40IFE4LjUgNzAuNSA4LjUgNjEuOCBMOC41IDMxLjUgUTguNSAyNi45IDEyLjUgMjQuNiBaIgogICAgICAgIGZpbGw9InVybCgjcmZOYXZ5KSIgc3Ryb2tlPSJ1cmwoI3JmR29sZCkiIHN0cm9rZS13aWR0aD0iMi42Ii8+CgogIDwhLS0g2YLZiNizINiw2YfYqNmKINiv2KfYrtmE2YogLS0+CiAgPHBhdGggZD0iTTQ4IDEwLjUgTDc5IDI3IFE4MS41IDI4LjYgODEuNSAzMS42IEw4MS41IDYxIFE4MS41IDY3LjQgNzYgNzEuMSBMNTEgODcgUTQ4IDg4LjggNDUgODcgTDIwIDcxLjEgUTE0LjUgNjcuNCAxNC41IDYxIEwxNC41IDMxLjYgUTE0LjUgMjguNiAxNyAyNyBaIgogICAgICAgIGZpbGw9Im5vbmUiIHN0cm9rZT0iI0M5QTIyNyIgc3Ryb2tlLW9wYWNpdHk9IjAuMjgiIHN0cm9rZS13aWR0aD0iMSIvPgoKICA8IS0tINin2YTZhtis2YXYqSAtLT4KICA8cGF0aCBkPSJNNDggMjAgTDUxLjQgMjkuNiBMNjEgMzMgTDUxLjQgMzYuNCBMNDggNDYgTDQ0LjYgMzYuNCBMMzUgMzMgTDQ0LjYgMjkuNiBaIgogICAgICAgIGZpbGw9InVybCgjcmZHb2xkKSIvPgogIDxjaXJjbGUgY3g9IjQ4IiBjeT0iMzMiIHI9IjEuNiIgZmlsbD0iI0ZGRjZEOCIvPgoKICA8IS0tINin2YTZg9iq2KfYqCDYp9mE2YXZgdiq2YjYrSAtLT4KICA8cGF0aCBkPSJNMjEgNTYuNSBRMzIgNTAuNSA0NS4yIDU2LjggTDQ1LjIgNzUuOCBRMzIgNjkuNSAyMSA3NS41IFoiCiAgICAgICAgZmlsbD0idXJsKCNyZlBhZ2UpIi8+CiAgPHBhdGggZD0iTTc1IDU2LjUgUTY0IDUwLjUgNTAuOCA1Ni44IEw1MC44IDc1LjggUTY0IDY5LjUgNzUgNzUuNSBaIgogICAgICAgIGZpbGw9InVybCgjcmZQYWdlKSIvPgogIDxwYXRoIGQ9Ik00OCA1Ni42IEw0OCA3Ni4yIiBzdHJva2U9IiM5RkIzQzgiIHN0cm9rZS13aWR0aD0iMS42IiBzdHJva2UtbGluZWNhcD0icm91bmQiLz4KCiAgPCEtLSDYo9iz2LfYsSDYp9mE2LXZgdit2KfYqiAtLT4KICA8ZyBzdHJva2U9IiNCOUNCREIiIHN0cm9rZS13aWR0aD0iMS4xNSIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIj4KICAgIDxwYXRoIGQ9Ik0yNi41IDYwLjQgTDQwIDYyLjYiLz4KICAgIDxwYXRoIGQ9Ik0yNi41IDY1LjIgTDQwIDY3LjQiLz4KICAgIDxwYXRoIGQ9Ik0yNi41IDcwIEwzNyA3MS45Ii8+CiAgICA8cGF0aCBkPSJNNjkuNSA2MC40IEw1NiA2Mi42Ii8+CiAgICA8cGF0aCBkPSJNNjkuNSA2NS4yIEw1NiA2Ny40Ii8+CiAgICA8cGF0aCBkPSJNNjkuNSA3MCBMNTkgNzEuOSIvPgogIDwvZz4KCiAgPCEtLSDZgtmI2LMg2KfZhNmG2YXZiCAtLT4KICA8cGF0aCBkPSJNMjIgODMuNSBRNDggNzQgNzQgODMuNSIgZmlsbD0ibm9uZSIgc3Ryb2tlPSJ1cmwoI3JmVGVhbCkiIHN0cm9rZS13aWR0aD0iMi42IiBzdHJva2UtbGluZWNhcD0icm91bmQiLz4KICA8Y2lyY2xlIGN4PSI3NCIgY3k9IjgzLjUiIHI9IjIuNiIgZmlsbD0iIzE3QTg5QSIvPgo8L3N2Zz4K" alt="" />
+            <div><b>رِفاد</b><small>للمتابعة والجودة</small></div></div>
+          <div class="lbl">القائمة الرئيسية</div>
+          <nav class="nav">
+            <a href="#" class="on"><span class="i"></span>لوحة التحكم</a>
+            <a href="#"><span class="i"></span>المدارس</a>
+            <a href="#"><span class="i"></span>الزيارات الميدانية</a>
+            <a href="#"><span class="i"></span>التقييم الميداني</a>
+            <a href="#"><span class="i"></span>الأدلة والشواهد</a>
+            <a href="#"><span class="i"></span>التقارير</a>
+            <a href="#"><span class="i"></span>خطط التحسين</a>
+            <a href="#"><span class="i"></span>التواصل</a>
+            <a href="#"><span class="i"></span>الإعدادات</a>
+            <a href="#"><span class="i"></span>المستخدمون والأدوار</a>
+          </nav>
+          <div class="admin">◆ لوحة الإدارة الشاملة</div>
+          <div class="user"><span class="av">م</span>
+            <div><b>مدير النظام</b><small>مدير النظام</small></div></div>
+        </aside>
+
+        <div class="main">
+          <div class="top">
+            <div class="t">منصة رِفاد للمتابعة والجودة المدرسية
+              <small>الأربعاء، ٢٨ أكتوبر ٢٠٢٦</small></div>
+            <div class="r"><span class="gold">◆ الإدارة</span><span class="av">م</span></div>
+          </div>
+
+          <div class="content">
+            <div class="ph">
+              <div><h3>أهلاً مدير النظام</h3>
+                <p>نظرة شاملة على مدارس نطاقك</p></div>
+              <div class="acts">
+                <button class="btn gh">بدء تقييم</button>
+                <button class="btn pri">+ زيارة جديدة</button>
+              </div>
+            </div>
+
+            <div class="kpis">
+              <div class="kpi">
+                <div class="ic" style="background:rgba(11,37,69,.08);color:#0B2545">▣</div>
+                <div class="n">24</div><div class="l">المدارس في نطاقك</div>
+                <div class="h">24 مدرسة نشطة</div></div>
+              <div class="kpi">
+                <div class="ic" style="background:#E4F5F2;color:#0E7C66">◷</div>
+                <div class="n">18</div><div class="l">الزيارات الميدانية</div>
+                <div class="h">11 مكتملة · 2 اليوم</div></div>
+              <div class="kpi">
+                <div class="ic" style="background:#FAF3DC;color:#C9A227">◎</div>
+                <div class="n">64.3%</div><div class="l">متوسط تحقق المؤشرات</div>
+                <div class="h">412 مؤشراً مقيَّماً</div></div>
+              <div class="kpi">
+                <div class="ic" style="background:#E7F5EE;color:#0F7B4F">▤</div>
+                <div class="n">72%</div><div class="l">نسبة تغطية الأدلة</div>
+                <div class="h">3 إجراءً متأخراً</div></div>
+            </div>
+
+            <div class="row r2">
+              <div class="card">
+                <h4>اتجاه نسبة التحقق <span>تحسّن ↗</span></h4>
+                <div class="chart">
+                  <svg viewBox="0 0 300 88" preserveAspectRatio="none">
+                    <defs>
+                      <linearGradient id="ag" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stop-color="#17A89A" stop-opacity=".38"/>
+                        <stop offset="100%" stop-color="#17A89A" stop-opacity=".02"/>
+                      </linearGradient>
+                    </defs>
+                    <path d="M0,58 C60,50 90,28 150,30 C210,32 250,16 300,20 L300,88 L0,88 Z"
+                      fill="url(#ag)"/>
+                    <path d="M0,58 C60,50 90,28 150,30 C210,32 250,16 300,20"
+                      fill="none" stroke="#0E7C66" stroke-width="2.2"/>
+                    <circle cx="150" cy="30" r="3" fill="#17A89A" stroke="#fff" stroke-width="1.6"/>
+                  </svg>
+                </div>
+              </div>
+              <div class="card">
+                <h4>حالة الزيارات</h4>
+                <div class="donut">
+                  <div class="ring"></div>
+                  <div class="ctr" style="position:absolute"><b>18</b><small>زيارة</small></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="card" style="padding:0;overflow:hidden">
+              <div style="display:flex;justify-content:space-between;align-items:center;
+                padding:6px 9px;border-bottom:1px solid var(--g100)">
+                <h4 style="margin:0">⚠ مدارس تحتاج متابعة</h4>
+                <span style="font-size:7px;color:#17A89A;font-weight:600">كل المدارس ←</span>
+              </div>
+              <table>
+                <thead><tr><th>المدرسة</th><th>الرمز</th><th>نسبة التحقق</th><th>إجراء</th></tr></thead>
+                <tbody>
+                  <tr><td class="b">مدرسة النموذج التجريبية</td><td style="font-family:ui-monospace,monospace;font-size:6.5px">SCH-014</td>
+                    <td><div style="display:flex;align-items:center;gap:4px">
+                      <div class="prog red" style="width:52px"><span style="width:31%"></span></div>
+                      <b style="font-family:ui-monospace,monospace;font-size:7px;color:#B42318">31%</b></div></td>
+                    <td style="color:#17A89A;font-weight:600">عرض</td></tr>
+                  <tr><td class="b">مدرسة الأمل الأساسية</td><td style="font-family:ui-monospace,monospace;font-size:6.5px">SCH-021</td>
+                    <td><div style="display:flex;align-items:center;gap:4px">
+                      <div class="prog red" style="width:52px"><span style="width:43%"></span></div>
+                      <b style="font-family:ui-monospace,monospace;font-size:7px;color:#C2760B">43%</b></div></td>
+                    <td style="color:#17A89A;font-weight:600">عرض</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 2. التقييم ============ -->
+  <section>
+    <div class="sec-head"><h2>٢ — التقييم الميداني</h2><span>EVALUATION</span></div>
+    <div class="frame">
+      <div class="bar"><i></i><i></i><i></i><span>rifad.local/evaluation</span></div>
+      <div class="app">
+        <aside class="side">
+          <div class="brand"><img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA5NiA5NiIgd2lkdGg9Ijk2IiBoZWlnaHQ9Ijk2IiByb2xlPSJpbWciIGFyaWEtbGFiZWw9Iti02LnYp9ixINmF2YbYtdipINix2ZDZgdin2K8iPgo8ZGVmcz4KICAgIDxsaW5lYXJHcmFkaWVudCBpZD0icmZOYXZ5IiB4MT0iMCIgeTE9IjAiIHgyPSIxIiB5Mj0iMSI+CiAgICAgIDxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iIzEyM0E2NiIvPgogICAgICA8c3RvcCBvZmZzZXQ9IjAuNTUiIHN0b3AtY29sb3I9IiMwQjI1NDUiLz4KICAgICAgPHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjMDYxNzI5Ii8+CiAgICA8L2xpbmVhckdyYWRpZW50PgogICAgPGxpbmVhckdyYWRpZW50IGlkPSJyZkdvbGQiIHgxPSIwIiB5MT0iMCIgeDI9IjAiIHkyPSIxIj4KICAgICAgPHN0b3Agb2Zmc2V0PSIwIiBzdG9wLWNvbG9yPSIjRjBENzdBIi8+CiAgICAgIDxzdG9wIG9mZnNldD0iMC41IiBzdG9wLWNvbG9yPSIjQzlBMjI3Ii8+CiAgICAgIDxzdG9wIG9mZnNldD0iMSIgc3RvcC1jb2xvcj0iIzhFNkYxNiIvPgogICAgPC9saW5lYXJHcmFkaWVudD4KICAgIDxsaW5lYXJHcmFkaWVudCBpZD0icmZUZWFsIiB4MT0iMCIgeTE9IjAiIHgyPSIxIiB5Mj0iMCI+CiAgICAgIDxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iIzE3QTg5QSIvPgogICAgICA8c3RvcCBvZmZzZXQ9IjEiIHN0b3AtY29sb3I9IiMwRTdDNjYiLz4KICAgIDwvbGluZWFyR3JhZGllbnQ+CiAgICA8bGluZWFyR3JhZGllbnQgaWQ9InJmUGFnZSIgeDE9IjAiIHkxPSIwIiB4Mj0iMCIgeTI9IjEiPgogICAgICA8c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9IiNGRkZGRkYiLz4KICAgICAgPHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjRTZFRUY2Ii8+CiAgICA8L2xpbmVhckdyYWRpZW50PgogIDwvZGVmcz4KCiAgPCEtLSDYp9mE2K/Ysdi5INin2YTYs9iv2KfYs9mKIC0tPgogIDxwYXRoIGQ9Ik00OCA0LjUgTDgzLjUgMjQuNiBRODcuNSAyNi45IDg3LjUgMzEuNSBMODcuNSA2MS44IFE4Ny41IDcwLjUgODAuMiA3NS40IEw1Mi4zIDkyLjQgUTQ4IDk1IDQzLjcgOTIuNCBMMTUuOCA3NS40IFE4LjUgNzAuNSA4LjUgNjEuOCBMOC41IDMxLjUgUTguNSAyNi45IDEyLjUgMjQuNiBaIgogICAgICAgIGZpbGw9InVybCgjcmZOYXZ5KSIgc3Ryb2tlPSJ1cmwoI3JmR29sZCkiIHN0cm9rZS13aWR0aD0iMi42Ii8+CgogIDwhLS0g2YLZiNizINiw2YfYqNmKINiv2KfYrtmE2YogLS0+CiAgPHBhdGggZD0iTTQ4IDEwLjUgTDc5IDI3IFE4MS41IDI4LjYgODEuNSAzMS42IEw4MS41IDYxIFE4MS41IDY3LjQgNzYgNzEuMSBMNTEgODcgUTQ4IDg4LjggNDUgODcgTDIwIDcxLjEgUTE0LjUgNjcuNCAxNC41IDYxIEwxNC41IDMxLjYgUTE0LjUgMjguNiAxNyAyNyBaIgogICAgICAgIGZpbGw9Im5vbmUiIHN0cm9rZT0iI0M5QTIyNyIgc3Ryb2tlLW9wYWNpdHk9IjAuMjgiIHN0cm9rZS13aWR0aD0iMSIvPgoKICA8IS0tINin2YTZhtis2YXYqSAtLT4KICA8cGF0aCBkPSJNNDggMjAgTDUxLjQgMjkuNiBMNjEgMzMgTDUxLjQgMzYuNCBMNDggNDYgTDQ0LjYgMzYuNCBMMzUgMzMgTDQ0LjYgMjkuNiBaIgogICAgICAgIGZpbGw9InVybCgjcmZHb2xkKSIvPgogIDxjaXJjbGUgY3g9IjQ4IiBjeT0iMzMiIHI9IjEuNiIgZmlsbD0iI0ZGRjZEOCIvPgoKICA8IS0tINin2YTZg9iq2KfYqCDYp9mE2YXZgdiq2YjYrSAtLT4KICA8cGF0aCBkPSJNMjEgNTYuNSBRMzIgNTAuNSA0NS4yIDU2LjggTDQ1LjIgNzUuOCBRMzIgNjkuNSAyMSA3NS41IFoiCiAgICAgICAgZmlsbD0idXJsKCNyZlBhZ2UpIi8+CiAgPHBhdGggZD0iTTc1IDU2LjUgUTY0IDUwLjUgNTAuOCA1Ni44IEw1MC44IDc1LjggUTY0IDY5LjUgNzUgNzUuNSBaIgogICAgICAgIGZpbGw9InVybCgjcmZQYWdlKSIvPgogIDxwYXRoIGQ9Ik00OCA1Ni42IEw0OCA3Ni4yIiBzdHJva2U9IiM5RkIzQzgiIHN0cm9rZS13aWR0aD0iMS42IiBzdHJva2UtbGluZWNhcD0icm91bmQiLz4KCiAgPCEtLSDYo9iz2LfYsSDYp9mE2LXZgdit2KfYqiAtLT4KICA8ZyBzdHJva2U9IiNCOUNCREIiIHN0cm9rZS13aWR0aD0iMS4xNSIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIj4KICAgIDxwYXRoIGQ9Ik0yNi41IDYwLjQgTDQwIDYyLjYiLz4KICAgIDxwYXRoIGQ9Ik0yNi41IDY1LjIgTDQwIDY3LjQiLz4KICAgIDxwYXRoIGQ9Ik0yNi41IDcwIEwzNyA3MS45Ii8+CiAgICA8cGF0aCBkPSJNNjkuNSA2MC40IEw1NiA2Mi42Ii8+CiAgICA8cGF0aCBkPSJNNjkuNSA2NS4yIEw1NiA2Ny40Ii8+CiAgICA8cGF0aCBkPSJNNjkuNSA3MCBMNTkgNzEuOSIvPgogIDwvZz4KCiAgPCEtLSDZgtmI2LMg2KfZhNmG2YXZiCAtLT4KICA8cGF0aCBkPSJNMjIgODMuNSBRNDggNzQgNzQgODMuNSIgZmlsbD0ibm9uZSIgc3Ryb2tlPSJ1cmwoI3JmVGVhbCkiIHN0cm9rZS13aWR0aD0iMi42IiBzdHJva2UtbGluZWNhcD0icm91bmQiLz4KICA8Y2lyY2xlIGN4PSI3NCIgY3k9IjgzLjUiIHI9IjIuNiIgZmlsbD0iIzE3QTg5QSIvPgo8L3N2Zz4K" alt="" />
+            <div><b>رِفاد</b><small>للمتابعة والجودة</small></div></div>
+          <div class="lbl">القائمة الرئيسية</div>
+          <nav class="nav">
+            <a href="#"><span class="i"></span>لوحة التحكم</a>
+            <a href="#"><span class="i"></span>المدارس</a>
+            <a href="#"><span class="i"></span>الزيارات الميدانية</a>
+            <a href="#" class="on"><span class="i"></span>التقييم الميداني</a>
+            <a href="#"><span class="i"></span>الأدلة والشواهد</a>
+            <a href="#"><span class="i"></span>التقارير</a>
+            <a href="#"><span class="i"></span>خطط التحسين</a>
+          </nav>
+          <div class="user"><span class="av">م</span>
+            <div><b>مفتش ميداني</b><small>مفتش</small></div></div>
+        </aside>
+
+        <div class="main">
+          <div class="top">
+            <div class="t">التقييم الميداني
+              <small>زيارة: مدرسة النموذج · ٢٨ أكتوبر ٢٠٢٦</small></div>
+            <div class="r"><span class="av">م</span></div>
+          </div>
+
+          <div class="content">
+            <div class="ph">
+              <div><h3>المعيار ١ — الإدارة المدرسية</h3>
+                <p>الوزن 15% · 24 مؤشراً · 18 مقيَّماً</p></div>
+              <div class="acts"><button class="btn gld">حفظ التقييم</button></div>
+            </div>
+
+            <div class="card" style="padding:8px 10px">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+                <span style="font-size:8.5px;color:var(--g600)">نسبة التحقق في هذا المعيار</span>
+                <b style="font-family:ui-monospace,monospace;font-size:10px;color:#0E7C66">72.2%</b>
+              </div>
+              <div class="prog"><span style="width:72%"></span></div>
+              <div style="display:flex;justify-content:space-between;margin-top:4px;
+                font-size:6.5px;color:var(--g400)">
+                <span>المساهمة في الدرجة الكلية: 10.8 من 15</span>
+                <span>14 مقيَّماً · 6 غير مقيَّم</span>
+              </div>
+            </div>
+
+            <div class="crit">
+              <div class="hd"><span class="cd">1-1</span>
+                <span class="tt">الرؤية والرسالة</span><span class="wt">5%</span></div>
+              <div class="ind"><span class="ic">1-1-01</span>
+                <span class="tx">توجد رؤية ورسالة مكتوبة ومعلنة لجميع العاملين</span>
+                <span class="sc"><i class="on">3</i><i>2</i><i>1</i><i>0</i></span></div>
+              <div class="ind"><span class="ic">1-1-02</span>
+                <span class="tx">الرؤية والرسالة معروفة لدى المتعلمين وأولياء الأمور</span>
+                <span class="sc"><i>3</i><i class="on">2</i><i>1</i><i>0</i></span></div>
+              <div class="ind"><span class="ic">1-1-03</span>
+                <span class="tx">توجد آليات لمراجعة الرؤية والرسالة وتحديثها</span>
+                <span class="sc"><i>3</i><i>2</i><i>1</i><i class="ne">؟</i></span></div>
+            </div>
+
+            <div class="crit">
+              <div class="hd"><span class="cd">1-2</span>
+                <span class="tt">القيادة والإدارة</span><span class="wt">10%</span></div>
+              <div class="ind"><span class="ic">1-2-01</span>
+                <span class="tx">يوجد هيكل تنظيمي واضح ومعتمد للمدرسة</span>
+                <span class="sc"><i class="on">3</i><i>2</i><i>1</i><i>0</i></span></div>
+              <div class="ind"><span class="ic">1-2-02</span>
+                <span class="tx">توزّع المهام والمسؤوليات بشكل مكتوب على العاملين</span>
+                <span class="sc"><i>3</i><i class="on2">2</i><i>1</i><i>0</i></span></div>
+              <div class="ind"><span class="ic">1-2-03</span>
+                <span class="tx">تُدار الاجتماعات بجدول أعمال ومحاضر موثّقة</span>
+                <span class="sc"><i class="on">3</i><i>2</i><i>1</i><i>0</i></span></div>
+            </div>
+
+            <div style="display:flex;gap:6px;justify-content:flex-end;margin-top:auto">
+              <button class="btn gh">السابق</button>
+              <button class="btn pri">التالي: المعيار ٢ ←</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="note">
+      <strong>مفتاح التقييم:</strong> 3 = متحقق · 2 = متحقق جزئياً · 1 = متحقق بدرجة ضعيفة ·
+      0 = غير متحقق · «؟» = لم يُقيَّم بعد (حالة إجرائية منفصلة، لا تُحسب صفراً ولا تُحسب نجاحاً).
+    </div>
+  </section>
+
+  <!-- ============ 3. التقارير ============ -->
+  <section>
+    <div class="sec-head"><h2>٣ — التقارير</h2><span>REPORTS</span></div>
+    <div class="frame">
+      <div class="bar"><i></i><i></i><i></i><span>rifad.local/reports</span></div>
+      <div class="app" style="height:430px">
+        <aside class="side">
+          <div class="brand"><img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA5NiA5NiIgd2lkdGg9Ijk2IiBoZWlnaHQ9Ijk2IiByb2xlPSJpbWciIGFyaWEtbGFiZWw9Iti02LnYp9ixINmF2YbYtdipINix2ZDZgdin2K8iPgo8ZGVmcz4KICAgIDxsaW5lYXJHcmFkaWVudCBpZD0icmZOYXZ5IiB4MT0iMCIgeTE9IjAiIHgyPSIxIiB5Mj0iMSI+CiAgICAgIDxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iIzEyM0E2NiIvPgogICAgICA8c3RvcCBvZmZzZXQ9IjAuNTUiIHN0b3AtY29sb3I9IiMwQjI1NDUiLz4KICAgICAgPHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjMDYxNzI5Ii8+CiAgICA8L2xpbmVhckdyYWRpZW50PgogICAgPGxpbmVhckdyYWRpZW50IGlkPSJyZkdvbGQiIHgxPSIwIiB5MT0iMCIgeDI9IjAiIHkyPSIxIj4KICAgICAgPHN0b3Agb2Zmc2V0PSIwIiBzdG9wLWNvbG9yPSIjRjBENzdBIi8+CiAgICAgIDxzdG9wIG9mZnNldD0iMC41IiBzdG9wLWNvbG9yPSIjQzlBMjI3Ii8+CiAgICAgIDxzdG9wIG9mZnNldD0iMSIgc3RvcC1jb2xvcj0iIzhFNkYxNiIvPgogICAgPC9saW5lYXJHcmFkaWVudD4KICAgIDxsaW5lYXJHcmFkaWVudCBpZD0icmZUZWFsIiB4MT0iMCIgeTE9IjAiIHgyPSIxIiB5Mj0iMCI+CiAgICAgIDxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iIzE3QTg5QSIvPgogICAgICA8c3RvcCBvZmZzZXQ9IjEiIHN0b3AtY29sb3I9IiMwRTdDNjYiLz4KICAgIDwvbGluZWFyR3JhZGllbnQ+CiAgICA8bGluZWFyR3JhZGllbnQgaWQ9InJmUGFnZSIgeDE9IjAiIHkxPSIwIiB4Mj0iMCIgeTI9IjEiPgogICAgICA8c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9IiNGRkZGRkYiLz4KICAgICAgPHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjRTZFRUY2Ii8+CiAgICA8L2xpbmVhckdyYWRpZW50PgogIDwvZGVmcz4KCiAgPCEtLSDYp9mE2K/Ysdi5INin2YTYs9iv2KfYs9mKIC0tPgogIDxwYXRoIGQ9Ik00OCA0LjUgTDgzLjUgMjQuNiBRODcuNSAyNi45IDg3LjUgMzEuNSBMODcuNSA2MS44IFE4Ny41IDcwLjUgODAuMiA3NS40IEw1Mi4zIDkyLjQgUTQ4IDk1IDQzLjcgOTIuNCBMMTUuOCA3NS40IFE4LjUgNzAuNSA4LjUgNjEuOCBMOC41IDMxLjUgUTguNSAyNi45IDEyLjUgMjQuNiBaIgogICAgICAgIGZpbGw9InVybCgjcmZOYXZ5KSIgc3Ryb2tlPSJ1cmwoI3JmR29sZCkiIHN0cm9rZS13aWR0aD0iMi42Ii8+CgogIDwhLS0g2YLZiNizINiw2YfYqNmKINiv2KfYrtmE2YogLS0+CiAgPHBhdGggZD0iTTQ4IDEwLjUgTDc5IDI3IFE4MS41IDI4LjYgODEuNSAzMS42IEw4MS41IDYxIFE4MS41IDY3LjQgNzYgNzEuMSBMNTEgODcgUTQ4IDg4LjggNDUgODcgTDIwIDcxLjEgUTE0LjUgNjcuNCAxNC41IDYxIEwxNC41IDMxLjYgUTE0LjUgMjguNiAxNyAyNyBaIgogICAgICAgIGZpbGw9Im5vbmUiIHN0cm9rZT0iI0M5QTIyNyIgc3Ryb2tlLW9wYWNpdHk9IjAuMjgiIHN0cm9rZS13aWR0aD0iMSIvPgoKICA8IS0tINin2YTZhtis2YXYqSAtLT4KICA8cGF0aCBkPSJNNDggMjAgTDUxLjQgMjkuNiBMNjEgMzMgTDUxLjQgMzYuNCBMNDggNDYgTDQ0LjYgMzYuNCBMMzUgMzMgTDQ0LjYgMjkuNiBaIgogICAgICAgIGZpbGw9InVybCgjcmZHb2xkKSIvPgogIDxjaXJjbGUgY3g9IjQ4IiBjeT0iMzMiIHI9IjEuNiIgZmlsbD0iI0ZGRjZEOCIvPgoKICA8IS0tINin2YTZg9iq2KfYqCDYp9mE2YXZgdiq2YjYrSAtLT4KICA8cGF0aCBkPSJNMjEgNTYuNSBRMzIgNTAuNSA0NS4yIDU2LjggTDQ1LjIgNzUuOCBRMzIgNjkuNSAyMSA3NS41IFoiCiAgICAgICAgZmlsbD0idXJsKCNyZlBhZ2UpIi8+CiAgPHBhdGggZD0iTTc1IDU2LjUgUTY0IDUwLjUgNTAuOCA1Ni44IEw1MC44IDc1LjggUTY0IDY5LjUgNzUgNzUuNSBaIgogICAgICAgIGZpbGw9InVybCgjcmZQYWdlKSIvPgogIDxwYXRoIGQ9Ik00OCA1Ni42IEw0OCA3Ni4yIiBzdHJva2U9IiM5RkIzQzgiIHN0cm9rZS13aWR0aD0iMS42IiBzdHJva2UtbGluZWNhcD0icm91bmQiLz4KCiAgPCEtLSDYo9iz2LfYsSDYp9mE2LXZgdit2KfYqiAtLT4KICA8ZyBzdHJva2U9IiNCOUNCREIiIHN0cm9rZS13aWR0aD0iMS4xNSIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIj4KICAgIDxwYXRoIGQ9Ik0yNi41IDYwLjQgTDQwIDYyLjYiLz4KICAgIDxwYXRoIGQ9Ik0yNi41IDY1LjIgTDQwIDY3LjQiLz4KICAgIDxwYXRoIGQ9Ik0yNi41IDcwIEwzNyA3MS45Ii8+CiAgICA8cGF0aCBkPSJNNjkuNSA2MC40IEw1NiA2Mi42Ii8+CiAgICA8cGF0aCBkPSJNNjkuNSA2NS4yIEw1NiA2Ny40Ii8+CiAgICA8cGF0aCBkPSJNNjkuNSA3MCBMNTkgNzEuOSIvPgogIDwvZz4KCiAgPCEtLSDZgtmI2LMg2KfZhNmG2YXZiCAtLT4KICA8cGF0aCBkPSJNMjIgODMuNSBRNDggNzQgNzQgODMuNSIgZmlsbD0ibm9uZSIgc3Ryb2tlPSJ1cmwoI3JmVGVhbCkiIHN0cm9rZS13aWR0aD0iMi42IiBzdHJva2UtbGluZWNhcD0icm91bmQiLz4KICA8Y2lyY2xlIGN4PSI3NCIgY3k9IjgzLjUiIHI9IjIuNiIgZmlsbD0iIzE3QTg5QSIvPgo8L3N2Zz4K" alt="" />
+            <div><b>رِفاد</b><small>للمتابعة والجودة</small></div></div>
+          <nav class="nav">
+            <a href="#"><span class="i"></span>لوحة التحكم</a>
+            <a href="#"><span class="i"></span>المدارس</a>
+            <a href="#"><span class="i"></span>الزيارات الميدانية</a>
+            <a href="#"><span class="i"></span>التقييم الميداني</a>
+            <a href="#"><span class="i"></span>الأدلة والشواهد</a>
+            <a href="#" class="on"><span class="i"></span>التقارير</a>
+          </nav>
+          <div class="user"><span class="av">م</span>
+            <div><b>مدير التعليم</b><small>مدير التعليم</small></div></div>
+        </aside>
+
+        <div class="main">
+          <div class="top">
+            <div class="t">التقارير <small>سجل التقارير وحالات الاعتماد</small></div>
+            <div class="r"><span class="av">م</span></div>
+          </div>
+
+          <div class="content">
+            <div class="ph">
+              <div><h3>سجل التقارير</h3>
+                <p>كل تقرير مرتبط بزيارة معتمدة وله رمز تحقق فريد</p></div>
+              <div class="acts"><button class="btn gh">تصدير Excel</button></div>
+            </div>
+
+            <div class="card" style="padding:0;overflow:hidden">
+              <table>
+                <thead><tr>
+                  <th>الرمز</th><th>المدرسة</th><th>الحالة</th>
+                  <th>نسبة التحقق</th><th>المعتمِد</th><th>التاريخ</th><th></th>
+                </tr></thead>
+                <tbody>
+                  <tr><td style="font-family:ui-monospace,monospace;font-size:7px">RIF-2026-0001</td>
+                    <td class="b">مدرسة النموذج التجريبية</td>
+                    <td><span class="bdg s">✓ معتمد</span></td>
+                    <td><b style="font-family:ui-monospace,monospace;color:#0E7C66">84.2%</b></td>
+                    <td>أ. عبدالله المقطري</td><td style="font-size:7px">2026-10-20</td>
+                    <td style="color:#17A89A;font-weight:600">PDF</td></tr>
+                  <tr><td style="font-family:ui-monospace,monospace;font-size:7px">RIF-2026-0002</td>
+                    <td class="b">مدرسة الأمل الأساسية</td>
+                    <td><span class="bdg w">◷ قيد المراجعة</span></td>
+                    <td><b style="font-family:ui-monospace,monospace;color:#C2760B">56.1%</b></td>
+                    <td>—</td><td style="font-size:7px">2026-10-25</td>
+                    <td style="color:#17A89A;font-weight:600">PDF</td></tr>
+                  <tr><td style="font-family:ui-monospace,monospace;font-size:7px">RIF-2026-0003</td>
+                    <td class="b">مدرسة السلام</td>
+                    <td><span class="bdg n">✎ مسودة</span></td>
+                    <td><b style="font-family:ui-monospace,monospace;color:var(--g400)">—</b></td>
+                    <td>—</td><td style="font-size:7px">2026-10-26</td>
+                    <td style="color:#17A89A;font-weight:600">PDF</td></tr>
+                  <tr><td style="font-family:ui-monospace,monospace;font-size:7px">RIF-2026-0004</td>
+                    <td class="b">مدرسة الفجر</td>
+                    <td><span class="bdg d">✕ مرفوض</span></td>
+                    <td><b style="font-family:ui-monospace,monospace;color:#B42318">31.7%</b></td>
+                    <td>—</td><td style="font-size:7px">2026-10-27</td>
+                    <td style="color:#17A89A;font-weight:600">PDF</td></tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div class="row r2">
+              <div class="card">
+                <h4>مسار الاعتماد</h4>
+                <div style="display:flex;align-items:center;gap:3px;margin-top:6px">
+                  <div style="flex:1;text-align:center">
+                    <div style="height:16px;border-radius:5px;background:#EFF1F4;display:grid;
+                      place-items:center;font-size:6.5px;color:#5A6B7B">مسودة</div></div>
+                  <span style="color:var(--g400);font-size:7px">←</span>
+                  <div style="flex:1;text-align:center">
+                    <div style="height:16px;border-radius:5px;background:#EAF3FB;display:grid;
+                      place-items:center;font-size:6.5px;color:#1D6FB8">قيد المراجعة</div></div>
+                  <span style="color:var(--g400);font-size:7px">←</span>
+                  <div style="flex:1">
+                    <div style="height:16px;border-radius:5px;background:#E7F5EE;display:grid;
+                      place-items:center;font-size:6.5px;color:#0F7B4F;font-weight:700">معتمد</div></div>
+                </div>
+                <p style="font-size:7px;color:var(--g400);margin-top:5px;line-height:1.7">
+                  الاعتماد يتطلب مدير النظام أو مدير التعليم، ويُسجَّل اسم المعتمِد وتاريخه.
+                  التقرير المعتمد غير قابل للتعديل.
+                </p>
+              </div>
+              <div class="card">
+                <h4>التحقق من صحة تقرير</h4>
+                <div style="display:flex;gap:4px;margin-top:6px">
+                  <div style="flex:1;height:20px;border-radius:5px;border:1px solid var(--g200);
+                    display:flex;align-items:center;padding:0 6px;font-size:6.5px;color:var(--g400);
+                    font-family:ui-monospace,monospace;direction:ltr">RIF-2026-0001</div>
+                  <button class="btn pri" style="padding:4px 8px">تحقق</button>
+                </div>
+                <div style="margin-top:6px;display:grid;grid-template-columns:28px 1fr;gap:6px;
+                  align-items:center;background:#E7F5EE;border-radius:6px;padding:5px">
+                  <div style="width:28px;height:28px;background:#0B2545;border-radius:4px;
+                    display:grid;place-items:center;color:#E8C547;font-size:12px">▦</div>
+                  <div style="font-size:6.5px;color:#0F7B4F;line-height:1.5">
+                    رمز التحقق يظهر في ترويسة التقرير ويقود إلى صفحة تحقق تعرض
+                    حالة التقرير واسم المعتمِد.</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 4. لوحة الإدارة ============ -->
+  <section>
+    <div class="sec-head"><h2>٤ — لوحة الإدارة الشاملة</h2><span>ADMIN CONSOLE</span></div>
+    <div class="frame">
+      <div class="bar"><i></i><i></i><i></i><span>rifad.local/admin</span></div>
+      <div class="app" style="height:400px">
+        <aside class="side">
+          <div class="brand"><img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA5NiA5NiIgd2lkdGg9Ijk2IiBoZWlnaHQ9Ijk2IiByb2xlPSJpbWciIGFyaWEtbGFiZWw9Iti02LnYp9ixINmF2YbYtdipINix2ZDZgdin2K8iPgo8ZGVmcz4KICAgIDxsaW5lYXJHcmFkaWVudCBpZD0icmZOYXZ5IiB4MT0iMCIgeTE9IjAiIHgyPSIxIiB5Mj0iMSI+CiAgICAgIDxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iIzEyM0E2NiIvPgogICAgICA8c3RvcCBvZmZzZXQ9IjAuNTUiIHN0b3AtY29sb3I9IiMwQjI1NDUiLz4KICAgICAgPHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjMDYxNzI5Ii8+CiAgICA8L2xpbmVhckdyYWRpZW50PgogICAgPGxpbmVhckdyYWRpZW50IGlkPSJyZkdvbGQiIHgxPSIwIiB5MT0iMCIgeDI9IjAiIHkyPSIxIj4KICAgICAgPHN0b3Agb2Zmc2V0PSIwIiBzdG9wLWNvbG9yPSIjRjBENzdBIi8+CiAgICAgIDxzdG9wIG9mZnNldD0iMC41IiBzdG9wLWNvbG9yPSIjQzlBMjI3Ii8+CiAgICAgIDxzdG9wIG9mZnNldD0iMSIgc3RvcC1jb2xvcj0iIzhFNkYxNiIvPgogICAgPC9saW5lYXJHcmFkaWVudD4KICAgIDxsaW5lYXJHcmFkaWVudCBpZD0icmZUZWFsIiB4MT0iMCIgeTE9IjAiIHgyPSIxIiB5Mj0iMCI+CiAgICAgIDxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iIzE3QTg5QSIvPgogICAgICA8c3RvcCBvZmZzZXQ9IjEiIHN0b3AtY29sb3I9IiMwRTdDNjYiLz4KICAgIDwvbGluZWFyR3JhZGllbnQ+CiAgICA8bGluZWFyR3JhZGllbnQgaWQ9InJmUGFnZSIgeDE9IjAiIHkxPSIwIiB4Mj0iMCIgeTI9IjEiPgogICAgICA8c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9IiNGRkZGRkYiLz4KICAgICAgPHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjRTZFRUY2Ii8+CiAgICA8L2xpbmVhckdyYWRpZW50PgogIDwvZGVmcz4KCiAgPCEtLSDYp9mE2K/Ysdi5INin2YTYs9iv2KfYs9mKIC0tPgogIDxwYXRoIGQ9Ik00OCA0LjUgTDgzLjUgMjQuNiBRODcuNSAyNi45IDg3LjUgMzEuNSBMODcuNSA2MS44IFE4Ny41IDcwLjUgODAuMiA3NS40IEw1Mi4zIDkyLjQgUTQ4IDk1IDQzLjcgOTIuNCBMMTUuOCA3NS40IFE4LjUgNzAuNSA4LjUgNjEuOCBMOC41IDMxLjUgUTguNSAyNi45IDEyLjUgMjQuNiBaIgogICAgICAgIGZpbGw9InVybCgjcmZOYXZ5KSIgc3Ryb2tlPSJ1cmwoI3JmR29sZCkiIHN0cm9rZS13aWR0aD0iMi42Ii8+CgogIDwhLS0g2YLZiNizINiw2YfYqNmKINiv2KfYrtmE2YogLS0+CiAgPHBhdGggZD0iTTQ4IDEwLjUgTDc5IDI3IFE4MS41IDI4LjYgODEuNSAzMS42IEw4MS41IDYxIFE4MS41IDY3LjQgNzYgNzEuMSBMNTEgODcgUTQ4IDg4LjggNDUgODcgTDIwIDcxLjEgUTE0LjUgNjcuNCAxNC41IDYxIEwxNC41IDMxLjYgUTE0LjUgMjguNiAxNyAyNyBaIgogICAgICAgIGZpbGw9Im5vbmUiIHN0cm9rZT0iI0M5QTIyNyIgc3Ryb2tlLW9wYWNpdHk9IjAuMjgiIHN0cm9rZS13aWR0aD0iMSIvPgoKICA8IS0tINin2YTZhtis2YXYqSAtLT4KICA8cGF0aCBkPSJNNDggMjAgTDUxLjQgMjkuNiBMNjEgMzMgTDUxLjQgMzYuNCBMNDggNDYgTDQ0LjYgMzYuNCBMMzUgMzMgTDQ0LjYgMjkuNiBaIgogICAgICAgIGZpbGw9InVybCgjcmZHb2xkKSIvPgogIDxjaXJjbGUgY3g9IjQ4IiBjeT0iMzMiIHI9IjEuNiIgZmlsbD0iI0ZGRjZEOCIvPgoKICA8IS0tINin2YTZg9iq2KfYqCDYp9mE2YXZgdiq2YjYrSAtLT4KICA8cGF0aCBkPSJNMjEgNTYuNSBRMzIgNTAuNSA0NS4yIDU2LjggTDQ1LjIgNzUuOCBRMzIgNjkuNSAyMSA3NS41IFoiCiAgICAgICAgZmlsbD0idXJsKCNyZlBhZ2UpIi8+CiAgPHBhdGggZD0iTTc1IDU2LjUgUTY0IDUwLjUgNTAuOCA1Ni44IEw1MC44IDc1LjggUTY0IDY5LjUgNzUgNzUuNSBaIgogICAgICAgIGZpbGw9InVybCgjcmZQYWdlKSIvPgogIDxwYXRoIGQ9Ik00OCA1Ni42IEw0OCA3Ni4yIiBzdHJva2U9IiM5RkIzQzgiIHN0cm9rZS13aWR0aD0iMS42IiBzdHJva2UtbGluZWNhcD0icm91bmQiLz4KCiAgPCEtLSDYo9iz2LfYsSDYp9mE2LXZgdit2KfYqiAtLT4KICA8ZyBzdHJva2U9IiNCOUNCREIiIHN0cm9rZS13aWR0aD0iMS4xNSIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIj4KICAgIDxwYXRoIGQ9Ik0yNi41IDYwLjQgTDQwIDYyLjYiLz4KICAgIDxwYXRoIGQ9Ik0yNi41IDY1LjIgTDQwIDY3LjQiLz4KICAgIDxwYXRoIGQ9Ik0yNi41IDcwIEwzNyA3MS45Ii8+CiAgICA8cGF0aCBkPSJNNjkuNSA2MC40IEw1NiA2Mi42Ii8+CiAgICA8cGF0aCBkPSJNNjkuNSA2NS4yIEw1NiA2Ny40Ii8+CiAgICA8cGF0aCBkPSJNNjkuNSA3MCBMNTkgNzEuOSIvPgogIDwvZz4KCiAgPCEtLSDZgtmI2LMg2KfZhNmG2YXZiCAtLT4KICA8cGF0aCBkPSJNMjIgODMuNSBRNDggNzQgNzQgODMuNSIgZmlsbD0ibm9uZSIgc3Ryb2tlPSJ1cmwoI3JmVGVhbCkiIHN0cm9rZS13aWR0aD0iMi42IiBzdHJva2UtbGluZWNhcD0icm91bmQiLz4KICA8Y2lyY2xlIGN4PSI3NCIgY3k9IjgzLjUiIHI9IjIuNiIgZmlsbD0iIzE3QTg5QSIvPgo8L3N2Zz4K" alt="" />
+            <div><b>رِفاد</b><small>للمتابعة والجودة</small></div></div>
+          <nav class="nav">
+            <a href="#"><span class="i"></span>لوحة التحكم</a>
+            <a href="#"><span class="i"></span>المدارس</a>
+            <a href="#"><span class="i"></span>المستخدمون والأدوار</a>
+          </nav>
+          <div class="admin" style="background:rgba(201,162,39,.28);border-color:rgba(201,162,39,.5)">
+            ◆ لوحة الإدارة الشاملة</div>
+          <div class="user"><span class="av">م</span>
+            <div><b>مدير النظام</b><small>مدير النظام</small></div></div>
+        </aside>
+
+        <div class="main">
+          <div class="top">
+            <div class="t">لوحة الإدارة الشاملة <small>إدارة كاملة لكل بيانات المنصة</small></div>
+            <div class="r"><span class="gold">◆ الإدارة</span></div>
+          </div>
+
+          <div class="content">
+            <div class="ph">
+              <div><h3>لوحة الإدارة الشاملة</h3>
+                <p>أضف وعدّل واحذف المدارس والمديريات والمستخدمين والمعايير</p></div>
+            </div>
+
+            <div style="display:flex;gap:3px;background:#fff;padding:4px;border-radius:10px;
+              border:1px solid var(--g200)">
+              <div style="flex:1;text-align:center;padding:5px;border-radius:7px;font-size:8.5px;
+                color:var(--g600);font-weight:600">المدارس</div>
+              <div style="flex:1;text-align:center;padding:5px;border-radius:7px;font-size:8.5px;
+                color:var(--g600);font-weight:600">المحافظات والمديريات</div>
+              <div style="flex:1;text-align:center;padding:5px;border-radius:7px;font-size:8.5px;
+                color:var(--g600);font-weight:600">المستخدمون</div>
+              <div style="flex:1;text-align:center;padding:5px;border-radius:7px;font-size:8.5px;
+                background:linear-gradient(135deg,#0B2545,#133A63);color:#fff;font-weight:700;
+                box-shadow:0 3px 10px -4px rgba(11,37,69,.6)">المعايير والمؤشرات</div>
+              <div style="flex:1;text-align:center;padding:5px;border-radius:7px;font-size:8.5px;
+                color:var(--g600);font-weight:600">مقياس التقدير</div>
+            </div>
+
+            <div class="kpis" style="grid-template-columns:repeat(4,1fr)">
+              <div class="kpi"><div class="n">7</div><div class="l">معيار رئيسي</div></div>
+              <div class="kpi"><div class="n">12</div><div class="l">معيار فرعي</div></div>
+              <div class="kpi"><div class="n">109</div><div class="l">مؤشر</div></div>
+              <div class="kpi" style="border:1px solid rgba(15,123,79,.3)">
+                <div class="n" style="color:#0F7B4F">100%</div>
+                <div class="l" style="color:#0F7B4F">مجموع الأوزان صحيح</div></div>
+            </div>
+
+            <div class="crit">
+              <div class="hd">
+                <span class="cd">1</span>
+                <span class="tt">الإدارة المدرسية <span style="font-weight:400;color:var(--g400);font-size:7px">
+                  · 24 مؤشراً · 2 معياراً فرعياً</span></span>
+                <span class="wt" style="background:#E7F5EE;color:#0F7B4F;border-color:rgba(15,123,79,.3)">وزن 15%</span>
+                <span style="font-size:8px;color:var(--g400);letter-spacing:2px">+ ✎ 🗑</span>
+              </div>
+              <div class="ind" style="background:#FAFBFC">
+                <span class="ic" style="color:var(--g400)">1-1</span>
+                <span class="tx" style="font-weight:700;color:var(--navy)">الرؤية والرسالة
+                  <span style="font-weight:400;color:var(--g400)">(8 مؤشرات)</span></span>
+                <span class="bdg n">5%</span>
+                <span style="font-size:7px;color:var(--g400);letter-spacing:2px">+ ✎ 🗑</span>
+              </div>
+              <div class="ind"><span class="ic">1-1-01</span>
+                <span class="tx">توجد رؤية ورسالة مكتوبة ومعلنة لجميع العاملين</span>
+                <span style="font-size:7px;color:var(--g200);letter-spacing:2px">✎ 🗑</span></div>
+              <div class="ind"><span class="ic">1-1-02</span>
+                <span class="tx">الرؤية والرسالة معروفة لدى المتعلمين وأولياء الأمور</span>
+                <span class="bdg i">3</span>
+                <span style="font-size:7px;color:var(--g200);letter-spacing:2px">✎ 🗑</span></div>
+              <div class="ind"><span class="ic">1-1-03</span>
+                <span class="tx">توجد آليات لمراجعة الرؤية والرسالة وتحديثها</span>
+                <span style="font-size:7px;color:var(--g200);letter-spacing:2px">✎ 🗑</span></div>
+            </div>
+
+            <p style="font-size:7px;color:var(--g400);line-height:1.7;margin-top:auto">
+              كل إضافة أو تعديل أو حذف يُسجَّل في سجل التدقيق. الحذف يُرفض إذا كانت هناك
+              تقييمات مرتبطة، ويُطلب تأكيد صريح قبل الحذف القسري.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 5. الدخول ============ -->
+  <section>
+    <div class="sec-head"><h2>٥ — صفحة الدخول</h2><span>LOGIN</span></div>
+    <div class="frame">
+      <div class="bar"><i></i><i></i><i></i><span>rifad.local/login</span></div>
+      <div style="display:flex;height:340px">
+        <div style="width:46%;background:linear-gradient(135deg,#061729,#0B2545 45%,#133A63);
+          color:#fff;padding:20px;display:flex;flex-direction:column;justify-content:space-between;
+          position:relative;overflow:hidden">
+          <div style="position:absolute;inset:0;background-image:
+            radial-gradient(circle at 1px 1px,rgba(255,255,255,.14) 1px,transparent 0);
+            background-size:18px 18px;opacity:.45"></div>
+          <div style="position:absolute;top:-50px;left:-40px;width:160px;height:160px;
+            border-radius:50%;background:radial-gradient(circle,rgba(23,168,154,.28),transparent 70%)"></div>
+          <div style="position:relative;z-index:1;display:flex;align-items:center;gap:7px">
+            <img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA5NiA5NiIgd2lkdGg9Ijk2IiBoZWlnaHQ9Ijk2IiByb2xlPSJpbWciIGFyaWEtbGFiZWw9Iti02LnYp9ixINmF2YbYtdipINix2ZDZgdin2K8iPgo8ZGVmcz4KICAgIDxsaW5lYXJHcmFkaWVudCBpZD0icmZOYXZ5IiB4MT0iMCIgeTE9IjAiIHgyPSIxIiB5Mj0iMSI+CiAgICAgIDxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iIzEyM0E2NiIvPgogICAgICA8c3RvcCBvZmZzZXQ9IjAuNTUiIHN0b3AtY29sb3I9IiMwQjI1NDUiLz4KICAgICAgPHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjMDYxNzI5Ii8+CiAgICA8L2xpbmVhckdyYWRpZW50PgogICAgPGxpbmVhckdyYWRpZW50IGlkPSJyZkdvbGQiIHgxPSIwIiB5MT0iMCIgeDI9IjAiIHkyPSIxIj4KICAgICAgPHN0b3Agb2Zmc2V0PSIwIiBzdG9wLWNvbG9yPSIjRjBENzdBIi8+CiAgICAgIDxzdG9wIG9mZnNldD0iMC41IiBzdG9wLWNvbG9yPSIjQzlBMjI3Ii8+CiAgICAgIDxzdG9wIG9mZnNldD0iMSIgc3RvcC1jb2xvcj0iIzhFNkYxNiIvPgogICAgPC9saW5lYXJHcmFkaWVudD4KICAgIDxsaW5lYXJHcmFkaWVudCBpZD0icmZUZWFsIiB4MT0iMCIgeTE9IjAiIHgyPSIxIiB5Mj0iMCI+CiAgICAgIDxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iIzE3QTg5QSIvPgogICAgICA8c3RvcCBvZmZzZXQ9IjEiIHN0b3AtY29sb3I9IiMwRTdDNjYiLz4KICAgIDwvbGluZWFyR3JhZGllbnQ+CiAgICA8bGluZWFyR3JhZGllbnQgaWQ9InJmUGFnZSIgeDE9IjAiIHkxPSIwIiB4Mj0iMCIgeTI9IjEiPgogICAgICA8c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9IiNGRkZGRkYiLz4KICAgICAgPHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjRTZFRUY2Ii8+CiAgICA8L2xpbmVhckdyYWRpZW50PgogIDwvZGVmcz4KCiAgPCEtLSDYp9mE2K/Ysdi5INin2YTYs9iv2KfYs9mKIC0tPgogIDxwYXRoIGQ9Ik00OCA0LjUgTDgzLjUgMjQuNiBRODcuNSAyNi45IDg3LjUgMzEuNSBMODcuNSA2MS44IFE4Ny41IDcwLjUgODAuMiA3NS40IEw1Mi4zIDkyLjQgUTQ4IDk1IDQzLjcgOTIuNCBMMTUuOCA3NS40IFE4LjUgNzAuNSA4LjUgNjEuOCBMOC41IDMxLjUgUTguNSAyNi45IDEyLjUgMjQuNiBaIgogICAgICAgIGZpbGw9InVybCgjcmZOYXZ5KSIgc3Ryb2tlPSJ1cmwoI3JmR29sZCkiIHN0cm9rZS13aWR0aD0iMi42Ii8+CgogIDwhLS0g2YLZiNizINiw2YfYqNmKINiv2KfYrtmE2YogLS0+CiAgPHBhdGggZD0iTTQ4IDEwLjUgTDc5IDI3IFE4MS41IDI4LjYgODEuNSAzMS42IEw4MS41IDYxIFE4MS41IDY3LjQgNzYgNzEuMSBMNTEgODcgUTQ4IDg4LjggNDUgODcgTDIwIDcxLjEgUTE0LjUgNjcuNCAxNC41IDYxIEwxNC41IDMxLjYgUTE0LjUgMjguNiAxNyAyNyBaIgogICAgICAgIGZpbGw9Im5vbmUiIHN0cm9rZT0iI0M5QTIyNyIgc3Ryb2tlLW9wYWNpdHk9IjAuMjgiIHN0cm9rZS13aWR0aD0iMSIvPgoKICA8IS0tINin2YTZhtis2YXYqSAtLT4KICA8cGF0aCBkPSJNNDggMjAgTDUxLjQgMjkuNiBMNjEgMzMgTDUxLjQgMzYuNCBMNDggNDYgTDQ0LjYgMzYuNCBMMzUgMzMgTDQ0LjYgMjkuNiBaIgogICAgICAgIGZpbGw9InVybCgjcmZHb2xkKSIvPgogIDxjaXJjbGUgY3g9IjQ4IiBjeT0iMzMiIHI9IjEuNiIgZmlsbD0iI0ZGRjZEOCIvPgoKICA8IS0tINin2YTZg9iq2KfYqCDYp9mE2YXZgdiq2YjYrSAtLT4KICA8cGF0aCBkPSJNMjEgNTYuNSBRMzIgNTAuNSA0NS4yIDU2LjggTDQ1LjIgNzUuOCBRMzIgNjkuNSAyMSA3NS41IFoiCiAgICAgICAgZmlsbD0idXJsKCNyZlBhZ2UpIi8+CiAgPHBhdGggZD0iTTc1IDU2LjUgUTY0IDUwLjUgNTAuOCA1Ni44IEw1MC44IDc1LjggUTY0IDY5LjUgNzUgNzUuNSBaIgogICAgICAgIGZpbGw9InVybCgjcmZQYWdlKSIvPgogIDxwYXRoIGQ9Ik00OCA1Ni42IEw0OCA3Ni4yIiBzdHJva2U9IiM5RkIzQzgiIHN0cm9rZS13aWR0aD0iMS42IiBzdHJva2UtbGluZWNhcD0icm91bmQiLz4KCiAgPCEtLSDYo9iz2LfYsSDYp9mE2LXZgdit2KfYqiAtLT4KICA8ZyBzdHJva2U9IiNCOUNCREIiIHN0cm9rZS13aWR0aD0iMS4xNSIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIj4KICAgIDxwYXRoIGQ9Ik0yNi41IDYwLjQgTDQwIDYyLjYiLz4KICAgIDxwYXRoIGQ9Ik0yNi41IDY1LjIgTDQwIDY3LjQiLz4KICAgIDxwYXRoIGQ9Ik0yNi41IDcwIEwzNyA3MS45Ii8+CiAgICA8cGF0aCBkPSJNNjkuNSA2MC40IEw1NiA2Mi42Ii8+CiAgICA8cGF0aCBkPSJNNjkuNSA2NS4yIEw1NiA2Ny40Ii8+CiAgICA8cGF0aCBkPSJNNjkuNSA3MCBMNTkgNzEuOSIvPgogIDwvZz4KCiAgPCEtLSDZgtmI2LMg2KfZhNmG2YXZiCAtLT4KICA8cGF0aCBkPSJNMjIgODMuNSBRNDggNzQgNzQgODMuNSIgZmlsbD0ibm9uZSIgc3Ryb2tlPSJ1cmwoI3JmVGVhbCkiIHN0cm9rZS13aWR0aD0iMi42IiBzdHJva2UtbGluZWNhcD0icm91bmQiLz4KICA8Y2lyY2xlIGN4PSI3NCIgY3k9IjgzLjUiIHI9IjIuNiIgZmlsbD0iIzE3QTg5QSIvPgo8L3N2Zz4K" style="width:26px;height:26px" alt="" />
+            <div><b style="font-family:Amiri,serif;font-size:14px">رِفاد</b>
+              <div style="font-size:6.5px;color:rgba(255,255,255,.5)">للمتابعة والجودة المدرسية</div></div>
+          </div>
+          <div style="position:relative;z-index:1">
+            <div style="font-family:Amiri,serif;font-size:22px;line-height:1.3">كل مدرسة</div>
+            <div style="font-family:Amiri,serif;font-size:22px;line-height:1.3;
+              background:linear-gradient(100deg,#E8C547,#F2DA7A,#C9A227);
+              -webkit-background-clip:text;background-clip:text;color:transparent">تستحق قياساً منصفاً</div>
+            <p style="font-size:8.5px;color:rgba(255,255,255,.6);line-height:1.9;margin-top:7px;
+              max-width:200px">109 مؤشراً، سبعة معايير بأوزانها الرسمية، وحساب فوري للدرجة.</p>
+          </div>
+          <div style="position:relative;z-index:1;font-size:6.5px;color:rgba(255,255,255,.35);
+            line-height:1.7">مديرية الجراحي — الحديدة<br/>
+            منصة إدارية داخلية لا تصدر وثائق حكومية رسمية.</div>
+        </div>
+
+        <div style="flex:1;background:#FBFAF7;padding:26px 30px;display:flex;flex-direction:column;
+          justify-content:center">
+          <div style="font-family:Amiri,serif;font-size:19px;color:var(--navy);font-weight:700">
+            تسجيل الدخول</div>
+          <p style="font-size:8.5px;color:var(--g600);margin-top:2px">
+            أدخل بيانات حسابك للوصول إلى لوحة المتابعة.</p>
+          <div style="margin-top:14px">
+            <div style="font-size:7.5px;font-weight:700;color:var(--navy);margin-bottom:3px">البريد الإلكتروني</div>
+            <div style="height:24px;border:1px solid var(--g200);border-radius:7px;background:#fff;
+              display:flex;align-items:center;padding:0 8px;font-size:7.5px;color:var(--g400);
+              direction:ltr;justify-content:flex-end">name@rifad.demo</div>
+          </div>
+          <div style="margin-top:8px">
+            <div style="font-size:7.5px;font-weight:700;color:var(--navy);margin-bottom:3px">كلمة المرور</div>
+            <div style="height:24px;border:1px solid var(--g200);border-radius:7px;background:#fff;
+              display:flex;align-items:center;padding:0 8px;font-size:9px;color:var(--g400);
+              direction:ltr;letter-spacing:2px;justify-content:flex-end">••••••••••</div>
+          </div>
+          <label style="display:flex;align-items:center;gap:4px;font-size:7.5px;color:var(--g600);margin-top:8px">
+            <span style="width:9px;height:9px;border-radius:2px;border:1px solid var(--g200);
+              background:#fff;display:block"></span>
+            إبقاء الجلسة مفتوحة على هذا الجهاز</label>
+          <button class="btn gld" style="margin-top:12px;padding:8px;font-size:9px;border-radius:8px">
+            الدخول ←</button>
+          <div style="margin-top:10px;text-align:center;font-size:7px;color:var(--g400)">— أو —</div>
+          <div style="margin-top:6px;text-align:center;font-size:7.5px;color:var(--navy);
+            font-weight:600;border:1px solid var(--g200);border-radius:7px;padding:6px;
+            background:#fff">تهيئة حساب المسؤول الأول</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <span>منصة رِفاد — نماذج الشاشات · مديرية الجراحي، الحديدة</span>
+    <span>RIFAD · UI Screens v1.0</span>
+  </footer>
+</div>
+</body>
+</html>

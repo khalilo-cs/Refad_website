@@ -1,0 +1,53 @@
+# ==========================================================
+# منصة رِفاد — خدمة systemd للتشغيل بدون Docker
+# ----------------------------------------------------------
+# التركيب:
+#   sudo cp deploy/rifad.service /etc/systemd/system/rifad.service
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now rifad
+#   sudo systemctl status rifad
+#   journalctl -u rifad -f
+# ==========================================================
+
+[Unit]
+Description=RIFAD School Quality Platform
+Documentation=https://github.com/khalilo-cs/-
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=rifad
+Group=rifad
+WorkingDirectory=/opt/rifad
+EnvironmentFile=/opt/rifad/.env
+Environment=NODE_ENV=production
+Environment=PORT=3000
+Environment=HOSTNAME=127.0.0.1
+
+# يُشغَّل من مخرجات البناء المستقلة
+ExecStart=/usr/bin/node /opt/rifad/server.js
+
+Restart=always
+RestartSec=5
+KillSignal=SIGINT
+TimeoutStopSec=30
+
+# تقوية أمنية
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+# المجلد الوحيد القابل للكتابة: قاعدة البيانات
+ReadWritePaths=/opt/rifad/data
+
+# حدود الموارد
+LimitNOFILE=65535
+MemoryMax=1G
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=rifad
+
+[Install]
+WantedBy=multi-user.target
