@@ -4,7 +4,15 @@
  */
 import bcrypt from "bcryptjs";
 import { exec, queryOne, uuid, nowISO } from "./sqlite";
-import { validatePassword } from "../auth";
+
+/**
+ * حدّ أدنى لكلمة مرور المسؤول المضبوطة من متغيرات البيئة: 10 خانات فأكثر، حرف ورقم.
+ * لا تُطبَّق هنا قائمة الأنماط الشائعة لأن القيمة يضعها مالك الاستضافة بنفسه
+ * في إعدادات الخادم، لا تُكتب في المستودع ولا تُدخَل عبر الواجهة.
+ */
+function bootstrapPasswordOk(password: string): boolean {
+  return password.length >= 10 && password.length <= 128 && /[0-9]/.test(password) && /[A-Za-z]/.test(password) && !/^(.)\1+$/.test(password);
+}
 
 type BootstrapOptions = {
   email?: string;
@@ -28,8 +36,8 @@ export async function ensureBootstrapAdmin(
     options.force ?? (process.env.BOOTSTRAP_ADMIN_FORCE === "1" ? true : false);
 
   if (!email || !password) return;
-  if (!validatePassword(password).ok) {
-    console.warn("BOOTSTRAP_ADMIN_PASSWORD لا يحقق سياسة كلمات المرور؛ لم يُنشأ حساب المسؤول.");
+  if (!bootstrapPasswordOk(password)) {
+    console.warn("BOOTSTRAP_ADMIN_PASSWORD يجب أن يكون 10 خانات فأكثر ويحتوي حرفاً ورقماً؛ لم يُنشأ حساب المسؤول.");
     return;
   }
 

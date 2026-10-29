@@ -23,10 +23,18 @@ describe("الدخول بالبريد دون حساسية لحالة الأحر�
 });
 
 describe("إنشاء المسؤول من متغيرات البيئة", () => {
-  it("يرفض كلمة مرور لا تحقق السياسة ولا ينشئ حساباً", async () => {
+  it("يرفض كلمة مرور قصيرة أو بلا أرقام ولا ينشئ حساباً", async () => {
     const { ensureBootstrapAdmin } = await import("@/lib/db/bootstrap-admin");
-    await ensureBootstrapAdmin({ email: "weak@example.org", password: "Ab1234567890" });
+    await ensureBootstrapAdmin({ email: "weak@example.org", password: "Ab12345" });
+    await ensureBootstrapAdmin({ email: "weak@example.org", password: "OnlyLettersHere" });
     expect(await q.queryOne("SELECT id FROM users WHERE email = 'weak@example.org'")).toBeNull();
+  });
+
+  it("يقبل كلمة مرور مالك الاستضافة بصيغة حرف وأرقام متتالية", async () => {
+    const { ensureBootstrapAdmin } = await import("@/lib/db/bootstrap-admin");
+    await ensureBootstrapAdmin({ email: "Site.Owner@Example.org", password: "Xy987654321" });
+    const { authenticateUser } = await import("@/lib/auth");
+    expect((await authenticateUser("site.owner@example.org", "Xy987654321")).ok).toBe(true);
   });
 
   it("ينشئ حساب مدير المنصة مرة واحدة ويسجّل ذلك في سجل التدقيق", async () => {

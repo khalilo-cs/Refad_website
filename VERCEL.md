@@ -50,7 +50,7 @@ turso db tokens create itqan
 | المتغيّر | القيمة |
 |---|---|
 | `BOOTSTRAP_ADMIN_EMAIL` | بريد المسؤول |
-| `BOOTSTRAP_ADMIN_PASSWORD` | 10 أحرف فأكثر، حرف ورقم، ولا تحتوي تسلسلات شائعة مثل `123456` |
+| `BOOTSTRAP_ADMIN_PASSWORD` | 10 خانات فأكثر تحتوي حرفاً ورقماً (تُضبط هنا فقط، ولا تُكتب في المستودع) |
 | `BOOTSTRAP_ADMIN_NAME` | الاسم الظاهر (اختياري) |
 | `BOOTSTRAP_ADMIN_FORCE` | `1` فقط لإعادة تعيين كلمة مرور حساب قائم |
 
