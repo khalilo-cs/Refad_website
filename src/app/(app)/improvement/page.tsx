@@ -38,6 +38,8 @@ function ImprovementInner() {
   const [actionModal, setActionModal] = useState<{ planId?: string; preset?: any } | null>(sp.get("new") === "action" ? { preset: { indicatorId: sp.get("indicatorId") ?? "", schoolId: sp.get("schoolId") ?? "" } } : null);
   const [detail, setDetail] = useState<any>(null);
   const [delPlan, setDelPlan] = useState<any>(null);
+  const [required, setRequired] = useState<RequiredItem[]>([]);
+  const [showRequired, setShowRequired] = useState(sp.get("required") === "1");
 
   const role = user?.roleKey ?? "";
   const canCreate = ["SUPER_ADMIN", "EDUCATION_DIRECTOR", "INSPECTOR", "SCHOOL_PRINCIPAL", "QUALITY_COORDINATOR"].includes(role);
@@ -55,6 +57,12 @@ function ImprovementInner() {
     } catch (e: any) { add({ type: "error", message: e.message || "تعذّر تحميل الخطط" }); } finally { setLoading(false); }
   }, [schoolFilter, add]);
   useEffect(() => { void load(); }, [load]);
+  const loadRequired = useCallback(async () => {
+    const qs = schoolFilter ? `?schoolId=${schoolFilter}` : "";
+    const r = await fetch(`/api/improvement/required${qs}`, { credentials: "include" }).catch(() => null);
+    if (r?.ok) setRequired((await r.json()).items ?? []);
+  }, [schoolFilter]);
+  useEffect(() => { void loadRequired(); }, [loadRequired]);
 
   const schools = useMemo(() => [...new Map((data?.plans ?? []).map((p: any) => [p.school_id, p.school_name])).entries()], [data]);
   const actions: any[] = data?.actions ?? [];
@@ -85,6 +93,15 @@ function ImprovementInner() {
           <div key={l} className="card p-4"><div className="flex items-center justify-between"><span className="text-[12px] text-gray-600">{l}</span><Icon className={`h-4 w-4 ${c}`} /></div><p className={`mt-2 font-heading text-3xl font-bold ${c}`}>{v}</p></div>
         ))}
       </div>
+
+      {required.length > 0 && (
+        <RequiredPanel items={required} open={showRequired} onToggle={() => setShowRequired((x) => !x)} canCreate={canCreate}
+          onCreate={(it) => setActionModal({ preset: {
+            schoolId: it.schoolId, indicatorId: it.indicatorId, evaluationId: it.evaluationId, schoolName: it.schoolName,
+            problemDescription: `المؤشر ${it.code} قُيِّم «${it.score === 0 ? "غير متحقق" : "متحقق بدرجة ضعيفة"}» في زيارة ${fmtDate(it.visitDate)}: ${it.title}`,
+            priority: it.score === 0 ? "HIGH" : "MEDIUM",
+          } })} />
+      )}
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Tabs<View> value={view} onChange={setView} tabs={[{ key: "board", label: "لوحة الإجراءات" }, { key: "plans", label: "الخطط", count: data?.plans?.length ?? 0 }]} />
@@ -144,10 +161,57 @@ function ImprovementInner() {
       )}
 
       <PlanModal open={planModal} onClose={() => setPlanModal(false)} onDone={() => { setPlanModal(false); void load(); }} />
-      {actionModal && <ActionModal ctx={actionModal} plans={data?.plans ?? []} people={data?.people ?? []} onClose={() => setActionModal(null)} onDone={() => { setActionModal(null); void load(); }} />}
+      {actionModal && <ActionModal ctx={actionModal} plans={data?.plans ?? []} people={data?.people ?? []} onPlansChanged={load} onClose={() => setActionModal(null)} onDone={() => { setActionModal(null); void load(); void loadRequired(); }} />}
       <ActionDetail a={detail} canVerify={!!data?.canVerify} meId={user?.userId ?? ""} onClose={() => setDetail(null)} onChanged={load} />
       <ConfirmDialog open={!!delPlan} title="حذف خطة التحسين" message={`سيُحذف «${delPlan?.title}» بكل إجراءاتها نهائياً.`} confirmLabel="حذف" onConfirm={delPlanGo} onClose={() => setDelPlan(null)} />
     </div>
+  );
+}
+
+type RequiredItem = { schoolId: string; schoolName: string; visitId: string; visitDate: string; evaluationId: string; indicatorId: string; code: string; title: string; score: number };
+
+/** المؤشرات الضعيفة في آخر تقييم والتي لم يُنشأ لها إجراء تصحيحي بعد. */
+function RequiredPanel({ items, open, onToggle, onCreate, canCreate }: { items: RequiredItem[]; open: boolean; onToggle: () => void; onCreate: (it: RequiredItem) => void; canCreate: boolean }) {
+  const bySchool = useMemo(() => {
+    const m = new Map<string, { name: string; list: RequiredItem[] }>();
+    for (const it of items) {
+      const g = m.get(it.schoolId) ?? { name: it.schoolName, list: [] };
+      g.list.push(it);
+      m.set(it.schoolId, g);
+    }
+    return [...m.entries()];
+  }, [items]);
+  return (
+    <section className="overflow-hidden rounded-2xl border border-warning/30 bg-warning/5">
+      <button onClick={onToggle} className="flex w-full items-center justify-between gap-3 px-4 py-3 text-right" aria-expanded={open}>
+        <span className="flex items-center gap-2 font-heading text-[15px] font-bold text-navy">
+          <AlertTriangle className="h-4 w-4 text-warning" />
+          {items.length} مؤشراً ضعيفاً بلا إجراء تصحيحي
+          <span className="text-[12px] font-normal text-gray-500">في {bySchool.length} مدرسة</span>
+        </span>
+        <span className="text-[12px] font-semibold text-turquoise">{open ? "إخفاء" : "عرض"}</span>
+      </button>
+      {open && (
+        <div className="space-y-4 border-t border-warning/20 bg-white/60 px-4 py-4">
+          <p className="text-[12px] text-gray-600">وفق خطة المشروع، كل مؤشر قُيِّم بدرجة 0 أو 1 في آخر تقييم يحتاج إجراءً بمسؤول وموعد ومؤشر نجاح.</p>
+          {bySchool.map(([sid, g]) => (
+            <div key={sid}>
+              <h3 className="mb-2 text-[13px] font-bold text-navy">{g.name}</h3>
+              <ul className="divide-y divide-gray-100 rounded-xl border border-gray-100 bg-white">
+                {g.list.map((it) => (
+                  <li key={it.evaluationId} className="flex items-center gap-3 px-3 py-2.5">
+                    <span className="shrink-0 rounded bg-navy px-1.5 py-0.5 font-mono text-[10.5px] font-bold text-gold-bright">{it.code}</span>
+                    <span className="min-w-0 flex-1 truncate text-[12.5px] text-gray-700" title={it.title}>{it.title}</span>
+                    <span className={`badge ${it.score === 0 ? "badge-danger" : "badge-warning"}`}>{it.score === 0 ? "غير متحقق" : "ضعيف"}</span>
+                    {canCreate && <button className="btn btn-primary btn-sm shrink-0" onClick={() => onCreate(it)}><Plus className="h-3.5 w-3.5" /> إجراء</button>}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -197,12 +261,27 @@ function PlanModal({ open, onClose, onDone }: { open: boolean; onClose: () => vo
   );
 }
 
-function ActionModal({ ctx, plans, people, onClose, onDone }: { ctx: { planId?: string; preset?: any }; plans: any[]; people: any[]; onClose: () => void; onDone: () => void }) {
+function ActionModal({ ctx, plans, people, onClose, onDone, onPlansChanged }: { ctx: { planId?: string; preset?: any }; plans: any[]; people: any[]; onClose: () => void; onDone: () => void; onPlansChanged: () => Promise<void> }) {
   const { user } = useSession();
   const { add } = useToast();
   const [indicators, setIndicators] = useState<any[]>([]);
   const preset = ctx.preset ?? {};
-  const [f, setF] = useState<any>({ planId: ctx.planId ?? "", priority: "MEDIUM", indicatorId: preset.indicatorId ?? "", responsibleId: user?.userId ?? "", dueDate: new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10) });
+  const [f, setF] = useState<any>({
+    planId: ctx.planId ?? "", priority: preset.priority ?? "MEDIUM", indicatorId: preset.indicatorId ?? "", evaluationId: preset.evaluationId ?? "",
+    problemDescription: preset.problemDescription ?? "", responsibleId: user?.userId ?? "", dueDate: new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10),
+  });
+  const [creatingPlan, setCreatingPlan] = useState(false);
+  const createPlanForSchool = async () => {
+    setCreatingPlan(true);
+    try {
+      const r = await fetch("/api/improvement", { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ kind: "plan", schoolId: preset.schoolId, title: `خطة تحسين ${new Date().getFullYear()} — ${preset.schoolName ?? ""}`.trim(), description: "أُنشئت لمعالجة المؤشرات الضعيفة في آخر تقييم." }) });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.message);
+      await onPlansChanged();
+      setF((x: any) => ({ ...x, planId: d.id }));
+    } catch (e: any) { add({ type: "error", message: e.message }); } finally { setCreatingPlan(false); }
+  };
   const [busy, setBusy] = useState(false);
   const activePlans = plans.filter((p) => p.status === "ACTIVE" && (!preset.schoolId || p.school_id === preset.schoolId));
   useEffect(() => { fetch("/api/lookup/indicators", { credentials: "include" }).then((r) => (r.ok ? r.json() : [])).then((d) => setIndicators(Array.isArray(d) ? d : [])).catch(() => {}); }, []);
@@ -222,7 +301,9 @@ function ActionModal({ ctx, plans, people, onClose, onDone }: { ctx: { planId?: 
   return (
     <Modal open onClose={onClose} title="إجراء تصحيحي" description="يرتبط بمؤشر نتج عنه القصور، وبمسؤول وموعد ومؤشر نجاح" width="lg">
       <div className="grid gap-3 sm:grid-cols-2">
-        <div className="sm:col-span-2"><label className="label">الخطة</label><select className="input" value={f.planId} onChange={(e) => setF({ ...f, planId: e.target.value })}><option value="">اختر خطة…</option>{activePlans.map((p) => <option key={p.id} value={p.id}>{p.title} — {p.school_name}</option>)}</select>{activePlans.length === 0 && <p className="mt-1 text-[11.5px] text-warning">لا خطط نشطة — أنشئ خطة أولاً.</p>}</div>
+        <div className="sm:col-span-2"><label className="label">الخطة</label><select className="input" value={f.planId} onChange={(e) => setF({ ...f, planId: e.target.value })}><option value="">اختر خطة…</option>{activePlans.map((p) => <option key={p.id} value={p.id}>{p.title} — {p.school_name}</option>)}</select>{activePlans.length === 0 && (preset.schoolId
+          ? <button type="button" className="btn btn-ghost btn-sm mt-2" disabled={creatingPlan} onClick={createPlanForSchool}>{creatingPlan && <Loader2 className="h-3.5 w-3.5 animate-spin" />} إنشاء خطة تحسين لهذه المدرسة</button>
+          : <p className="mt-1 text-[11.5px] text-warning">لا خطط نشطة — أنشئ خطة أولاً.</p>)}</div>
         <div className="sm:col-span-2"><label className="label">المؤشر المرتبط</label><select className="input" value={f.indicatorId} onChange={(e) => setF({ ...f, indicatorId: e.target.value })}><option value="">بلا ربط</option>{indicators.map((i) => <option key={i.id} value={i.id}>{i.code} — {i.title.slice(0, 80)}</option>)}</select></div>
         <div className="sm:col-span-2"><label className="label">وصف المشكلة</label><textarea className="input min-h-[64px]" value={f.problemDescription ?? ""} onChange={(e) => setF({ ...f, problemDescription: e.target.value })} /></div>
         <div className="sm:col-span-2"><label className="label">السبب (إن عُرف)</label><input className="input" value={f.rootCause ?? ""} onChange={(e) => setF({ ...f, rootCause: e.target.value })} /></div>

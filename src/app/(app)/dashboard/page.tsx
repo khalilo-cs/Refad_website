@@ -36,6 +36,7 @@ export default function DashboardPage() {
   const [filters, setFilters] = useState<Filters>(EMPTY);
   const [showFilters, setShowFilters] = useState(false);
   const [stats, setStats] = useState<any>(null);
+  const [required, setRequired] = useState<{ total: number; schools: number } | null>(null);
   const [error, setError] = useState(false);
   const [loading, setLoading] = useState(true);
   const [dirs, setDirs] = useState<any[]>([]);
@@ -63,6 +64,7 @@ export default function DashboardPage() {
     if (!staff) return;
     fetch("/api/lookup/directorates", { credentials: "include" }).then((r) => (r.ok ? r.json() : { directorates: [] })).then((d) => setDirs(d.directorates ?? d ?? [])).catch(() => {});
     fetch("/api/schools?limit=100", { credentials: "include" }).then((r) => (r.ok ? r.json() : { schools: [] })).then((d) => setSchools(d.schools ?? [])).catch(() => {});
+    fetch("/api/improvement/required", { credentials: "include" }).then((r) => (r.ok ? r.json() : null)).then((d) => d && setRequired({ total: d.total, schools: d.schools })).catch(() => {});
   }, [staff]);
 
   const activeCount = Object.values(filters).filter(Boolean).length;
@@ -140,6 +142,16 @@ export default function DashboardPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {required && required.total > 0 && (
+        <Link href="/improvement?required=1" className="flex items-center justify-between gap-3 rounded-2xl border border-warning/30 bg-warning/5 px-4 py-3 transition hover:bg-warning/10">
+          <span className="flex items-center gap-2 text-[13px] font-semibold text-navy">
+            <AlertTriangle className="h-4 w-4 shrink-0 text-warning" />
+            {required.total} مؤشراً ضعيفاً في {required.schools} مدرسة يستوجب خطة تحسين ولم يُنشأ له إجراء بعد
+          </span>
+          <span className="shrink-0 text-[12px] font-semibold text-turquoise">معالجة الآن</span>
+        </Link>
       )}
 
       {error && <Alert tone="danger" title="تعذّر تحميل البيانات">لم يستجب الخادم لطلب الإحصاءات. أعد المحاولة أو راجع اتصالك.</Alert>}

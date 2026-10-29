@@ -18,6 +18,7 @@ import {
   Layers,
   Sparkles,
   Map,
+  Trophy,
 } from "lucide-react";
 import RifadLogo from "@/components/brand/rifad-logo";
 import InstitutionLogos from "@/components/brand/institution-logos";
@@ -37,6 +38,7 @@ const ICONS: Record<string, React.ComponentType<any>> = {
   ShieldCheck,
   Layers,
   Map,
+  Trophy,
 };
 
 type Props = {

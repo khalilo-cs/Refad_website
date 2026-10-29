@@ -10,6 +10,7 @@ export const NAV_ITEMS: NavItem[] = [
   { key: "evidence", label: "الأدلة والشواهد", href: "/evidence", icon: "FileText" },
   { key: "reports", label: "التقارير", href: "/reports", icon: "BarChart" },
   { key: "improvement", label: "خطط التحسين", href: "/improvement", icon: "RefreshCw" },
+  { key: "rankings", label: "التميّز والتكريم", href: "/rankings", icon: "Trophy" },
   { key: "communication", label: "التواصل", href: "/communication", icon: "Mail" },
   { key: "settings", label: "الإعدادات", href: "/settings", icon: "Settings" },
   { key: "users", label: "المستخدمون والأدوار", href: "/users", icon: "ShieldCheck" },
@@ -18,8 +19,8 @@ export const NAV_ITEMS: NavItem[] = [
 const ALL = NAV_ITEMS.map((n) => n.key);
 const ROLE_NAV: Record<string, string[]> = {
   SUPER_ADMIN: ALL,
-  EDUCATION_DIRECTOR: ["dashboard", "schools", "map", "visits", "evaluation", "evidence", "reports", "improvement", "communication", "settings"],
-  INSPECTOR: ["dashboard", "schools", "map", "visits", "evaluation", "evidence", "reports", "improvement", "communication", "settings"],
+  EDUCATION_DIRECTOR: ["dashboard", "schools", "map", "visits", "evaluation", "evidence", "reports", "improvement", "rankings", "communication", "settings"],
+  INSPECTOR: ["dashboard", "schools", "map", "visits", "evaluation", "evidence", "reports", "improvement", "rankings", "communication", "settings"],
   SCHOOL_PRINCIPAL: ["dashboard", "schools", "visits", "evidence", "reports", "improvement", "communication", "settings"],
   QUALITY_COORDINATOR: ["dashboard", "schools", "evidence", "reports", "improvement", "communication", "settings"],
   TEACHER: ["dashboard", "evidence", "communication", "settings"],

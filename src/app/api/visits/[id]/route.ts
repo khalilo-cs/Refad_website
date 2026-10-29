@@ -4,6 +4,7 @@ import { queryOne, nowISO , query , exec } from "@/lib/db/sqlite";
 import { canAccessVisit } from "@/lib/scope";
 import { notify, schoolUsers } from "@/lib/notify";
 import { clientIp } from "@/lib/security";
+import { requiredActions } from "@/lib/required-actions";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -96,6 +97,14 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     } else if (action === "approve") {
       await notify([visit.inspector_id, ...(await schoolUsers(visit.school_id, ["SCHOOL_PRINCIPAL", "QUALITY_COORDINATOR"]))],
         "اعتُمدت الزيارة", `${school?.name}: ${labels[action]}`, { link: "/reports", type: "SUCCESS" });
+      // إلزام المدرسة بخطة تحسين للمؤشرات الضعيفة التي لا إجراء لها
+      const required = await requiredActions(session, { visitId: id });
+      if (required.length) {
+        await notify(await schoolUsers(visit.school_id, ["SCHOOL_PRINCIPAL", "QUALITY_COORDINATOR"]),
+          "مؤشرات تستوجب خطة تحسين",
+          `${required.length} مؤشراً قُيِّم بدرجة ضعيفة في ${school?.name} ويحتاج إجراءً تصحيحياً بمسؤول وموعد`,
+          { link: `/improvement?required=1&schoolId=${visit.school_id}`, type: "WARNING" });
+      }
     } else if (["postpone", "cancel", "reschedule"].includes(action)) {
       await notify([visit.inspector_id, ...(await schoolUsers(visit.school_id, ["SCHOOL_PRINCIPAL"]))],
         labels[action], `${school?.name}`, { link: "/visits", type: "WARNING" });
