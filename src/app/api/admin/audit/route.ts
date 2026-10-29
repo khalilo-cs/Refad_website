@@ -34,6 +34,7 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get("q")?.trim();
     const from = searchParams.get("from")?.trim();
     const to = searchParams.get("to")?.trim();
+    const userId = searchParams.get("userId")?.trim();
 
     const where: string[] = ["1 = 1"];
     const params: any[] = [];
@@ -45,6 +46,10 @@ export async function GET(request: NextRequest) {
     if (entity) {
       where.push("a.entity_type = ?");
       params.push(entity);
+    }
+    if (userId) {
+      where.push("a.user_id = ?");
+      params.push(userId);
     }
     if (search) {
       where.push("(u.name LIKE ? OR a.entity_id LIKE ? OR a.action LIKE ?)");

@@ -1,3 +1,4 @@
+/* eslint-disable react/no-children-prop */
 import { describe, it, expect } from "vitest";
 import React from "react";
 import { renderToString } from "react-dom/server";
@@ -18,7 +19,7 @@ const render = (el: React.ReactElement) => renderToString(el);
 describe("مكوّنات الهوية", () => {
   it("يركّب الشعار بالرمز فقط", () => {
     const html = render(React.createElement(RifadLogo, { size: 40 }));
-    expect(html).toContain("<svg");
+    expect(html).toContain("caqae-mark");
     expect(html.length).toBeGreaterThan(200);
   });
 
@@ -30,7 +31,7 @@ describe("مكوّنات الهوية", () => {
 
   it("يركّب الشعار على خلفية داكنة", () => {
     const html = render(React.createElement(RifadLogo, { size: 40, tone: "light" }));
-    expect(html).toContain("<svg");
+    expect(html).toContain("caqae-mark");
   });
 });
 
@@ -59,7 +60,7 @@ describe("مكوّنات الواجهة المشتركة", () => {
   it("يركّب تنبيهاً بنغمات مختلفة", () => {
     for (const tone of ["info", "warning", "danger", "success"] as const) {
       const html = render(
-        React.createElement(Alert, { tone, title: "تنبيه", children: "نص التنبيه" })
+        React.createElement(Alert, { tone, title: "تنبيه", children: "نص التنبيه" } as React.ComponentProps<typeof Alert>)
       );
       expect(html).toContain("نص التنبيه");
     }

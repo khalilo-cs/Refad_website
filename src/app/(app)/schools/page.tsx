@@ -1,398 +1,252 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
-import { PageHeader } from "@/components/ui";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import { motion } from "framer-motion";
+import { ArrowDown, ArrowUp, Building2, Download, FileUp, Loader2, MapPin, Plus, Search, TriangleAlert } from "lucide-react";
+import { EmptyState, Modal, PageHeader, LoadingRows } from "@/components/ui";
+import { Pagination, useDebounced } from "@/components/ui/extra";
 import { useSession, useToast } from "@/components/providers";
-import { Building, Plus, Search, Filter, FileUp, ChevronRight, Building2 } from "lucide-react";
+import { fmtDate } from "@/lib/labels";
+import { SchoolFormModal } from "@/components/schools/school-form-modal";
 
 type School = {
-  id: string;
-  code: string;
-  name: string;
-  type: string;
-  stage: string;
-  contact_phone: string | null;
-  status: string;
-  data_source: string;
-  directorate: string;
-  governorate: string;
-  visitsCount: number;
+  id: string; code: string; name: string; type: string; stage: string; status: string; data_source: string;
+  directorate: string; governorate: string; visitsCount: number; last_updated_at: string; latitude: number | null; longitude: number | null;
 };
+
+const SORTS: { key: string; label: string; cls?: string }[] = [
+  { key: "name", label: "اسم المدرسة" },
+  { key: "code", label: "الكود" },
+  { key: "directorate", label: "المديرية", cls: "hidden md:table-cell" },
+  { key: "visits", label: "الزيارات" },
+  { key: "updated", label: "آخر تحديث", cls: "hidden lg:table-cell" },
+];
+const STATUS_AR: Record<string, string> = { ACTIVE: "نشطة", INACTIVE: "غير نشطة", SUSPENDED: "موقوفة", ARCHIVED: "مؤرشفة" };
 
 export default function SchoolsPage() {
   const { user } = useSession();
   const { add } = useToast();
-  const [schools, setSchools] = useState<School[]>([]);
+  const canManage = user?.roleKey === "SUPER_ADMIN" || user?.roleKey === "EDUCATION_DIRECTOR";
+
+  const [rows, setRows] = useState<School[]>([]);
   const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("ACTIVE");
   const [directorateId, setDirectorateId] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [openCreate, setOpenCreate] = useState(false);
-  const [openImport, setOpenImport] = useState(false);
-  const [createLoading, setCreateLoading] = useState(false);
+  const [sort, setSort] = useState("name");
+  const [dir, setDir] = useState<"asc" | "desc">("asc");
+  const [loading, setLoading] = useState(true);
+  const [dirs, setDirs] = useState<any[]>([]);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
+  const q = useDebounced(search, 300);
 
-  const fetchSchools = useCallback(async () => {
+  const load = useCallback(async () => {
     setLoading(true);
     try {
-      const qs = new URLSearchParams({
-        search, status, page: String(page), limit: "20",
-        ...(directorateId ? { directorateId } : {}),
-      });
+      const qs = new URLSearchParams({ search: q, status, page: String(page), limit: "20", sort, dir, ...(directorateId ? { directorateId } : {}) });
       const res = await fetch(`/api/schools?${qs}`, { credentials: "include" });
       const data = await res.json();
-      setSchools(data.schools ?? []);
+      if (!res.ok) throw new Error(data.message);
+      setRows(data.schools ?? []);
       setTotal(data.total ?? 0);
-    } catch {
-      add({ type: "error", message: "فشل تحميل المدارس" });
+      setTotalPages(data.totalPages ?? 1);
+    } catch (e: any) {
+      add({ type: "error", message: e.message || "فشل تحميل المدارس" });
     } finally {
       setLoading(false);
     }
-  }, [search, status, page, directorateId, add]);
+  }, [q, status, page, sort, dir, directorateId, add]);
 
-  useEffect(() => { fetchSchools(); }, [fetchSchools]);
+  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    fetch("/api/lookup/directorates", { credentials: "include" }).then((r) => (r.ok ? r.json() : [])).then((d) => setDirs(Array.isArray(d) ? d : [])).catch(() => {});
+  }, []);
 
-  const handleCreate = async (formData: FormData) => {
-    setCreateLoading(true);
-    try {
-      const res = await fetch("/api/schools", {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          code: formData.get("code"),
-          name: formData.get("name"),
-          governorateId: formData.get("governorateId"),
-          directorateId: formData.get("directorateId"),
-          areaId: formData.get("areaId") || undefined,
-          address: formData.get("address") || undefined,
-          type: formData.get("type"),
-          stage: formData.get("stage"),
-          contactPhone: formData.get("contactPhone") || undefined,
-          contactEmail: formData.get("contactEmail") || undefined,
-          principalName: formData.get("principalName") || undefined,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message || "فشل الإضافة");
-      add({ type: "success", message: data.message });
-      setOpenCreate(false);
-      fetchSchools();
-    } catch (e: any) {
-      add({ type: "error", message: e.message });
-    } finally {
-      setCreateLoading(false);
-    }
-  };
-
-  /* ====== الاستيراد على مرحلتين: فحص أولاً ثم تأكيد ====== */
-  const [importFile, setImportFile] = useState<File | null>(null);
-  const [preview, setPreview] = useState<{
-    validCount: number;
-    errorCount: number;
-    errors: Array<{ row: number; field: string; message: string }>;
-    sample: any[];
-  } | null>(null);
-  const [importing, setImporting] = useState(false);
-
-  const resetImport = () => {
-    setImportFile(null);
-    setPreview(null);
-    setImporting(false);
-  };
-
-  const runPreview = async (file: File) => {
-    setImporting(true);
-    try {
-      const fd = new FormData();
-      fd.append("file", file);
-      const res = await fetch(`/api/schools/import`, {
-        method: "POST",
-        credentials: "include",
-        body: fd,
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message || "تعذّر قراءة الملف");
-      setImportFile(file);
-      setPreview(data);
-    } catch (e: any) {
-      add({ type: "error", message: e.message });
-      setPreview(null);
-    } finally {
-      setImporting(false);
-    }
-  };
-
-  const confirmImport = async () => {
-    if (!importFile) return;
-    setImporting(true);
-    try {
-      const fd = new FormData();
-      fd.append("file", importFile);
-      const res = await fetch(`/api/schools/import?commit=true`, {
-        method: "POST",
-        credentials: "include",
-        body: fd,
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message || "فشل الاستيراد");
-      add({ type: "success", message: data.message });
-      setOpenImport(false);
-      resetImport();
-      fetchSchools();
-    } catch (e: any) {
-      add({ type: "error", message: e.message });
-    } finally {
-      setImporting(false);
-    }
+  const toggleSort = (k: string) => {
+    if (sort === k) setDir((d) => (d === "asc" ? "desc" : "asc"));
+    else { setSort(k); setDir("asc"); }
+    setPage(1);
   };
 
   return (
     <div className="space-y-5">
       <PageHeader
-        title="إدارة المدارس"
-        subtitle="سجل المدارس في مديرية الجراحي — إضافة وتعديل واستيراد مع فحص قبل الحفظ"
+        title="المدارس"
+        subtitle="السجل المركزي للمدارس — بحث وفرز وتصدير، وإضافة يدوية أو استيراد من Excel/CSV مع فحص قبل الحفظ"
         icon={Building2}
         actions={
-        <div className="flex gap-2">
-          <button onClick={() => setOpenCreate(true)} className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-navy text-white text-sm font-semibold hover:bg-navy-soft transition">
-            <Plus className="w-4 h-4" /> إضافة مدرسة
-          </button>
-          <button onClick={() => setOpenImport(true)} className="flex items-center gap-2 px-4 py-2.5 rounded-lg border border-gray-200 text-gray-700 text-sm font-medium hover:bg-gray-50 transition">
-            <FileUp className="w-4 h-4" /> استيراد Excel/CSV
-          </button>
-        </div>
+          <>
+            <a href={`/api/schools/export?format=xlsx${directorateId ? `&directorateId=${directorateId}` : ""}`} className="btn btn-ghost btn-sm"><Download className="h-3.5 w-3.5" /> Excel</a>
+            <a href={`/api/schools/export?format=csv${directorateId ? `&directorateId=${directorateId}` : ""}`} className="btn btn-ghost btn-sm"><Download className="h-3.5 w-3.5" /> CSV</a>
+            <Link href="/map" className="btn btn-ghost btn-sm"><MapPin className="h-3.5 w-3.5" /> الخريطة</Link>
+            {canManage && (
+              <>
+                <button onClick={() => setImportOpen(true)} className="btn btn-ghost btn-sm"><FileUp className="h-3.5 w-3.5" /> استيراد</button>
+                <button onClick={() => setCreateOpen(true)} className="btn btn-primary btn-sm"><Plus className="h-3.5 w-3.5" /> إضافة مدرسة</button>
+              </>
+            )}
+          </>
         }
       />
 
-      <div className="bg-white rounded-xl border border-gray-100 shadow-sm">
-        <div className="p-4 border-b border-gray-100 flex flex-col sm:flex-row gap-3">
+      <div className="card overflow-hidden">
+        <div className="flex flex-col gap-3 border-b border-gray-100 p-4 md:flex-row">
           <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-            <input
-              type="text"
-              placeholder="ابحث باسم المدرسة أو الكود..."
-              className="w-full pl-9 pr-4 py-2.5 rounded-lg border border-gray-200 bg-gray-50 focus:border-turquoise focus:ring-2 focus:ring-turquoise/20 outline-none text-sm"
-              value={search}
-              onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-            />
+            <Search className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+            <input className="input pr-9" placeholder="ابحث باسم المدرسة أو الرمز…" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} aria-label="بحث" />
           </div>
-          <select
-            value={status}
-            onChange={(e) => { setStatus(e.target.value); setPage(1); }}
-            className="pr-4 py-2.5 rounded-lg border border-gray-200 bg-gray-50 focus:border-turquoise focus:ring-2 focus:ring-turquoise/20 outline-none text-sm"
-          >
-            <option value="ACTIVE">النشطة فقط</option>
-            <option value="ALL">الكل</option>
+          <select className="input md:w-48" value={directorateId} onChange={(e) => { setDirectorateId(e.target.value); setPage(1); }} aria-label="المديرية">
+            <option value="">كل المديريات</option>
+            {dirs.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
           </select>
-          <button
-            onClick={() => setPage(1)}
-            className="flex items-center gap-2 px-3 py-2.5 rounded-lg border border-gray-200 text-gray-700 text-sm font-medium hover:bg-gray-50 transition"
-          >
-            <Filter className="w-4 h-4" /> الفلترة
-          </button>
+          <select className="input md:w-40" value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }} aria-label="الحالة">
+            <option value="ACTIVE">النشطة</option>
+            <option value="INACTIVE">غير النشطة</option>
+            <option value="SUSPENDED">الموقوفة</option>
+            <option value="">الكل</option>
+          </select>
         </div>
 
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="text-gray-500 border-b border-gray-200">
-                <th className="py-3 pr-4 font-medium">اسم المدرسة</th>
-                <th className="py-3 pr-4 font-medium">الكود</th>
-                <th className="py-3 pr-4 font-hidden md:table-cell font-medium">المحافظة</th>
-                <th className="py-3 pr-4 font-hidden md:table-cell font-medium">المديرية</th>
-                <th className="py-3 pr-4 font-medium">النوع / المرحلة</th>
-                <th className="py-3 pr-4 font-medium">الزيارات</th>
-                <th className="py-3 pr-4 font-medium">الحالة</th>
-                <th className="py-3 pr-4 font-medium">إجراءات</th>
+              <tr className="border-b border-gray-200 bg-gray-50/60 text-gray-500">
+                {SORTS.map((c) => (
+                  <th key={c.key} className={`px-4 py-3 text-right font-medium ${c.cls ?? ""}`}>
+                    <button onClick={() => toggleSort(c.key)} className="inline-flex items-center gap-1 transition hover:text-navy" aria-label={`فرز حسب ${c.label}`}>
+                      {c.label}{sort === c.key && (dir === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />)}
+                    </button>
+                  </th>
+                ))}
+                <th className="px-4 py-3 text-right font-medium">النوع / المرحلة</th>
+                <th className="px-4 py-3 text-right font-medium">الحالة</th>
               </tr>
             </thead>
             <tbody>
-              {schools.map((s) => (
-                <tr key={s.id} className="border-b border-gray-50/50 hover:bg-gray-50 group">
-                  <td className="py-3 pr-4 font-medium text-navy">
-                    <a href={`/(app)/schools/${s.id}`} className="hover:underline">{s.name}</a>
+              {loading ? <LoadingRows cols={7} rows={6} /> : rows.map((s, i) => (
+                <motion.tr key={s.id} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: Math.min(i * 0.03, 0.3) }} className="group border-b border-gray-50 transition hover:bg-turquoise-soft/30">
+                  <td className="px-4 py-3">
+                    <Link href={`/schools/${s.id}`} className="font-semibold text-navy hover:text-turquoise hover:underline">{s.name}</Link>
+                    {s.data_source !== "OFFICIAL" && s.code.startsWith("RIFAD-DEMO") && <span className="badge badge-gold ms-2">تجريبية</span>}
                   </td>
-                  <td className="py-3 pr-4 font-mono text-gray-600">{s.code}</td>
-                  <td className="py-3 pr-4 font-hidden md:table-cell text-gray-600">{s.governorate}</td>
-                  <td className="py-3 pr-4 font-hidden md:table-cell text-gray-600">{s.directorate}</td>
-                  <td className="py-3 pr-4 text-gray-600">{s.type} / {s.stage}</td>
-                  <td className="py-3 pr-4 font-mono">{s.visitsCount}</td>
-                  <td className="py-3 pr-4">
-                    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${
-                      s.status === "ACTIVE" ? "bg-success/10 text-success border border-success/20" : "bg-gray-100 text-gray-600 border border-gray-200"
-                    }`}>{s.status === "ACTIVE" ? "نشطة" : s.status === "INACTIVE" ? "غير نشطة" : "مقيدة"}</span>
-                  </td>
-                  <td className="py-3 pr-4">
-                    <a href={`/(app)/schools/${s.id}`} className="text-turquoise text-sm font-medium hover:underline flex items-center gap-1">
-                      عرض <ChevronRight className="w-3 h-3" />
-                    </a>
-                  </td>
-                </tr>
+                  <td className="px-4 py-3 font-mono text-gray-600">{s.code}</td>
+                  <td className="hidden px-4 py-3 text-gray-600 md:table-cell">{s.directorate}</td>
+                  <td className="px-4 py-3 font-mono">{s.visitsCount}</td>
+                  <td className="hidden px-4 py-3 text-gray-500 lg:table-cell">{fmtDate(s.last_updated_at)}</td>
+                  <td className="px-4 py-3 text-gray-600">{s.type} / {s.stage}</td>
+                  <td className="px-4 py-3"><span className={`badge ${s.status === "ACTIVE" ? "badge-success" : "badge-neutral"}`}>{STATUS_AR[s.status] ?? s.status}</span></td>
+                </motion.tr>
               ))}
-              {schools.length === 0 && (
-                <tr><td colSpan={8} className="py-8 text-center text-gray-500">لا توجد مدارس مطابقة.</td></tr>
+              {!loading && rows.length === 0 && (
+                <tr><td colSpan={7}>
+                  <EmptyState icon={Building2} title="لا توجد مدارس مطابقة" description={canManage ? "أضف مدرسة يدوياً أو استورد السجل من ملف Excel/CSV." : "لا مدارس ضمن نطاق صلاحيتك بهذه المرشحات."}
+                    action={canManage ? <button className="btn btn-primary btn-sm" onClick={() => setCreateOpen(true)}><Plus className="h-3.5 w-3.5" /> إضافة مدرسة</button> : undefined} />
+                </td></tr>
               )}
             </tbody>
           </table>
         </div>
-
-        <div className="px-4 py-3 border-t border-gray-100 flex items-center justify-between">
-          <div className="text-xs text-gray-600">الصفحة {page} من {Math.ceil(total / 20) || 1} — إجمالي {total} مدرسة</div>
-          <div className="flex gap-1">
-            <button disabled={page === 1} onClick={() => setPage(page - 1)} className="px-3 py-2 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-50">السابقة</button>
-            <button disabled={page * 20 >= total} onClick={() => setPage(page + 1)} className="px-3 py-2 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-50">التالي</button>
-          </div>
-        </div>
+        <div className="border-t border-gray-100 px-3"><Pagination page={page} totalPages={totalPages} total={total} onPage={setPage} /></div>
       </div>
 
-      {/* نموذج إضافة مدرسة */}
-      <div
-        className={`fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm ${
-          openCreate ? "" : "hidden"
-        }`}
-      >
-        <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-2xl m-4 max-h-[90vh] overflow-y-auto">
-          <h2 className="text-xl font-heading text-navy font-bold mb-2">
-            استيراد المدارس من ملف Excel أو CSV
-          </h2>
-          <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-            <p className="text-sm text-gray-600">
-              الأعمدة المتوقعة: الكود، الاسم، المحافظة، المديرية، النوع، المرحلة، العنوان،
-              الهاتف، البريد، مدير المدرسة. لا تُحفظ أي سجلات قبل تأكيدك.
-            </p>
-            <a
-              href="/api/schools/import/template"
-              className="shrink-0 rounded-lg border border-turquoise/40 bg-turquoise-soft/50 px-3 py-1.5 text-[11.5px] font-medium text-emerald-deep transition hover:bg-turquoise-soft"
-            >
-              تنزيل القالب
-            </a>
-          </div>
-
-          <label
-            className={`flex cursor-pointer flex-col items-center gap-2 rounded-xl border-2 border-dashed p-5 transition ${
-              importing ? "border-gray-200 opacity-60" : "border-gray-200 hover:border-turquoise hover:bg-turquoise-soft/30"
-            }`}
-          >
-            <FileUp className="h-6 w-6 text-turquoise" />
-            <span className="text-sm font-medium text-navy">
-              {importFile ? importFile.name : "اختر ملف (xlsx, xls, csv)"}
-            </span>
-            <span className="text-[11px] text-gray-400">
-              {importFile ? "اختر ملفاً آخر لاستبداله" : "سيُعرض تقرير فحص أولاً قبل الحفظ"}
-            </span>
-            <input
-              type="file"
-              accept=".xlsx,.xls,.csv"
-              className="hidden"
-              disabled={importing}
-              onChange={(e) => {
-                const f = e.target.files?.[0];
-                if (f) void runPreview(f);
-              }}
-            />
-          </label>
-
-          {importing && (
-            <p className="mt-4 text-center text-[12px] text-gray-500">
-              جارٍ {preview ? "الحفظ" : "فحص"} الملف…
-            </p>
-          )}
-
-          {preview && !importing && (
-            <div className="mt-4 space-y-3">
-              <div className="grid grid-cols-2 gap-2">
-                <div className="rounded-xl border border-success/25 bg-success-soft px-3 py-2.5 text-center">
-                  <p className="text-[10px] text-gray-600">صفوف صالحة</p>
-                  <p className="font-mono text-lg font-bold text-success">{preview.validCount}</p>
-                </div>
-                <div className="rounded-xl border border-danger/25 bg-danger-soft px-3 py-2.5 text-center">
-                  <p className="text-[10px] text-gray-600">صفوف بها أخطاء</p>
-                  <p className="font-mono text-lg font-bold text-danger">{preview.errorCount}</p>
-                </div>
-              </div>
-
-              {preview.sample?.length > 0 && (
-                <div>
-                  <p className="mb-1 text-[11px] font-semibold text-gray-600">عيّنة من الصفوف الصالحة</p>
-                  <div className="overflow-x-auto rounded-lg border border-gray-100">
-                    <table className="w-full text-[11px]">
-                      <thead className="bg-gray-50 text-gray-500">
-                        <tr>
-                          <th className="px-2 py-1.5 text-right">الكود</th>
-                          <th className="px-2 py-1.5 text-right">الاسم</th>
-                          <th className="px-2 py-1.5 text-right">المديرية</th>
-                          <th className="px-2 py-1.5 text-right">النوع</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {preview.sample.map((r: any, i: number) => (
-                          <tr key={i} className="border-t border-gray-100">
-                            <td className="px-2 py-1.5 font-mono text-navy">{r.code}</td>
-                            <td className="px-2 py-1.5">{r.name}</td>
-                            <td className="px-2 py-1.5 text-gray-600">{r.directorate}</td>
-                            <td className="px-2 py-1.5 text-gray-600">{r.type}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
-
-              {preview.errors?.length > 0 && (
-                <div>
-                  <p className="mb-1 text-[11px] font-semibold text-danger">
-                    أخطاء يجب تصحيحها في الملف (تُعرض أول 100)
-                  </p>
-                  <div className="max-h-44 overflow-y-auto rounded-lg border border-danger/20">
-                    <table className="w-full text-[11px]">
-                      <tbody>
-                        {preview.errors.map((e, i) => (
-                          <tr key={i} className="border-b border-gray-100 last:border-0">
-                            <td className="w-16 px-2 py-1 font-mono text-gray-500">صف {e.row}</td>
-                            <td className="px-2 py-1 text-gray-600">{e.message}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
-
-              <div className="flex flex-wrap items-center gap-2 border-t border-gray-100 pt-3">
-                <button
-                  onClick={confirmImport}
-                  disabled={preview.validCount === 0}
-                  className="rounded-lg bg-navy px-4 py-2 text-sm font-semibold text-white transition hover:bg-navy-soft disabled:cursor-not-allowed disabled:opacity-40"
-                >
-                  تأكيد وحفظ {preview.validCount} مدرسة
-                </button>
-                <button
-                  onClick={() => setPreview(null)}
-                  className="rounded-lg border border-gray-200 px-4 py-2 text-sm text-gray-600 transition hover:bg-gray-50"
-                >
-                  اختيار ملف آخر
-                </button>
-                <span className="text-[10px] text-gray-400">
-                  الصفوف التي بها أخطاء لا تُحفظ؛ صحّحها ثم أعد الفحص.
-                </span>
-              </div>
-            </div>
-          )}
-
-          <button
-            onClick={() => {
-              setOpenImport(false);
-              resetImport();
-            }}
-            className="mt-4 text-sm text-gray-600 hover:underline"
-          >
-            إلغاء
-          </button>
-        </div>
-      </div>
+      <SchoolFormModal open={createOpen} onClose={() => setCreateOpen(false)} onSaved={() => { setCreateOpen(false); void load(); }} />
+      <ImportModal open={importOpen} onClose={() => setImportOpen(false)} onDone={() => { setImportOpen(false); void load(); }} />
     </div>
   );
+}
+
+/* ------------------------------------------------------------------ */
+/* الاستيراد على مرحلتين: فحص ثم تأكيد                                  */
+/* ------------------------------------------------------------------ */
+function ImportModal({ open, onClose, onDone }: { open: boolean; onClose: () => void; onDone: () => void }) {
+  const { add } = useToast();
+  const [file, setFile] = useState<File | null>(null);
+  const [preview, setPreview] = useState<any>(null);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => { if (!open) { setFile(null); setPreview(null); } }, [open]);
+
+  const run = async (f: File, commit: boolean) => {
+    setBusy(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", f);
+      const res = await fetch(`/api/schools/import${commit ? "?commit=true" : ""}`, { method: "POST", credentials: "include", body: fd });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "تعذّر قراءة الملف");
+      if (commit) { add({ type: "success", message: data.message }); onDone(); }
+      else { setFile(f); setPreview(data); }
+    } catch (e: any) {
+      add({ type: "error", message: e.message });
+      if (!commit) setPreview(null);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const errorReport = useMemo(() => {
+    if (!preview?.errors?.length) return null;
+    const csv = "﻿" + ["الصف,الحقل,الخطأ", ...preview.errors.map((e: any) => `${e.row},${e.field},"${String(e.message).replace(/"/g, '""')}"`)].join("\r\n");
+    return URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+  }, [preview]);
+
+  return (
+    <Modal open={open} onClose={onClose} title="استيراد المدارس من Excel أو CSV" description="لا يُحفظ شيء قبل تأكيدك. الصفوف المكررة أو الخاطئة تُستبعد وتُعرض أسبابها." width="lg">
+      <div className="space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-2 text-[12.5px] text-gray-600">
+          <span>الأعمدة: الكود، الاسم، المحافظة، المديرية، النوع، المرحلة، العنوان، الهاتف، البريد، مدير المدرسة، خط العرض، خط الطول.</span>
+          {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
+          <a href="/api/schools/import/template" className="btn btn-ghost btn-sm"><Download className="h-3.5 w-3.5" /> تنزيل القالب</a>
+        </div>
+        <label className={`flex cursor-pointer flex-col items-center gap-2 rounded-2xl border-2 border-dashed p-6 transition ${busy ? "opacity-60" : "border-gray-200 hover:border-turquoise hover:bg-turquoise-soft/30"}`}>
+          {busy ? <Loader2 className="h-6 w-6 animate-spin text-turquoise" /> : <FileUp className="h-6 w-6 text-turquoise" />}
+          <span className="text-sm font-semibold text-navy">{file ? file.name : "اختر ملف xlsx أو csv"}</span>
+          <input type="file" accept=".xlsx,.csv" className="hidden" disabled={busy} onChange={(e) => { const f = e.target.files?.[0]; if (f) void run(f, false); }} />
+        </label>
+
+        {preview && (
+          <div className="space-y-3 animate-fade-up">
+            <div className="grid grid-cols-3 gap-2 text-center">
+              <Stat label="صفوف صالحة" v={preview.validCount} tone="success" />
+              <Stat label="صفوف بها أخطاء" v={new Set((preview.errors ?? []).map((e: any) => e.row)).size} tone="danger" />
+              <Stat label="إجمالي الصفوف" v={preview.totalRows ?? preview.validCount} tone="navy" />
+            </div>
+            {preview.sample?.length > 0 && (
+              <div className="overflow-x-auto rounded-xl border border-gray-100">
+                <table className="w-full text-[12px]">
+                  <thead className="bg-gray-50 text-gray-500"><tr><th className="px-2 py-1.5 text-right">الكود</th><th className="px-2 py-1.5 text-right">الاسم</th><th className="px-2 py-1.5 text-right">المديرية</th><th className="px-2 py-1.5 text-right">النوع</th></tr></thead>
+                  <tbody>{preview.sample.map((r: any, i: number) => <tr key={i} className="border-t border-gray-100"><td className="px-2 py-1.5 font-mono text-navy">{r.code}</td><td className="px-2 py-1.5">{r.name}</td><td className="px-2 py-1.5 text-gray-600">{r.directorate}</td><td className="px-2 py-1.5 text-gray-600">{r.type}</td></tr>)}</tbody>
+                </table>
+              </div>
+            )}
+            {preview.errors?.length > 0 && (
+              <div>
+                <div className="mb-1 flex items-center justify-between">
+                  <p className="flex items-center gap-1 text-[12px] font-semibold text-danger"><TriangleAlert className="h-3.5 w-3.5" /> أخطاء يجب تصحيحها</p>
+                  {errorReport && <a href={errorReport} download="import-report.csv" className="text-[12px] font-semibold text-turquoise hover:underline">تصدير تقرير الأخطاء</a>}
+                </div>
+                <div className="max-h-44 overflow-y-auto rounded-xl border border-danger/20">
+                  <table className="w-full text-[12px]"><tbody>{preview.errors.map((e: any, i: number) => <tr key={i} className="border-b border-gray-100 last:border-0"><td className="w-16 px-2 py-1 font-mono text-gray-500">صف {e.row}</td><td className="px-2 py-1 text-gray-600">{e.message}</td></tr>)}</tbody></table>
+                </div>
+              </div>
+            )}
+            <div className="flex justify-end gap-2 border-t border-gray-100 pt-3">
+              <button className="btn btn-ghost btn-sm" onClick={onClose}>إلغاء</button>
+              <button className="btn btn-primary btn-sm" disabled={busy || preview.validCount === 0} onClick={() => file && run(file, true)}>
+                {busy && <Loader2 className="h-3.5 w-3.5 animate-spin" />} تأكيد وحفظ {preview.validCount} مدرسة
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </Modal>
+  );
+}
+
+function Stat({ label, v, tone }: { label: string; v: number; tone: "success" | "danger" | "navy" }) {
+  const c = { success: "border-success/25 bg-success-soft text-success", danger: "border-danger/25 bg-danger-soft text-danger", navy: "border-gray-200 bg-gray-50 text-navy" }[tone];
+  return <div className={`rounded-xl border px-3 py-2.5 ${c}`}><p className="text-[11px] text-gray-600">{label}</p><p className="font-mono text-xl font-bold">{v}</p></div>;
 }

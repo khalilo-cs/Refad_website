@@ -6,6 +6,7 @@ import {
   auditLog,
 } from "@/lib/auth";
 import { query, queryOne, exec, uuid, nowISO, toJson, getDb } from "@/lib/db/sqlite";
+import { schoolScope } from "@/lib/scope";
 
 export const runtime = "nodejs";
 
@@ -26,15 +27,6 @@ const schoolSchema = z.object({
   dataSource: z.enum(["MANUAL", "EXCEL_IMPORT", "OFFICIAL"]).default("MANUAL"),
 });
 
-function scopeSql(user: { roleKey: string; schoolId: string | null; directorateId: string | null }): string {
-  if (user.roleKey === "SUPER_ADMIN") return "";
-  if (user.roleKey === "EDUCATION_DIRECTOR") return `AND s.directorate_id = '${user.directorateId}'`;
-  if (user.roleKey === "SCHOOL_PRINCIPAL") return `AND s.id = '${user.schoolId}'`;
-  if (user.roleKey === "INSPECTOR" && user.directorateId)
-    return `AND s.directorate_id = '${user.directorateId}'`;
-  return `AND 1 = 0`;
-}
-
 export async function GET(request: NextRequest) {
   const session = await getServerSession();
   if (!session) return NextResponse.json({ message: "غير مصدق" }, { status: 401 });
@@ -44,34 +36,58 @@ export async function GET(request: NextRequest) {
   if (!allowed) return NextResponse.json({ message: "غير مصرح" }, { status: 403 });
 
   const { searchParams } = new URL(request.url);
-  const search = searchParams.get("search") ?? "";
+  const search = (searchParams.get("search") ?? "").trim().slice(0, 100);
   const directorateId = searchParams.get("directorateId") ?? "";
   const status = searchParams.get("status") ?? "ACTIVE";
-  const page = Math.max(Number(searchParams.get("page") ?? 1), 1);
-  const limit = Math.min(Math.max(Number(searchParams.get("limit") ?? 20), 1), 100);
+  const sort = searchParams.get("sort") ?? "name";
+  const dir = searchParams.get("dir") === "desc" ? "DESC" : "ASC";
+  const page = Math.max(Number(searchParams.get("page") ?? 1) || 1, 1);
+  const limit = Math.min(Math.max(Number(searchParams.get("limit") ?? 20) || 20, 1), 100);
   const offset = (page - 1) * limit;
 
-  const scope = scopeSql(session);
-  const dirFilter = directorateId ? `AND s.directorate_id = '${directorateId}'` : "";
-  const statusFilter = status ? `AND s.status = '${status}'` : "";
-  const like = `%${search}%`;
+  const SORTS: Record<string, string> = {
+    name: "s.name",
+    code: "s.code",
+    directorate: "d.name",
+    visits: "visitsCount",
+    updated: "s.last_updated_at",
+  };
+  const orderBy = SORTS[sort] ?? "s.name";
+
+  const scope = schoolScope(session, "s");
+  const where: string[] = [scope.sql];
+  const params: unknown[] = [...scope.params];
+  if (directorateId) {
+    where.push("s.directorate_id = ?");
+    params.push(directorateId);
+  }
+  if (status && ["ACTIVE", "INACTIVE", "SUSPENDED"].includes(status)) {
+    where.push("s.status = ?");
+    params.push(status);
+  }
+  if (search) {
+    where.push("(s.name LIKE ? OR s.code LIKE ?)");
+    const like = `%${search.replace(/[%_]/g, "")}%`;
+    params.push(like, like);
+  }
+  const whereSql = where.join(" AND ");
 
   const schools = query<any>(
     `SELECT s.id, s.code, s.name, s.type, s.stage, s.contact_phone, s.status, s.data_source, s.last_updated_at,
+            s.latitude, s.longitude, s.principal_name,
             d.name AS directorate, g.name AS governorate,
             (SELECT COUNT(*) FROM visits v WHERE v.school_id = s.id) AS visitsCount
      FROM schools s
      JOIN directorates d ON d.id = s.directorate_id
      JOIN governorates g ON g.id = s.governorate_id
-     WHERE 1=1 ${scope} ${dirFilter} ${statusFilter}
-       AND (s.name LIKE ? OR s.code LIKE ?)
-     ORDER BY s.name
+     WHERE ${whereSql}
+     ORDER BY ${orderBy} ${dir}
      LIMIT ? OFFSET ?`,
-    [like, like, limit, offset]
+    [...params, limit, offset]
   );
   const totalRow = queryOne<{ n: number }>(
-    `SELECT COUNT(*) n FROM schools s WHERE 1=1 ${scope} ${dirFilter} ${statusFilter} AND (s.name LIKE ? OR s.code LIKE ?)`,
-    [like, like]
+    `SELECT COUNT(*) n FROM schools s WHERE ${whereSql}`,
+    params
   );
 
   return NextResponse.json({

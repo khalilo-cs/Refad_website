@@ -87,6 +87,7 @@ export const PERMISSION_GROUPS: PermissionGroup[] = [
       { key: "viewOwnSchool", label: "عرض مدرستي", hint: "محصور بمدرسة المستخدم" },
       { key: "viewOwnData", label: "عرض بياناتي", hint: "بيانات المستخدم الشخصية فقط" },
       { key: "viewChildren", label: "عرض الأبناء", hint: "لأولياء الأمور" },
+      { key: "uploadAchievementFiles", label: "رفع ملفات الإنجاز", hint: "رفع ملف إنجاز المعلم" },
       { key: "viewPublicInfo", label: "عرض المعلومات العامة", hint: "معلومات متاحة للجميع" },
     ],
   },

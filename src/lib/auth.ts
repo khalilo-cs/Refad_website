@@ -80,10 +80,16 @@ export type UserSession = TokenUser & {
   permissions: Record<string, unknown>;
 };
 
-/** سياسة كلمات المرور: 8 أحرف على الأقل، رقم واحد وحرف واحد. */
+/** سياسة كلمات المرور: 10 أحرف على الأقل، رقم وحرف، وغير شائعة. */
 export function validatePassword(password: string): { ok: boolean; message?: string } {
-  if (password.length < 8) {
-    return { ok: false, message: "يجب أن تتكون كلمة المرور من 8 أحرف على الأقل" };
+  if (password.length < 10) {
+    return { ok: false, message: "يجب أن تتكون كلمة المرور من 10 أحرف على الأقل" };
+  }
+  if (password.length > 128) {
+    return { ok: false, message: "كلمة المرور طويلة جداً" };
+  }
+  if (/^(.)\1+$/.test(password) || /password|123456|qwerty|رفاد|rifad/i.test(password)) {
+    return { ok: false, message: "كلمة المرور شائعة أو متوقعة، اختر غيرها" };
   }
   if (!/[0-9]/.test(password)) {
     return {
@@ -214,14 +220,37 @@ async function findUserByEmail(email: string): Promise<UserSession | null> {
   };
 }
 
+const LOCK_THRESHOLD = 5;
+const LOCK_MINUTES = 15;
+// تجزئة وهمية تُستخدم لتسوية زمن الاستجابة عند عدم وجود المستخدم (منع كشف الحسابات بالتوقيت).
+const DUMMY_HASH = bcrypt.hashSync("rifad-dummy-password", 12);
+
+export type AuthFailure = "credentials" | "locked" | "inactive" | "throttled";
+
 export async function authenticateUser(
   email: string,
   password: string
-): Promise<{ ok: true; user: UserSession } | { ok: false; reason: "credentials" | "locked" | "inactive" }> {
+): Promise<
+  | { ok: true; user: UserSession }
+  | { ok: false; reason: AuthFailure; retryAfterMin?: number }
+> {
+  email = email.trim().toLowerCase();
   const user = await findUserByEmail(email);
-  if (!user) return { ok: false, reason: "credentials" };
+  if (!user) {
+    await bcrypt.compare(password, DUMMY_HASH);
+    return { ok: false, reason: "credentials" };
+  }
   if (user.isLocked) return { ok: false, reason: "locked" };
   if (!user.isActive) return { ok: false, reason: "inactive" };
+
+  const lockRow = queryOne<{ locked_until: string | null }>(
+    "SELECT locked_until FROM users WHERE id = ?",
+    [user.userId]
+  );
+  if (lockRow?.locked_until && new Date(lockRow.locked_until).getTime() > Date.now()) {
+    const mins = Math.ceil((new Date(lockRow.locked_until).getTime() - Date.now()) / 60000);
+    return { ok: false, reason: "throttled", retryAfterMin: mins };
+  }
 
   const row = queryOne<{ password_hash: string }>(
     "SELECT password_hash FROM users WHERE id = ?",
@@ -229,13 +258,23 @@ export async function authenticateUser(
   );
   if (!row || !(await verifyPassword(password, row.password_hash))) {
     const db = getDb();
-    db.prepare(
-      "UPDATE users SET failed_login = failed_login + 1, is_locked = CASE WHEN failed_login + 1 >= 5 THEN 1 ELSE is_locked END WHERE id = ?"
-    ).run(user.userId);
+    const failed = (queryOne<{ f: number }>("SELECT failed_login + 1 AS f FROM users WHERE id = ?", [user.userId])?.f) ?? 1;
+    if (failed >= LOCK_THRESHOLD) {
+      // قفل مؤقت (وليس دائماً) حتى لا يُستغل لإيقاف حسابات الآخرين
+      db.prepare("UPDATE users SET failed_login = 0, locked_until = datetime('now', ?) WHERE id = ?").run(
+        `+${LOCK_MINUTES} minutes`,
+        user.userId
+      );
+      auditLog({ userId: user.userId, action: "LOGIN_TEMP_LOCK", entityType: "User", entityId: user.userId });
+    } else {
+      db.prepare("UPDATE users SET failed_login = ? WHERE id = ?").run(failed, user.userId);
+    }
     return { ok: false, reason: "credentials" };
   }
 
-  getDb().prepare("UPDATE users SET failed_login = 0, last_login_at = ? WHERE id = ?").run(nowISO(), user.userId);
+  getDb()
+    .prepare("UPDATE users SET failed_login = 0, locked_until = NULL, last_login_at = ? WHERE id = ?")
+    .run(nowISO(), user.userId);
   return { ok: true, user };
 }
 

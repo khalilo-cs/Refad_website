@@ -17,8 +17,10 @@ import {
   LogOut,
   Layers,
   Sparkles,
+  Map,
 } from "lucide-react";
 import RifadLogo from "@/components/brand/rifad-logo";
+import InstitutionLogos from "@/components/brand/institution-logos";
 
 type NavItem = { key: string; label: string; href: string; icon: string };
 
@@ -34,6 +36,7 @@ const ICONS: Record<string, React.ComponentType<any>> = {
   Settings,
   ShieldCheck,
   Layers,
+  Map,
 };
 
 type Props = {
@@ -157,6 +160,7 @@ export default function Sidebar({ items, open, onToggle, onLogout, user }: Props
           تسجيل الخروج
         </button>
 
+        <div className="mt-3 flex items-center justify-center gap-2 rounded-xl bg-white/6 px-3 py-2"><InstitutionLogos size={30} caption={false} show="ministry" /><span className="text-[10.5px] leading-tight text-white/60">بالتعاون مع<br />وزارة التربية والتعليم</span></div>
         <p className="mt-3 text-center text-[9px] leading-relaxed text-white/25">
           تصميم وتطوير: المهندس محمد خليل
           <br />

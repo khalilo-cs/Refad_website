@@ -16,6 +16,8 @@ type ParsedRow = {
   contact_phone?: string;
   contact_email?: string;
   principal_name?: string;
+  latitude?: number;
+  longitude?: number;
 };
 
 export async function POST(request: NextRequest) {
@@ -31,6 +33,8 @@ export async function POST(request: NextRequest) {
   const file = formData.get("file") as File | null;
   if (!file) return NextResponse.json({ message: "لم يتم رفع ملف" }, { status: 400 });
 
+  if (file.size > 5 * 1024 * 1024) return NextResponse.json({ message: "حجم الملف يتجاوز 5 ميجابايت" }, { status: 400 });
+  if (!/\.(xlsx|csv)$/i.test(file.name)) return NextResponse.json({ message: "الصيغ المقبولة: xlsx أو csv" }, { status: 400 });
   const arrayBuffer = await file.arrayBuffer();
   const workbook = new ExcelJS.Workbook();
   try {
@@ -70,6 +74,10 @@ export async function POST(request: NextRequest) {
     const phone = get("H") || undefined;
     const email = get("I") || undefined;
     const principal = get("J") || undefined;
+    const latRaw = get("K");
+    const lngRaw = get("L");
+    const lat = latRaw ? Number(latRaw) : undefined;
+    const lng = lngRaw ? Number(lngRaw) : undefined;
 
     rowNo = r;
     if (!code && !name && !governorateName) return; // صف فارغ
@@ -91,8 +99,16 @@ export async function POST(request: NextRequest) {
     if (!stage) errors.push({ row: r, field: "stage", message: "المرحلة الدراسية مطلوبة" });
     if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) errors.push({ row: r, field: "contact_email", message: "بريد إلكتروني غير صالح" });
 
+    if ((latRaw && (Number.isNaN(lat) || lat! < -90 || lat! > 90)) || (lngRaw && (Number.isNaN(lng) || lng! < -180 || lng! > 180)))
+      errors.push({ row: r, field: "coordinates", message: "إحداثيات غير صالحة (خط العرض -90..90، خط الطول -180..180)" });
+    if (!!latRaw !== !!lngRaw) errors.push({ row: r, field: "coordinates", message: "يجب إدخال خطي العرض والطول معاً" });
+    if (session.roleKey === "EDUCATION_DIRECTOR" && directorateName) {
+      const own = session.directorateId && directorates.find((x) => x.id === session.directorateId)?.name;
+      if (own !== directorateName) errors.push({ row: r, field: "directorate", message: "لا يمكنك إضافة مدارس خارج مديريتك" });
+    }
+
     if (errors.filter((e) => e.row === r).length === 0) {
-      valid.push({ code, name, governorate: governorateName!, directorate: directorateName!, type, stage, address: address || "", contact_phone: phone || undefined, contact_email: email, principal_name: principal });
+      valid.push({ code, name, governorate: governorateName!, directorate: directorateName!, type, stage, address: address || "", contact_phone: phone || undefined, contact_email: email, principal_name: principal, latitude: lat, longitude: lng });
     }
   });
 
@@ -100,8 +116,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       validCount: valid.length,
       errorCount: errors.length,
-      errors: errors.slice(0, 100),
+      errors: errors.slice(0, 500),
       sample: valid.slice(0, 5),
+      totalRows: valid.length + new Set(errors.map((e) => e.row)).size,
     });
   }
 
@@ -117,9 +134,9 @@ export async function POST(request: NextRequest) {
       const id = uuid();
       const now = nowISO();
       db.prepare(
-        `INSERT INTO schools (id, code, name, governorate_id, directorate_id, address, type, stage, contact_phone, contact_email, principal_name, data_source, status, last_updated_at, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'EXCEL_IMPORT', 'ACTIVE', ?, ?)`
-      ).run(id, row.code, row.name, g.id, d.id, row.address || null, row.type, row.stage, row.contact_phone || null, row.contact_email || null, row.principal_name || null, now, now);
+        `INSERT INTO schools (id, code, name, governorate_id, directorate_id, address, type, stage, contact_phone, contact_email, principal_name, latitude, longitude, data_source, status, last_updated_at, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'EXCEL_IMPORT', 'ACTIVE', ?, ?)`
+      ).run(id, row.code, row.name, g.id, d.id, row.address || null, row.type, row.stage, row.contact_phone || null, row.contact_email || null, row.principal_name || null, row.latitude ?? null, row.longitude ?? null, now, now);
       auditLog({
         userId: session.userId,
         action: "CREATE",
@@ -131,5 +148,5 @@ export async function POST(request: NextRequest) {
   });
   tx();
 
-  return NextResponse.json({ message: `تمت إضافة ${valid.length} مدرسة بنجاح`, imported: valid.length, errors: errors.slice(0, 100) });
+  return NextResponse.json({ message: `تمت إضافة ${valid.length} مدرسة بنجاح`, imported: valid.length, errors: errors.slice(0, 500) });
 }

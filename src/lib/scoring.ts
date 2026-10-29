@@ -76,6 +76,10 @@ export type EvaluationResult = {
   maxScore: number;
   totalScore: number | null;
   totalAchievementPercent: number | null;
+  /** مجموع أوزان المعايير الفرعية التي لها مؤشر مقيَّم واحد على الأقل. */
+  evaluatedWeight: number;
+  /** نسبة التحقق على الجزء المقيَّم فقط (الدرجة الكلية ÷ الوزن المقيَّم × 100) — للمقارنة لا للاعتماد. */
+  evaluatedPartPercent: number | null;
   completionPercent: number;
   totalIndicators: number;
   evaluatedIndicators: number;
@@ -227,6 +231,12 @@ export function computeEvaluation(
 
   const totalScore = contributions.length > 0 ? round2(contributions.reduce((a, b) => a + b, 0)) : null;
 
+  const evaluatedWeight = round2(
+    allSubs.filter((x) => x.achievementPercent !== null).reduce((a, x) => a + x.weight, 0)
+  );
+  const evaluatedPartPercent =
+    totalScore !== null && evaluatedWeight > 0 ? round2((totalScore / evaluatedWeight) * 100) : null;
+
   const warnings: string[] = [];
 
   const missingSubs = allSubs.filter((s) => s.achievementPercent === null);
@@ -261,6 +271,8 @@ export function computeEvaluation(
     maxScore,
     totalScore,
     totalAchievementPercent: totalScore,
+    evaluatedWeight,
+    evaluatedPartPercent,
     completionPercent,
     totalIndicators,
     evaluatedIndicators,

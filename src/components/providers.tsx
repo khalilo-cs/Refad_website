@@ -89,7 +89,17 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = useCallback(async () => {
+    // حاول رفع أي مسودات معلّقة قبل إنهاء الجلسة؛ ما لم يُرفع يبقى محلياً ولا يُمسح فيضيع
+    try {
+      const { flushPending, clearAllLocal } = await import("@/lib/offline/drafts");
+      const { remaining } = await flushPending();
+      if (remaining === 0) await clearAllLocal();
+    } catch { /* غير حرج */ }
     await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
+    try {
+      const reg = await navigator.serviceWorker?.getRegistration();
+      reg?.active?.postMessage({ type: "CLEAR_DATA" });
+    } catch { /* غير حرج */ }
     setUser(null);
   }, []);
 

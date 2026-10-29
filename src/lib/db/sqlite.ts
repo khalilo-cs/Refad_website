@@ -11,6 +11,7 @@ import Database from "better-sqlite3";
 import { randomUUID } from "crypto";
 import path from "path";
 import fs from "fs";
+import { runMigrations } from "./migrations";
 
 export type Db = Database.Database;
 
@@ -26,6 +27,7 @@ export function getDb(): Db {
   db.pragma("foreign_keys = ON");
   db.pragma("journal_mode = WAL");
   db.pragma("busy_timeout = 5000");
+  runMigrations(db);
   dbInstance = db;
   return db;
 }
@@ -109,14 +111,15 @@ export function transaction<T>(fn: () => T): T {
 /**
  * تهيئة قاعدة البيانات من ملف المخطط وبذر البيانات الأولية.
  */
-export async function initDatabase(opts?: { seed?: boolean }): Promise<void> {
+export async function initDatabase(opts?: { seed?: boolean; demo?: boolean; demoPassword?: string }): Promise<void> {
   const schemaPath = path.resolve(process.cwd(), "prisma", "schema.sql");
   const schema = fs.readFileSync(schemaPath, "utf8");
   const db = getDb();
   db.exec(schema);
+  runMigrations(db);
 
   if (opts?.seed) {
     const { seedDatabase } = await import("./seed-sqlite");
-    await seedDatabase(db);
+    await seedDatabase(db, { demo: opts.demo, demoPassword: opts.demoPassword });
   }
 }

@@ -14,8 +14,9 @@ import {
 import StructureManager from "@/components/admin/structure-manager";
 import RolesManager from "@/components/admin/roles-manager";
 import AuditLog from "@/components/admin/audit-log";
+import SecurityPanel from "@/components/admin/security-panel";
 
-type Tab = "schools" | "geo" | "users" | "structure" | "scale" | "roles" | "audit";
+type Tab = "schools" | "geo" | "users" | "structure" | "scale" | "roles" | "audit" | "security";
 
 const TABS: { key: Tab; label: string; icon: any }[] = [
   { key: "schools", label: "المدارس", icon: Building2 },
@@ -25,6 +26,7 @@ const TABS: { key: Tab; label: string; icon: any }[] = [
   { key: "scale", label: "مقياس التقدير", icon: SlidersHorizontal },
   { key: "roles", label: "الأدوار والصلاحيات", icon: ShieldCheck },
   { key: "audit", label: "سجل التدقيق", icon: History },
+  { key: "security", label: "الأمن والحوادث", icon: ShieldAlert },
 ];
 
 /** مسارات مرجعية قد تُرجع مصفوفة مباشرة أو كائناً مغلَّفاً بالمفتاح. */
@@ -609,6 +611,7 @@ export default function AdminPage() {
       {tab === "structure" && <StructureManager />}
       {tab === "roles" && <RolesManager />}
       {tab === "audit" && <AuditLog />}
+      {tab === "security" && <SecurityPanel />}
 
       {/* ============ مقياس التقدير ============ */}
       {tab === "scale" && (

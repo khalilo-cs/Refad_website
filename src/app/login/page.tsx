@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Mail, Lock, AlertCircle, Eye, EyeOff, ArrowLeft, ShieldCheck } from "lucide-react";
 import RifadLogo from "@/components/brand/rifad-logo";
+import InstitutionLogos from "@/components/brand/institution-logos";
 
 function LoginForm() {
   const { add } = useToast();
@@ -87,6 +88,7 @@ function LoginForm() {
         </div>
 
         <div className="relative p-10">
+          <InstitutionLogos size={64} className="mb-6 justify-start" />
           <div className="ornament mb-4 text-[10px] font-semibold tracking-wider text-gold/70">
             مديرية الجراحي — الحديدة
           </div>

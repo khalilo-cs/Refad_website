@@ -9,7 +9,7 @@
    - أي طلب فاشل لصفحة: تُعرض صفحة /offline.
    ========================================================== */
 
-const VERSION = "rifad-v2";
+const VERSION = "rifad-v3";
 const SHELL_CACHE = `${VERSION}-shell`;
 const DATA_CACHE = `${VERSION}-data`;
 
@@ -17,7 +17,8 @@ const SHELL_ASSETS = [
   "/offline",
   "/icons/icon-192.png",
   "/icons/icon-512.png",
-  "/brand/logo-mark.svg",
+  "/brand/caqae-mark.png",
+  "/brand/moe-logo.png",
   "/logo.svg",
   "/favicon.svg",
   "/fonts/Amiri-Regular.ttf",
@@ -65,8 +66,12 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // واجهات القراءة: شبكة أولاً ثم ذاكرة مؤقتة
+  // واجهات القراءة: شبكة أولاً ثم ذاكرة مؤقتة — لقائمة بيضاء فقط من المسارات اللازمة للعمل الميداني.
+  // لا تُخزَّن أبداً: الأدلة وملفاتها، المستخدمون، الإدارة، الإشعارات، الرسائل.
   if (url.pathname.startsWith("/api/")) {
+    const CACHEABLE = ["/api/evaluations/visit/", "/api/visits", "/api/schools", "/api/lookup"];
+    const cacheable = CACHEABLE.some((p) => url.pathname.startsWith(p)) && !url.pathname.includes("/export");
+    if (!cacheable) return;
     event.respondWith(
       (async () => {
         try {
@@ -124,4 +129,16 @@ self.addEventListener("fetch", (event) => {
       }
     })()
   );
+});
+
+// عند تسجيل الخروج: مسح البيانات المخزّنة حتى لا تبقى على جهاز مشترك
+self.addEventListener("message", (event) => {
+  if (event.data && event.data.type === "CLEAR_DATA") {
+    event.waitUntil(
+      (async () => {
+        const keys = await caches.keys();
+        await Promise.all(keys.filter((k) => k.endsWith("-data") || k.endsWith("-shell")).map((k) => caches.delete(k)));
+      })()
+    );
+  }
 });

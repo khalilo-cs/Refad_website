@@ -1,112 +1,111 @@
 import { NextResponse } from "next/server";
 import { getServerSession, authorize, auditLog } from "@/lib/auth";
-import { query, queryOne, getDb } from "@/lib/db/sqlite";
-import { randomUUID } from "crypto";
+import { query, queryOne, getDb, uuid } from "@/lib/db/sqlite";
 import { writeFile, mkdir } from "fs/promises";
 import path from "path";
+import { schoolScope, canAccessSchool } from "@/lib/scope";
+import { clientIp, rateLimit, sanitizeFilename, sha256Hex, sniffFile, uploadsRoot } from "@/lib/security";
+import { notify, schoolUsers } from "@/lib/notify";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
-const MAX_BYTES = 15 * 1024 * 1024; // 15MB
-const ALLOWED = [
-  "application/pdf",
-  "image/jpeg",
-  "image/png",
-  "image/webp",
-  "application/msword",
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-  "application/vnd.ms-excel",
-  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-];
+/** الحد الأقصى للحجم: قابل للضبط من الإعدادات (file.maxSizeMB) وبالبيئة. */
+function maxBytes(): number {
+  const row = queryOne<{ value: string }>("SELECT value FROM settings WHERE key = 'file.maxSizeMB'");
+  let mb = Number(process.env.MAX_UPLOAD_MB ?? 15);
+  try {
+    if (row) mb = Number(JSON.parse(row.value)) || mb;
+  } catch { /* القيمة الافتراضية */ }
+  return Math.min(Math.max(mb, 1), 100) * 1024 * 1024;
+}
 
-/** أي دور يمكنه رفع الأدلة */
-const UPLOAD_ROLES = [
-  "SUPER_ADMIN",
-  "EDUCATION_DIRECTOR",
-  "INSPECTOR",
-  "SCHOOL_PRINCIPAL",
-  "QUALITY_COORDINATOR",
-  "TEACHER",
+const UPLOAD_ROLES = ["SUPER_ADMIN", "EDUCATION_DIRECTOR", "INSPECTOR", "SCHOOL_PRINCIPAL", "QUALITY_COORDINATOR", "TEACHER"];
+const REVIEW_ROLES = ["SUPER_ADMIN", "EDUCATION_DIRECTOR", "INSPECTOR", "QUALITY_COORDINATOR"];
+
+export const DOCUMENT_TYPES = [
+  "وثيقة رسمية", "خطة", "تقرير", "محضر", "سجل", "كشف", "صورة ميدانية", "نموذج", "شهادة", "أخرى",
 ];
 
 function bad(message: string, status = 400) {
   return NextResponse.json({ message }, { status });
 }
 
-/** GET /api/evidence?schoolId=&visitId=&status= */
+/** GET /api/evidence?schoolId=&visitId=&indicatorId=&subCriterionId=&status=&q=&type= */
 export async function GET(request: Request) {
   const session = await getServerSession();
   if (!session) return bad("غير مصدق", 401);
   const { allowed } = authorize(session, { roles: UPLOAD_ROLES });
   if (!allowed) return bad("غير مصرح", 403);
 
-  const { searchParams } = new URL(request.url);
-  const schoolId = searchParams.get("schoolId") ?? "";
-  const visitId = searchParams.get("visitId") ?? "";
-  const status = searchParams.get("status") ?? "";
-
-  const where: string[] = ["1=1"];
-  const params: unknown[] = [];
-
-  // نطاق الدور
-  if (session.roleKey === "SCHOOL_PRINCIPAL" && session.schoolId) {
-    where.push("e.school_id = ?");
-    params.push(session.schoolId);
-  } else if (session.roleKey === "EDUCATION_DIRECTOR" && session.directorateId) {
-    where.push("s.directorate_id = ?");
-    params.push(session.directorateId);
+  const sp = new URL(request.url).searchParams;
+  const scope = schoolScope(session, "s");
+  const where: string[] = [scope.sql];
+  const params: unknown[] = [...scope.params];
+  // المعلم يرى ما رفعه هو فقط
+  if (session.roleKey === "TEACHER") {
+    where.push("e.uploaded_by_id = ?");
+    params.push(session.userId);
   }
-  if (schoolId) {
-    where.push("e.school_id = ?");
-    params.push(schoolId);
+  const add = (cond: string, val: unknown) => { where.push(cond); params.push(val); };
+  const schoolId = sp.get("schoolId"); if (schoolId) add("e.school_id = ?", schoolId);
+  const visitId = sp.get("visitId"); if (visitId) add("e.visit_id = ?", visitId);
+  const indicatorId = sp.get("indicatorId"); if (indicatorId) add("COALESCE(e.indicator_id, ev.indicator_id) = ?", indicatorId);
+  const subId = sp.get("subCriterionId"); if (subId) add("e.sub_criterion_id = ?", subId);
+  const type = sp.get("type"); if (type) add("e.document_type = ?", type);
+  const q = (sp.get("q") ?? "").trim().slice(0, 100);
+  if (q) {
+    where.push("(e.name LIKE ? OR e.original_name LIKE ? OR e.description LIKE ?)");
+    const like = `%${q.replace(/[%_]/g, "")}%`;
+    params.push(like, like, like);
   }
-  if (visitId) {
-    where.push("e.visit_id = ?");
-    params.push(visitId);
-  }
-  if (status) {
-    where.push("e.review_status = ?");
-    params.push(status);
-  }
+  const baseWhere = where.join(" AND ");
+  const status = sp.get("status");
+  const fullWhere = status && ["PENDING", "ACCEPTED", "REJECTED"].includes(status) ? `${baseWhere} AND e.review_status = ?` : baseWhere;
+  const fullParams = status && ["PENDING", "ACCEPTED", "REJECTED"].includes(status) ? [...params, status] : params;
 
   const rows = query<any>(
-    `SELECT e.id, e.name, e.original_name, e.mime_type, e.size, e.url, e.review_status,
-            e.review_notes, e.created_at, e.school_id, e.visit_id, e.evaluation_id,
-            s.name AS school_name,
-            u.name AS uploaded_by_name,
+    `SELECT e.id, e.name, e.original_name, e.mime_type, e.size, e.review_status, e.review_notes,
+            e.validity, e.document_type, e.description, e.version, e.created_at, e.school_id, e.visit_id,
+            e.evaluation_id, COALESCE(e.indicator_id, ev.indicator_id) AS indicator_id, e.sub_criterion_id, e.action_id, e.library_item_id, e.can_download,
+            s.name AS school_name, u.name AS uploaded_by_name,
             i.code AS indicator_code, i.title AS indicator_title
      FROM evidence e
      JOIN schools s ON s.id = e.school_id
      LEFT JOIN users u ON u.id = e.uploaded_by_id
      LEFT JOIN evaluations ev ON ev.id = e.evaluation_id
-     LEFT JOIN indicators i ON i.id = ev.indicator_id
-     WHERE ${where.join(" AND ")}
+     LEFT JOIN indicators i ON i.id = COALESCE(e.indicator_id, ev.indicator_id)
+     WHERE ${fullWhere}
      ORDER BY e.created_at DESC
-     LIMIT 200`,
-    params
+     LIMIT 300`,
+    fullParams
   );
 
   const counts = queryOne<any>(
     `SELECT
-       SUM(CASE WHEN e.review_status = 'PENDING' THEN 1 ELSE 0 END) AS pending,
-       SUM(CASE WHEN e.review_status = 'ACCEPTED' THEN 1 ELSE 0 END) AS accepted,
-       SUM(CASE WHEN e.review_status = 'REJECTED' THEN 1 ELSE 0 END) AS rejected,
+       COALESCE(SUM(CASE WHEN e.review_status = 'PENDING' THEN 1 ELSE 0 END),0) AS pending,
+       COALESCE(SUM(CASE WHEN e.review_status = 'ACCEPTED' THEN 1 ELSE 0 END),0) AS accepted,
+       COALESCE(SUM(CASE WHEN e.review_status = 'REJECTED' THEN 1 ELSE 0 END),0) AS rejected,
        COUNT(*) AS total
      FROM evidence e
      JOIN schools s ON s.id = e.school_id
-     WHERE ${where.filter((w) => !w.startsWith("e.review_status")).join(" AND ")}`,
-    params.slice(0, params.length - (status ? 1 : 0))
+     LEFT JOIN evaluations ev ON ev.id = e.evaluation_id
+     WHERE ${baseWhere}`,
+    params
   );
 
-  return NextResponse.json({ evidence: rows, counts: counts ?? {} });
+  return NextResponse.json({ evidence: rows, counts: counts ?? {}, documentTypes: DOCUMENT_TYPES });
 }
 
-/** POST /api/evidence — رفع ملف دليل (multipart) */
+/** POST /api/evidence — رفع دليل جديد، أو نسخة جديدة من دليل قائم (replaceId). */
 export async function POST(request: Request) {
   const session = await getServerSession();
   if (!session) return bad("غير مصدق", 401);
   const { allowed } = authorize(session, { roles: UPLOAD_ROLES, permission: "uploadEvidence" });
   if (!allowed) return bad("غير مصرح لك برفع الأدلة", 403);
+
+  const rl = rateLimit(`upload:${session.userId}`, 60, 10 * 60_000);
+  if (!rl.ok) return bad("عدد كبير من عمليات الرفع. حاول لاحقاً.", 429);
 
   let form: FormData;
   try {
@@ -118,147 +117,159 @@ export async function POST(request: Request) {
   const file = form.get("file");
   if (!(file instanceof File)) return bad("لم يُرفق أي ملف");
   if (file.size === 0) return bad("الملف فارغ");
-  if (file.size > MAX_BYTES) return bad("حجم الملف يتجاوز 15 ميجابايت");
+  const limit = maxBytes();
+  if (file.size > limit) return bad(`حجم الملف يتجاوز ${Math.round(limit / 1024 / 1024)} ميجابايت`);
 
-  const schoolId = String(form.get("schoolId") ?? "");
+  const replaceId = String(form.get("replaceId") ?? "") || null;
+  let schoolId = String(form.get("schoolId") ?? "");
+  let replacing: any = null;
+  if (replaceId) {
+    replacing = queryOne<any>("SELECT * FROM evidence WHERE id = ?", [replaceId]);
+    if (!replacing) return bad("الدليل المراد استبداله غير موجود", 404);
+    schoolId = replacing.school_id;
+  }
   if (!schoolId) return bad("يجب تحديد المدرسة");
+  if (!queryOne("SELECT id FROM schools WHERE id = ?", [schoolId])) return bad("المدرسة غير موجودة", 404);
+  if (!canAccessSchool(session, schoolId)) return bad("المدرسة خارج نطاق صلاحيتك", 403);
 
-  const school = queryOne<{ id: string; directorate_id: string | null }>(
-    "SELECT id, directorate_id FROM schools WHERE id = ?",
-    [schoolId]
-  );
-  if (!school) return bad("المدرسة غير موجودة", 404);
+  const buf = Buffer.from(await file.arrayBuffer());
+  const kind = sniffFile(buf, file.name);
+  if (!kind) return bad("نوع الملف غير مسموح أو محتواه لا يطابق امتداده. المسموح: PDF، صور، Word، Excel، CSV.");
 
-  // منع رفع أدلة لمدرسة خارج نطاق المستخدم
-  if (session.roleKey === "SCHOOL_PRINCIPAL" && session.schoolId !== schoolId)
-    return bad("يمكنك رفع الأدلة لمدرستك فقط", 403);
-  if (
-    session.roleKey === "EDUCATION_DIRECTOR" &&
-    session.directorateId &&
-    school.directorate_id !== session.directorateId
-  )
-    return bad("المدرسة خارج مديريتك", 403);
+  const visitId = String(form.get("visitId") ?? "") || replacing?.visit_id || null;
+  const indicatorId = String(form.get("indicatorId") ?? "") || replacing?.indicator_id || null;
+  let evaluationId = String(form.get("evaluationId") ?? "") || replacing?.evaluation_id || null;
+  const subCriterionId = String(form.get("subCriterionId") ?? "") || replacing?.sub_criterion_id || null;
+  const actionId = String(form.get("actionId") ?? "") || replacing?.action_id || null;
+  const libraryItemId = String(form.get("libraryItemId") ?? "") || replacing?.library_item_id || null;
+  if (libraryItemId && !queryOne("SELECT id FROM evidence_library_items WHERE id = ?", [libraryItemId])) return bad("عنصر المكتبة غير موجود", 404);
+  if (visitId) {
+    const v = queryOne<{ school_id: string }>("SELECT school_id FROM visits WHERE id = ?", [visitId]);
+    if (!v || v.school_id !== schoolId) return bad("الزيارة لا تخص هذه المدرسة");
+  }
+  if (indicatorId && !queryOne("SELECT id FROM indicators WHERE id = ?", [indicatorId])) return bad("المؤشر غير موجود", 404);
+  if (visitId && indicatorId && !evaluationId) {
+    evaluationId = queryOne<{ id: string }>("SELECT id FROM evaluations WHERE visit_id = ? AND indicator_id = ?", [visitId, indicatorId])?.id ?? null;
+  }
 
-  const mime = file.type || "application/octet-stream";
-  if (!ALLOWED.includes(mime))
-    return bad("نوع الملف غير مسموح. المسموح: PDF، صور، Word، Excel.");
-
-  const ext = (file.name.split(".").pop() ?? "bin").toLowerCase().replace(/[^a-z0-9]/g, "");
-  const key = `${randomUUID()}.${ext}`;
-  const dir = path.join(process.cwd(), "public", "uploads", "evidence");
+  const key = `${uuid()}.${kind.ext}`;
+  const hash = sha256Hex(buf);
+  const db = getDb();
+  const documentType = String(form.get("documentType") ?? "").slice(0, 60) || replacing?.document_type || null;
+  const description = String(form.get("description") ?? "").slice(0, 1000) || replacing?.description || null;
+  const displayName = sanitizeFilename(String(form.get("name") ?? "") || file.name).slice(0, 200);
 
   try {
-    await mkdir(dir, { recursive: true });
-    const buf = Buffer.from(await file.arrayBuffer());
-    await writeFile(path.join(dir, key), buf);
+    await mkdir(uploadsRoot(), { recursive: true, mode: 0o750 });
+    await writeFile(path.join(uploadsRoot(), key), buf, { mode: 0o640 });
 
-    const id = randomUUID();
-    const name = String(form.get("name") ?? file.name).slice(0, 200);
-    const visitId = String(form.get("visitId") ?? "") || null;
-    const evaluationId = String(form.get("evaluationId") ?? "") || null;
-
-    getDb()
-      .prepare(
-        `INSERT INTO evidence (id, name, original_name, mime_type, size, storage_key, url,
-           school_id, visit_id, evaluation_id, uploaded_by_id, review_status, created_at)
-         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,datetime('now'))`
-      )
-      .run(
-        id,
-        name,
-        file.name.slice(0, 255),
-        mime,
-        file.size,
-        key,
-        `/uploads/evidence/${key}`,
-        schoolId,
-        visitId,
-        evaluationId,
-        session.userId,
-        "PENDING"
-      );
+    const id = replaceId ?? uuid();
+    let version = 1;
+    const tx = db.transaction(() => {
+      if (replacing) {
+        version = replacing.version + 1;
+        // حفظ النسخة السابقة في سجل النسخ
+        db.prepare(
+          `INSERT OR IGNORE INTO evidence_versions (id, evidence_id, version, storage_key, original_name, mime_type, size, sha256, uploaded_by_id, change_note)
+           VALUES (?,?,?,?,?,?,?,?,?,?)`
+        ).run(uuid(), id, replacing.version, replacing.storage_key, replacing.original_name, replacing.mime_type, replacing.size, replacing.sha256, replacing.uploaded_by_id, null);
+        db.prepare(
+          `UPDATE evidence SET storage_key = ?, original_name = ?, mime_type = ?, size = ?, sha256 = ?, url = ?,
+             version = ?, review_status = 'PENDING', review_notes = NULL, validity = NULL, reviewed_by_id = NULL, reviewed_at = NULL,
+             uploaded_by_id = ?, description = ?, document_type = ?, updated_at = datetime('now')
+           WHERE id = ?`
+        ).run(key, sanitizeFilename(file.name), kind.mime, buf.length, hash, `/api/evidence/${id}/file`, version, session.userId, description, documentType, id);
+      } else {
+        db.prepare(
+          `INSERT INTO evidence (id, name, original_name, mime_type, size, storage_key, url, school_id, visit_id, evaluation_id,
+             sub_criterion_id, indicator_id, action_id, library_item_id, uploaded_by_id, review_status, document_type, description, sha256, created_at)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?, 'PENDING', ?,?,?, datetime('now'))`
+        ).run(id, displayName, sanitizeFilename(file.name), kind.mime, buf.length, key, `/api/evidence/${id}/file`, schoolId, visitId, evaluationId,
+          subCriterionId, indicatorId, actionId, libraryItemId, session.userId, documentType, description, hash);
+      }
+    });
+    tx();
 
     auditLog({
       userId: session.userId,
-      action: "UPLOAD_EVIDENCE",
+      action: replacing ? "EVIDENCE_NEW_VERSION" : "UPLOAD_EVIDENCE",
       entityType: "evidence",
       entityId: id,
-      newValues: { name, schoolId, size: file.size },
+      newValues: { name: displayName, schoolId, size: buf.length, version, sha256: hash, indicatorId },
+      ipAddress: clientIp(request),
     });
 
-    return NextResponse.json(
-      { id, url: `/uploads/evidence/${key}`, message: "تم رفع الدليل" },
-      { status: 201 }
-    );
+    // إشعار المراجعين
+    if (session.roleKey === "SCHOOL_PRINCIPAL" || session.roleKey === "TEACHER") {
+      const reviewers = db.prepare(
+        `SELECT DISTINCT u.id FROM users u JOIN roles r ON r.id = u.role_id
+         JOIN schools s ON s.id = ? WHERE u.is_active = 1 AND (
+           (r.key = 'EDUCATION_DIRECTOR' AND u.directorate_id = s.directorate_id) OR
+           (r.key = 'QUALITY_COORDINATOR' AND u.school_id = s.id))`
+      ).all(schoolId) as { id: string }[];
+      notify(reviewers.map((r) => r.id), "دليل جديد بانتظار المراجعة", displayName, { link: "/evidence", type: "INFO" });
+    } else if (session.roleKey === "INSPECTOR") {
+      notify(schoolUsers(schoolId, ["SCHOOL_PRINCIPAL"]), "أُرفق دليل جديد لمدرستكم", displayName, { link: "/evidence", type: "INFO" });
+    }
+
+    return NextResponse.json({ id, version, url: `/api/evidence/${id}/file`, message: replacing ? "تم رفع نسخة جديدة من الدليل" : "تم رفع الدليل" }, { status: 201 });
   } catch (e: any) {
-    return bad("تعذّر حفظ الملف: " + (e?.message ?? "خطأ غير معروف"), 500);
+    return bad("تعذّر حفظ الملف", 500);
   }
 }
 
-/** PATCH /api/evidence — مراجعة دليل (قبول/رفض) */
+/** PATCH /api/evidence — مراجعة دليل: { id, status, validity?, notes? } */
 export async function PATCH(request: Request) {
   const session = await getServerSession();
   if (!session) return bad("غير مصدق", 401);
-  const { allowed } = authorize(session, {
-    roles: ["SUPER_ADMIN", "EDUCATION_DIRECTOR", "INSPECTOR"],
-    permission: "reviewEvidence",
-  });
-  if (!allowed) return bad("مراجعة الأدلة متاحة للمفتش ومدير التعليم ومدير النظام", 403);
+  const { allowed } = authorize(session, { roles: REVIEW_ROLES, permission: "reviewEvidence" });
+  if (!allowed) return bad("مراجعة الأدلة متاحة للمفتش ومدير التعليم ومنسق الجودة", 403);
 
   let body: any;
-  try {
-    body = await request.json();
-  } catch {
-    return bad("صيغة الطلب غير صحيحة");
-  }
+  try { body = await request.json(); } catch { return bad("صيغة الطلب غير صحيحة"); }
 
   const id = String(body.id ?? "");
   const status = String(body.status ?? "");
+  const validity = body.validity ? String(body.validity) : null;
   if (!["ACCEPTED", "REJECTED", "PENDING"].includes(status)) return bad("حالة مراجعة غير معروفة");
+  if (validity && !["VALID", "PARTIAL", "INVALID"].includes(validity)) return bad("تقدير الصلاحية غير معروف");
 
   const row = queryOne<any>("SELECT * FROM evidence WHERE id = ?", [id]);
   if (!row) return bad("الدليل غير موجود", 404);
+  if (!canAccessSchool(session, row.school_id)) return bad("خارج نطاق صلاحيتك", 403);
+  if (row.uploaded_by_id === session.userId && session.roleKey !== "SUPER_ADMIN")
+    return bad("لا يمكنك مراجعة دليل رفعته بنفسك", 403);
 
-  if (status === "REJECTED" && String(body.notes ?? "").trim().length < 5)
-    return bad("سبب الرفض مطلوب (5 أحرف على الأقل)");
+  if (status === "REJECTED" && String(body.notes ?? "").trim().length < 5) return bad("سبب الرفض مطلوب (5 أحرف على الأقل)");
 
   getDb()
-    .prepare(
-      `UPDATE evidence SET review_status = ?, review_notes = ?, reviewed_by_id = ?, reviewed_at = datetime('now') WHERE id = ?`
-    )
-    .run(status, String(body.notes ?? "").slice(0, 1000) || null, session.userId, id);
+    .prepare(`UPDATE evidence SET review_status = ?, review_notes = ?, validity = ?, reviewed_by_id = ?, reviewed_at = datetime('now') WHERE id = ?`)
+    .run(status, String(body.notes ?? "").slice(0, 1000) || null, status === "ACCEPTED" ? (validity ?? "VALID") : validity, session.userId, id);
 
   auditLog({
-    userId: session.userId,
-    action: "REVIEW_EVIDENCE",
-    entityType: "evidence",
-    entityId: id,
-    oldValues: { review_status: row.review_status },
-    newValues: { review_status: status, notes: body.notes },
+    userId: session.userId, action: "REVIEW_EVIDENCE", entityType: "evidence", entityId: id,
+    oldValues: { review_status: row.review_status }, newValues: { review_status: status, validity, notes: body.notes },
+    ipAddress: clientIp(request),
   });
+  notify([row.uploaded_by_id], status === "ACCEPTED" ? "قُبل الدليل" : status === "REJECTED" ? "رُفض الدليل" : "أُعيد الدليل للمراجعة",
+    `${row.name}${body.notes ? " — " + String(body.notes).slice(0, 120) : ""}`, { link: "/evidence", type: status === "REJECTED" ? "DANGER" : "SUCCESS" });
 
   return NextResponse.json({ message: status === "ACCEPTED" ? "تم قبول الدليل" : status === "REJECTED" ? "تم رفض الدليل" : "أُعيد الدليل للمراجعة" });
 }
 
-/** DELETE /api/evidence?id= — حذف دليل */
+/** DELETE /api/evidence?id= — حذف دليل (للإدارة فقط). الملف يُحذف من التخزين الخاص. */
 export async function DELETE(request: Request) {
   const session = await getServerSession();
   if (!session) return bad("غير مصدق", 401);
   const { allowed } = authorize(session, { roles: ["SUPER_ADMIN", "EDUCATION_DIRECTOR"] });
   if (!allowed) return bad("حذف الأدلة متاح لمدير النظام ومدير التعليم", 403);
 
-  const { searchParams } = new URL(request.url);
-  const id = searchParams.get("id") ?? "";
+  const id = new URL(request.url).searchParams.get("id") ?? "";
   const row = queryOne<any>("SELECT * FROM evidence WHERE id = ?", [id]);
   if (!row) return bad("الدليل غير موجود", 404);
+  if (!canAccessSchool(session, row.school_id)) return bad("خارج نطاق صلاحيتك", 403);
 
   getDb().prepare("DELETE FROM evidence WHERE id = ?").run(id);
-  auditLog({
-    userId: session.userId,
-    action: "DELETE_EVIDENCE",
-    entityType: "evidence",
-    entityId: id,
-    oldValues: row,
-  });
+  auditLog({ userId: session.userId, action: "DELETE_EVIDENCE", entityType: "evidence", entityId: id, oldValues: { name: row.name, sha256: row.sha256 }, ipAddress: clientIp(request) });
   return NextResponse.json({ message: "تم حذف الدليل" });
 }

@@ -1,517 +1,194 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
-import { PageHeader } from "@/components/ui";
+import { Suspense, useCallback, useEffect, useState } from "react";
+import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
+import { motion } from "framer-motion";
+import { BarChart3, CalendarClock, ClipboardCheck, Download, FileSpreadsheet, FileText, Layers, Loader2, Plus, Search, ShieldCheck, Sparkles } from "lucide-react";
+import { EmptyState, LoadingRows, Modal, PageHeader } from "@/components/ui";
+import { Pagination, StatusBadge, Tabs, useDebounced } from "@/components/ui/extra";
 import { useSession, useToast } from "@/components/providers";
-import { FileText, Download, Plus, CheckCircle2, XCircle, Clock, Send, FileBarChart, Eye, Printer, X } from "lucide-react";
-import { generateArabicPdf } from "@/lib/pdf";
+import { REPORT_STATUS, VISIT_STATUS, fmtDate } from "@/lib/labels";
 
-type Report = {
-  id: string;
-  number: string;
-  title: string;
-  status: string;
-  school_name: string | null;
-  generated_by_name: string | null;
-  approved_by_name: string | null;
-  approved_at: string | null;
-  verification_code: string;
-  summary: string | null;
-  rejection_reason: string | null;
-  created_at: string;
-  period_start: string | null;
-  period_end: string | null;
-};
+type Tab = "" | "DRAFT" | "UNDER_REVIEW" | "APPROVED" | "REJECTED";
 
-const STATUS: Record<string, { label: string; cls: string; icon: any }> = {
-  DRAFT: { label: "مسودة", cls: "bg-gray-100 text-gray-700", icon: Clock },
-  UNDER_REVIEW: { label: "قيد المراجعة", cls: "bg-warning/10 text-warning", icon: Send },
-  APPROVED: { label: "معتمد", cls: "bg-success/10 text-success", icon: CheckCircle2 },
-  REJECTED: { label: "مرفوض", cls: "bg-error/10 text-error", icon: XCircle },
-};
+const TYPE_CARDS = [
+  { type: "VISIT_DAILY", icon: ClipboardCheck, title: "تقرير الزيارة الميدانية", desc: "ملخص الزيارة: المعايير والمؤشرات والملاحظات والأدلة والفجوات والإجراءات", roles: ["SUPER_ADMIN", "EDUCATION_DIRECTOR", "INSPECTOR"] },
+  { type: "DIRECTORATE_DAILY", icon: CalendarClock, title: "التقرير اليومي للإدارة", desc: "إنجاز اليوم: الزيارات المخططة والمنفَّذة والمشكلات والاحتياجات العاجلة", roles: ["SUPER_ADMIN", "EDUCATION_DIRECTOR"] },
+  { type: "PERIODIC", icon: BarChart3, title: "التقرير الدوري", desc: "أسبوعي/شهري/فصلي/سنوي مع مقارنة بالفترة السابقة وتتبع التحسن", roles: ["SUPER_ADMIN", "EDUCATION_DIRECTOR", "INSPECTOR"] },
+  { type: "QUALITY_DETAILED", icon: ShieldCheck, title: "تقرير الجودة التفصيلي", desc: "المعايير والمؤشرات والشواهد المقبولة والناقصة وخطة التحسين", roles: ["SUPER_ADMIN", "EDUCATION_DIRECTOR", "INSPECTOR", "SCHOOL_PRINCIPAL", "QUALITY_COORDINATOR"] },
+  { type: "SPECIAL", icon: Layers, title: "تقرير إداري خاص", desc: "الحضور، النتائج، التدريب، المرافق، الصيانة، السلامة، أولياء الأمور، الأنشطة، الشراكة", roles: ["SUPER_ADMIN", "EDUCATION_DIRECTOR", "INSPECTOR", "SCHOOL_PRINCIPAL", "QUALITY_COORDINATOR"] },
+];
 
 export default function ReportsPage() {
+  return <Suspense fallback={<div className="skeleton h-64 rounded-2xl" />}><ReportsInner /></Suspense>;
+}
+
+function ReportsInner() {
   const { user } = useSession();
   const { add } = useToast();
-  const [reports, setReports] = useState<Report[]>([]);
+  const router = useRouter();
+  const sp = useSearchParams();
+  const [tab, setTab] = useState<Tab>((sp.get("status") as Tab) ?? "");
+  const [type, setType] = useState("");
+  const [q, setQ] = useState("");
+  const [page, setPage] = useState(1);
+  const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [open, setOpen] = useState(false);
-  const [visits, setVisits] = useState<any[]>([]);
-  const [busy, setBusy] = useState(false);
-  const [rejecting, setRejecting] = useState<string | null>(null);
+  const [createOpen, setCreateOpen] = useState(!!sp.get("visitId"));
+  const dq = useDebounced(q, 300);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/reports?limit=50", { credentials: "include" });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.message);
-      setReports(json.reports ?? []);
-    } catch (e: any) {
-      add({ type: "error", message: e.message || "تعذّر تحميل التقارير" });
-    } finally {
-      setLoading(false);
-    }
-  }, [add]);
+      const qs = new URLSearchParams({ page: String(page), limit: "15" });
+      if (tab) qs.set("status", tab);
+      if (type) qs.set("type", type);
+      if (dq) qs.set("q", dq);
+      const r = await fetch(`/api/reports?${qs}`, { credentials: "include" });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.message);
+      setData(d);
+    } catch (e: any) { add({ type: "error", message: e.message || "تعذّر تحميل التقارير" }); } finally { setLoading(false); }
+  }, [tab, type, dq, page, add]);
+  useEffect(() => { void load(); }, [load]);
 
-  useEffect(() => {
-    load();
-  }, [load]);
-
-  useEffect(() => {
-    if (!open) return;
-    fetch("/api/visits?limit=50", { credentials: "include" })
-      .then((r) => (r.ok ? r.json() : { visits: [] }))
-      .then((d) => setVisits(d.visits ?? []))
-      .catch(() => {});
-  }, [open]);
-
-  const generate = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    setBusy(true);
-    const fd = new FormData(e.currentTarget);
-    try {
-      const res = await fetch("/api/reports", {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          visitId: fd.get("visitId"),
-          title: fd.get("title") || undefined,
-          status: "DRAFT",
-        }),
-      });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.message);
-      add({ type: "success", message: `${json.message} — ${json.number}` });
-      setOpen(false);
-      load();
-    } catch (e: any) {
-      add({ type: "error", message: e.message });
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const changeStatus = async (id: string, status: string, reason?: string) => {
-    try {
-      const res = await fetch(`/api/reports/${id}/status`, {
-        method: "PATCH",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status, rejectionReason: reason }),
-      });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.message);
-      add({ type: "success", message: json.message });
-      setRejecting(null);
-      load();
-    } catch (e: any) {
-      add({ type: "error", message: e.message });
-    }
-  };
-
-  const exportPdf = async (r: Report) => {
-    try {
-      const summary = r.summary ? JSON.parse(r.summary) : null;
-      if (!summary) throw new Error("التقرير لا يحتوي بيانات محسوبة");
-
-      await generateArabicPdf({
-        number: r.number,
-        title: r.title,
-        schoolName: r.school_name ?? "—",
-        inspectorName: r.generated_by_name ?? "—",
-        date: new Date(r.created_at).toLocaleDateString("ar-YE"),
-        totalScore: summary.totalScore ?? null,
-        completionPercent: summary.completionPercent ?? 0,
-        reportState: summary.reportState ?? "DRAFT_INCOMPLETE",
-        evaluatedIndicators: summary.evaluatedIndicators ?? 0,
-        totalIndicators: summary.totalIndicators ?? 0,
-        verificationCode: r.verification_code,
-        warnings: summary.warnings ?? [],
-        criteria: (summary.criteria ?? []).map((c: any) => ({
-          code: c.code,
-          title: c.title,
-          weight: c.weight,
-          achievementPercent: c.achievementPercent,
-          contribution: c.contribution,
-        })),
-        subCriteria: [],
-      });
-      add({ type: "success", message: "تم تصدير ملف PDF" });
-    } catch (e: any) {
-      add({ type: "error", message: e.message || "تعذّر التصدير" });
-    }
-  };
-
-  const canGenerate = user && ["SUPER_ADMIN", "EDUCATION_DIRECTOR", "INSPECTOR"].includes(user.roleKey);
-  const canReview = user && ["SUPER_ADMIN", "EDUCATION_DIRECTOR"].includes(user.roleKey);
+  const counts = data?.counts ?? {};
+  const canCreate = !!user && ["SUPER_ADMIN", "EDUCATION_DIRECTOR", "INSPECTOR", "SCHOOL_PRINCIPAL", "QUALITY_COORDINATOR"].includes(user.roleKey);
+  const allCount = Object.values(counts).reduce((a: number, b: any) => a + Number(b), 0);
 
   return (
     <div className="space-y-5">
-      <PageHeader
-        title="التقارير"
-        subtitle="تقارير التقييم بحالاتها الأربع — كل تقرير يحمل رمز تحقق عاماً ورمز QR"
-        icon={FileBarChart}
-        actions={
-          canGenerate && (
-          <button
-            onClick={() => setOpen(true)}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-navy text-white text-sm font-semibold hover:bg-navy-soft transition"
-          >
-            <Plus className="w-4 h-4" /> توليد تقرير
-          </button>
-          )
-        }
-      />
+      <PageHeader icon={BarChart3} title="التقارير" subtitle="تقارير الزيارات والإدارة والجودة بمسار اعتماد واضح، وتصدير PDF وExcel وCSV مع رمز تحقق QR"
+        actions={canCreate ? <button className="btn btn-primary btn-sm" onClick={() => setCreateOpen(true)}><Plus className="h-3.5 w-3.5" /> إنشاء تقرير</button> : undefined} />
 
-      <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="text-gray-500 border-b border-gray-200">
-              <th className="py-3 pr-4 font-medium text-right">الرقم</th>
-              <th className="py-3 pr-4 font-medium text-right">العنوان</th>
-              <th className="py-3 pr-4 font-medium text-right">المدرسة</th>
-              <th className="py-3 pr-4 font-medium text-right">المُولِّد</th>
-              <th className="py-3 pr-4 font-medium text-right">الحالة</th>
-              <th className="py-3 pr-4 font-medium text-right">رمز التحقق</th>
-              <th className="py-3 pr-4 font-medium text-right">إجراءات</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading && (
-              <tr><td colSpan={7} className="py-8 text-center text-gray-500">جارٍ التحميل…</td></tr>
-            )}
-            {!loading && reports.length === 0 && (
-              <tr><td colSpan={7} className="py-8 text-center text-gray-500">لا توجد تقارير بعد.</td></tr>
-            )}
-            {reports.map((r) => {
-              const st = STATUS[r.status] ?? STATUS.DRAFT;
-              const Icon = st.icon;
-              const summary = r.summary ? JSON.parse(r.summary) : null;
-              return (
-                <tr key={r.id} className="border-b border-gray-50 hover:bg-gray-50/50 align-top">
-                  <td className="py-3 pr-4 font-mono text-xs text-navy">{r.number}</td>
-                  <td className="py-3 pr-4">
-                    <div className="font-medium text-navy">{r.title}</div>
-                    <div className="text-[11px] text-gray-500">
-                      الدرجة: {summary?.totalScore ?? "—"} · الإكمال: {summary?.completionPercent ?? 0}%
-                    </div>
-                  </td>
-                  <td className="py-3 pr-4 text-gray-600">{r.school_name ?? "—"}</td>
-                  <td className="py-3 pr-4 text-gray-600">{r.generated_by_name ?? "—"}</td>
-                  <td className="py-3 pr-4">
-                    <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-medium ${st.cls}`}>
-                      <Icon className="w-3 h-3" />
-                      {st.label}
-                    </span>
-                    {r.status === "APPROVED" && r.approved_by_name && (
-                      <div className="text-[10px] text-gray-500 mt-1">
-                        اعتمده {r.approved_by_name}
-                        {r.approved_at ? ` — ${new Date(r.approved_at).toLocaleDateString("ar-YE")}` : ""}
-                      </div>
-                    )}
-                    {r.status === "REJECTED" && r.rejection_reason && (
-                      <div className="text-[10px] text-error mt-1">السبب: {r.rejection_reason}</div>
-                    )}
-                  </td>
-                  <td className="py-3 pr-4 font-mono text-[11px] text-gray-600">{r.verification_code}</td>
-                  <td className="py-3 pr-4">
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      <button
-                        onClick={() => exportPdf(r)}
-                        className="inline-flex items-center gap-1 rounded-md border border-gray-200 px-2 py-1 text-[11px] font-medium text-turquoise transition hover:border-turquoise/40 hover:bg-turquoise-soft/40"
-                        title="تصدير PDF مع رمز تحقق و QR"
-                      >
-                        <Download className="w-3.5 h-3.5" /> PDF
-                      </button>
-                      <a
-                        href={`/api/reports/${r.id}/export?format=xlsx`}
-                        className="inline-flex items-center gap-1 rounded-md border border-gray-200 px-2 py-1 text-[11px] font-medium text-emerald transition hover:border-emerald/40 hover:bg-turquoise-soft/40"
-                        title="تصدير Excel"
-                      >
-                        <Download className="w-3.5 h-3.5" /> Excel
-                      </a>
-                      <a
-                        href={`/api/reports/${r.id}/export?format=csv`}
-                        className="inline-flex items-center gap-1 rounded-md border border-gray-200 px-2 py-1 text-[11px] font-medium text-gray-600 transition hover:border-gray-300 hover:bg-gray-50"
-                        title="تصدير CSV"
-                      >
-                        <Download className="w-3.5 h-3.5" /> CSV
-                      </a>
-                      <PreviewButton report={r} />
-                      {r.status === "DRAFT" && (
-                        <button
-                          onClick={() => changeStatus(r.id, "UNDER_REVIEW")}
-                          className="text-[11px] px-2 py-1 rounded border border-gray-200 hover:bg-gray-50"
-                        >
-                          رفع للمراجعة
-                        </button>
-                      )}
-                      {canReview && r.status === "UNDER_REVIEW" && (
-                        <>
-                          <button
-                            onClick={() => changeStatus(r.id, "APPROVED")}
-                            className="text-[11px] px-2 py-1 rounded bg-success/10 text-success hover:bg-success/20"
-                          >
-                            اعتماد
-                          </button>
-                          <button
-                            onClick={() => setRejecting(r.id)}
-                            className="text-[11px] px-2 py-1 rounded bg-error/10 text-error hover:bg-error/20"
-                          >
-                            رفض
-                          </button>
-                        </>
-                      )}
-                    </div>
-                    {rejecting === r.id && (
-                      <form
-                        onSubmit={(e) => {
-                          e.preventDefault();
-                          const fd = new FormData(e.currentTarget);
-                          changeStatus(r.id, "REJECTED", String(fd.get("reason") ?? ""));
-                        }}
-                        className="mt-2 space-y-1"
-                      >
-                        <input
-                          name="reason"
-                          required
-                          minLength={5}
-                          placeholder="سبب الرفض (إلزامي)"
-                          className="w-full text-[11px] px-2 py-1 rounded border border-gray-200"
-                        />
-                        <div className="flex gap-1">
-                          <button className="text-[11px] px-2 py-1 rounded bg-error text-white">تأكيد الرفض</button>
-                          <button
-                            type="button"
-                            onClick={() => setRejecting(null)}
-                            className="text-[11px] px-2 py-1 rounded border border-gray-200"
-                          >
-                            إلغاء
-                          </button>
-                        </div>
-                      </form>
-                    )}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <Tabs<Tab> value={tab} onChange={(t) => { setTab(t); setPage(1); }} tabs={[
+          { key: "", label: "الكل", count: allCount }, { key: "DRAFT", label: "مسودات", count: counts.DRAFT ?? 0 }, { key: "UNDER_REVIEW", label: "قيد المراجعة", count: counts.UNDER_REVIEW ?? 0 },
+          { key: "APPROVED", label: "معتمدة", count: counts.APPROVED ?? 0 }, { key: "REJECTED", label: "مرفوضة", count: counts.REJECTED ?? 0 },
+        ]} />
+        <div className="flex gap-2">
+          <div className="relative"><Search className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" /><input className="input pr-9 !py-2 w-52" placeholder="بحث بالرقم أو العنوان" value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} /></div>
+          <select className="input !py-2 w-44" value={type} onChange={(e) => { setType(e.target.value); setPage(1); }}><option value="">كل الأنواع</option>{Object.entries(data?.types ?? {}).filter(([k]) => k !== "SCHOOL_EVALUATION").map(([k, v]: any) => <option key={k} value={k}>{v}</option>)}</select>
+        </div>
       </div>
 
-      <p className="text-[11px] text-gray-500">
-        التقرير لا يُوصف بأنه معتمد إلا بعد تسجيل اعتماد موثّق بالاسم والتاريخ. لا تُدرج أي أختام أو تواقيع حكومية في الملفات المصدَّرة.
-      </p>
-
-      {open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-md">
-            <h2 className="text-xl font-heading text-navy font-bold mb-4">توليد تقرير</h2>
-            <form onSubmit={generate} className="space-y-4">
-              <div className="space-y-2">
-                <label className="text-xs font-medium text-gray-600">الزيارة*</label>
-                <select name="visitId" required className="w-full pr-3 py-2 rounded-lg border border-gray-200 bg-gray-50 text-sm">
-                  <option value="">اختر الزيارة…</option>
-                  {visits.map((v: any) => (
-                    <option key={v.id} value={v.id}>
-                      {v.school_name} — {new Date(v.visit_date).toLocaleDateString("ar-YE")}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="space-y-2">
-                <label className="text-xs font-medium text-gray-600">عنوان التقرير</label>
-                <input
-                  name="title"
-                  placeholder="يُولَّد تلقائياً إن تُرك فارغاً"
-                  className="w-full pr-3 py-2 rounded-lg border border-gray-200 bg-gray-50 text-sm"
-                />
-              </div>
-              <div className="flex gap-2">
-                <button disabled={busy} className="flex-1 py-2.5 rounded-lg bg-navy text-white text-sm font-semibold disabled:opacity-60">
-                  {busy ? "جارٍ التوليد…" : "توليد"}
-                </button>
-                <button type="button" onClick={() => setOpen(false)} className="px-4 py-2.5 rounded-lg border border-gray-200 text-sm text-gray-600">
-                  إلغاء
-                </button>
-              </div>
-            </form>
-          </div>
+      <div className="card overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead><tr className="border-b border-gray-200 bg-gray-50/60 text-gray-500">{["الرقم", "التقرير", "النوع", "المدرسة", "الحالة", "التاريخ", ""].map((h, i) => <th key={i} className="px-4 py-3 text-right font-medium">{h}</th>)}</tr></thead>
+            <tbody>
+              {loading ? <LoadingRows cols={7} rows={5} /> : (data?.reports ?? []).map((r: any, i: number) => (
+                <motion.tr key={r.id} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: Math.min(i * 0.03, 0.3) }} className="border-b border-gray-50 hover:bg-turquoise-soft/25">
+                  <td className="px-4 py-3 font-mono text-[12px] text-gray-600">{r.number}</td>
+                  <td className="max-w-[280px] px-4 py-3"><Link href={`/reports/${r.id}`} className="font-semibold text-navy hover:text-turquoise hover:underline">{r.title}</Link><p className="text-[11px] text-gray-400">{r.generated_by_name}</p></td>
+                  <td className="px-4 py-3 text-gray-600">{data?.types?.[r.type] ?? r.type}</td>
+                  <td className="px-4 py-3 text-gray-600">{r.school_name ?? r.directorate_name ?? "—"}</td>
+                  <td className="px-4 py-3"><StatusBadge map={REPORT_STATUS} value={r.status} /></td>
+                  <td className="px-4 py-3 text-gray-500">{fmtDate(r.created_at)}</td>
+                  <td className="px-4 py-3"><div className="flex items-center justify-end gap-1">
+                    <a className="btn btn-ghost btn-sm !px-2" title="PDF" href={`/api/reports/${r.id}/export?format=pdf`}><Download className="h-3.5 w-3.5" /></a>
+                    <a className="btn btn-ghost btn-sm !px-2" title="Excel" href={`/api/reports/${r.id}/export?format=xlsx`}><FileSpreadsheet className="h-3.5 w-3.5" /></a>
+                    <a className="btn btn-ghost btn-sm !px-2" title="CSV" href={`/api/reports/${r.id}/export?format=csv`}><FileText className="h-3.5 w-3.5" /></a>
+                  </div></td>
+                </motion.tr>
+              ))}
+              {!loading && (data?.reports ?? []).length === 0 && <tr><td colSpan={7}><EmptyState icon={FileText} title="لا تقارير" description="أنشئ تقريراً من بيانات الزيارات والمدارس الفعلية." action={canCreate ? <button className="btn btn-primary btn-sm" onClick={() => setCreateOpen(true)}>إنشاء تقرير</button> : undefined} /></td></tr>}
+            </tbody>
+          </table>
         </div>
-      )}
+        <div className="border-t border-gray-100 px-3"><Pagination page={page} totalPages={data?.totalPages ?? 1} total={data?.total} onPage={setPage} /></div>
+      </div>
+
+      <CreateReportModal open={createOpen} onClose={() => setCreateOpen(false)} presetVisitId={sp.get("visitId") ?? ""} topics={data?.topics ?? {}}
+        onCreated={(id) => { setCreateOpen(false); router.push(`/reports/${id}`); }} />
     </div>
   );
 }
 
-/* ==========================================================
-   معاينة التقرير قبل الطباعة
-   ========================================================== */
-function PreviewButton({ report }: { report: Report }) {
-  const [open, setOpen] = useState(false);
-  const [data, setData] = useState<any>(null);
-  const [loading, setLoading] = useState(false);
+function CreateReportModal({ open, onClose, onCreated, presetVisitId, topics }: { open: boolean; onClose: () => void; onCreated: (id: string) => void; presetVisitId: string; topics: Record<string, string> }) {
+  const { user } = useSession();
+  const { add } = useToast();
+  const [type, setType] = useState<string>("");
+  const [f, setF] = useState<any>({});
+  const [visits, setVisits] = useState<any[]>([]);
+  const [schools, setSchools] = useState<any[]>([]);
+  const [busy, setBusy] = useState(false);
+  const today = new Date().toISOString().slice(0, 10);
 
-  const load = async () => {
-    setOpen(true);
-    if (data) return;
-    setLoading(true);
+  useEffect(() => {
+    if (!open) return;
+    setType(presetVisitId ? "VISIT_DAILY" : "");
+    setF({ visitId: presetVisitId, date: today, period: "month", topic: "safety" });
+    fetch("/api/visits?limit=100", { credentials: "include" }).then((r) => (r.ok ? r.json() : { visits: [] })).then((d) => setVisits((d.visits ?? []).filter((v: any) => v.status !== "CANCELLED"))).catch(() => {});
+    fetch("/api/schools?limit=100", { credentials: "include" }).then((r) => (r.ok ? r.json() : { schools: [] })).then((d) => setSchools(d.schools ?? [])).catch(() => {});
+  }, [open, presetVisitId, today]);
+
+  const submit = async () => {
+    setBusy(true);
     try {
-      const res = await fetch(`/api/reports/${report.id}/export?format=json`, {
-        credentials: "include",
-      });
-      const j = await res.json();
-      setData(j.summary ? j : null);
-    } catch {
-      setData(null);
-    } finally {
-      setLoading(false);
-    }
+      const body: any = { type, title: f.title || undefined };
+      if (type === "VISIT_DAILY") body.visitId = f.visitId;
+      if (type === "DIRECTORATE_DAILY") body.date = f.date;
+      if (type === "PERIODIC") { body.date = f.date; body.period = f.period; }
+      if (type === "QUALITY_DETAILED") { body.schoolId = f.schoolId || undefined; }
+      if (type === "SPECIAL") { body.topic = f.topic; body.schoolId = f.schoolId || undefined; body.from = f.from || undefined; body.to = f.to || undefined; }
+      const r = await fetch("/api/reports", { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.message);
+      add({ type: "success", message: d.message });
+      onCreated(d.id);
+    } catch (e: any) { add({ type: "error", message: e.message }); } finally { setBusy(false); }
   };
 
-  const summary = data?.summary;
-  const STATUS_LABEL: Record<string, string> = {
-    APPROVED: "معتمد",
-    UNDER_REVIEW: "قيد المراجعة",
-    REJECTED: "مرفوض",
-    DRAFT: "مسودة",
-  };
+  const cards = TYPE_CARDS.filter((c) => c.roles.includes(user?.roleKey ?? ""));
+  const valid = type === "VISIT_DAILY" ? !!f.visitId : type === "QUALITY_DETAILED" ? !!(f.schoolId || user?.schoolId) : !!type;
 
   return (
-    <>
-      <button
-        onClick={load}
-        className="inline-flex items-center gap-1 rounded-md border border-gray-200 px-2 py-1 text-[11px] font-medium text-navy transition hover:border-navy/30 hover:bg-gray-50"
-        title="معاينة قبل الطباعة"
-      >
-        <Eye className="h-3.5 w-3.5" /> معاينة
-      </button>
-
-      {open && (
-        <div
-          className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-navy-deep/55 p-3 py-8 backdrop-blur-sm print:static print:block print:bg-white print:p-0"
-          onClick={() => setOpen(false)}
-        >
-          <div
-            className="card w-full max-w-3xl animate-fade-up print:max-w-none print:border-0 print:shadow-none"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between border-b border-gray-100 px-5 py-3 print:hidden">
-              <h3 className="font-heading text-[16px] font-bold text-navy">
-                معاينة التقرير — {report.number}
-              </h3>
-              <div className="flex items-center gap-2">
-                <button onClick={() => window.print()} className="btn btn-primary btn-sm">
-                  <Printer className="h-3.5 w-3.5" /> طباعة
-                </button>
-                <button
-                  onClick={() => setOpen(false)}
-                  className="rounded-lg p-1 text-gray-400 hover:bg-gray-100"
-                  aria-label="إغلاق"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              </div>
-            </div>
-
-            <div className="p-5 print:p-0">
-              <div className="mb-4 border-b border-gray-200 pb-3 text-center">
-                <p className="font-heading text-[19px] font-bold text-navy">{report.title}</p>
-                <p className="mt-1 font-mono text-[11px] text-gray-500">{report.number}</p>
-                <p className="mt-1 text-[11px] text-gray-500">
-                  {report.school_name ?? "—"} ·{" "}
-                  {new Date(report.created_at).toLocaleDateString("ar-YE")}
-                </p>
-              </div>
-
-              {loading && (
-                <p className="py-8 text-center text-[12px] text-gray-400">جارٍ التحميل…</p>
-              )}
-
-              {!loading && !summary && (
-                <p className="rounded-lg bg-warning-soft px-3 py-2 text-[12px] text-warning">
-                  لا توجد بيانات محسوبة محفوظة لهذا التقرير.
-                </p>
-              )}
-
-              {summary && (
-                <>
-                  <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
-                    {[
-                      ["الدرجة الكلية", summary.totalScore != null ? `${summary.totalScore}` : "—"],
-                      ["نسبة التحقق", `${summary.achievementPercent ?? 0}%`],
-                      ["نسبة الاكتمال", `${summary.completionPercent ?? 0}%`],
-                      [
-                        "مؤشرات مقيَّمة",
-                        `${summary.evaluatedIndicators ?? 0}/${summary.totalIndicators ?? 0}`,
-                      ],
-                    ].map(([l, v]) => (
-                      <div key={String(l)} className="rounded-lg bg-gray-50 px-3 py-2">
-                        <p className="text-[10px] text-gray-400">{l}</p>
-                        <p className="font-mono text-[14px] font-bold text-navy">{v}</p>
-                      </div>
-                    ))}
-                  </div>
-
-                  <table className="w-full border-collapse text-[11.5px]">
-                    <thead>
-                      <tr className="bg-gray-50 text-gray-600">
-                        <th className="border border-gray-200 px-2 py-1.5 text-right">المعيار</th>
-                        <th className="border border-gray-200 px-2 py-1.5 text-center">الوزن</th>
-                        <th className="border border-gray-200 px-2 py-1.5 text-center">نسبة التحقق</th>
-                        <th className="border border-gray-200 px-2 py-1.5 text-center">المساهمة</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {(summary.criteria ?? []).map((c: any) => (
-                        <tr key={c.code}>
-                          <td className="border border-gray-200 px-2 py-1.5 text-navy">
-                            {c.code} — {c.title}
-                          </td>
-                          <td className="border border-gray-200 px-2 py-1.5 text-center font-mono">
-                            {c.weight}%
-                          </td>
-                          <td className="border border-gray-200 px-2 py-1.5 text-center font-mono">
-                            {c.achievementPercent ?? 0}%
-                          </td>
-                          <td className="border border-gray-200 px-2 py-1.5 text-center font-mono">
-                            {c.contribution ?? 0}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-
-                  <div className="mt-4 flex flex-wrap items-end justify-between gap-3 border-t border-gray-200 pt-3">
-                    <div className="text-[10px] leading-relaxed text-gray-500">
-                      <p>
-                        رمز التحقق: <span className="font-mono">{report.verification_code}</span>
-                      </p>
-                      <p className="mt-0.5">
-                        تحقق عبر:{" "}
-                        <span className="font-mono">
-                          {typeof window !== "undefined" ? window.location.origin : ""}/verify
-                        </span>
-                      </p>
-                      <p className="mt-1 text-gray-400">
-                        لا يُعدّ هذا التقرير معتمداً رسمياً إلا إذا حمل حالة «معتمد» وسجلَ
-                        اعتمادٍ موثّقاً باسم المعتمِد وتاريخه.
-                      </p>
-                    </div>
-                    <div className="rounded-lg border border-gray-200 px-3 py-1.5 text-center">
-                      <p className="text-[9px] text-gray-400">الحالة</p>
-                      <p className="text-[12px] font-bold text-navy">
-                        {STATUS_LABEL[report.status] ?? report.status}
-                      </p>
-                    </div>
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
+    <Modal open={open} onClose={onClose} title="إنشاء تقرير" description="يُبنى التقرير من سجلات المنصة الفعلية ويُثبَّت كمسودة. الاعتماد بيد المخوَّلين فقط." width="lg">
+      <div className="space-y-5">
+        <div className="grid gap-2.5 sm:grid-cols-2">
+          {cards.map((c) => (
+            <button key={c.type} onClick={() => setType(c.type)} className={`flex items-start gap-3 rounded-2xl border p-3.5 text-right transition ${type === c.type ? "border-turquoise bg-turquoise-soft/50 ring-2 ring-turquoise/30" : "border-gray-200 hover:border-turquoise/50"}`}>
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-navy text-gold-bright"><c.icon className="h-5 w-5" /></span>
+              <span><span className="block font-heading font-bold text-navy">{c.title}</span><span className="mt-0.5 block text-[12px] leading-relaxed text-gray-600">{c.desc}</span></span>
+            </button>
+          ))}
         </div>
-      )}
-    </>
+
+        {type && (
+          <div className="grid gap-3 rounded-2xl bg-gray-50 p-4 sm:grid-cols-2 animate-fade-up">
+            {type === "VISIT_DAILY" && (
+              <div className="sm:col-span-2"><label className="label">الزيارة</label>
+                <select className="input" value={f.visitId ?? ""} onChange={(e) => setF({ ...f, visitId: e.target.value })}><option value="">اختر زيارة…</option>{visits.map((v) => <option key={v.id} value={v.id}>{v.school_name} — {VISIT_STATUS[v.status]?.label} — {fmtDate(v.visit_date)}</option>)}</select></div>
+            )}
+            {(type === "DIRECTORATE_DAILY" || type === "PERIODIC") && (
+              <div><label className="label">{type === "PERIODIC" ? "تاريخ ضمن الفترة" : "تاريخ اليوم"}</label><input type="date" className="input" value={f.date ?? ""} onChange={(e) => setF({ ...f, date: e.target.value })} /></div>
+            )}
+            {type === "PERIODIC" && (
+              <div><label className="label">نوع الفترة</label><select className="input" value={f.period} onChange={(e) => setF({ ...f, period: e.target.value })}><option value="week">أسبوعي</option><option value="month">شهري</option><option value="quarter">فصلي</option><option value="year">سنوي</option></select></div>
+            )}
+            {(type === "QUALITY_DETAILED" || type === "SPECIAL") && !["SCHOOL_PRINCIPAL", "QUALITY_COORDINATOR"].includes(user?.roleKey ?? "") && (
+              <div className={type === "QUALITY_DETAILED" ? "sm:col-span-2" : ""}><label className="label">المدرسة{type === "SPECIAL" ? " (اتركها فارغة لكل المدارس)" : ""}</label>
+                <select className="input" value={f.schoolId ?? ""} onChange={(e) => setF({ ...f, schoolId: e.target.value })}><option value="">{type === "SPECIAL" ? "كل المدارس ضمن النطاق" : "اختر…"}</option>{schools.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</select></div>
+            )}
+            {type === "SPECIAL" && (
+              <>
+                <div className="sm:col-span-2"><label className="label">الموضوع</label><select className="input" value={f.topic} onChange={(e) => setF({ ...f, topic: e.target.value })}>{Object.entries(topics).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></div>
+                <div><label className="label">من</label><input type="date" className="input" value={f.from ?? ""} onChange={(e) => setF({ ...f, from: e.target.value })} /></div>
+                <div><label className="label">إلى</label><input type="date" className="input" value={f.to ?? ""} onChange={(e) => setF({ ...f, to: e.target.value })} /></div>
+                <p className="sm:col-span-2 flex items-start gap-1.5 text-[11.5px] text-gray-500"><Sparkles className="mt-0.5 h-3.5 w-3.5 shrink-0 text-gold" />التقارير الخاصة مساندة ومنفصلة عن التقييم الرسمي، وتعتمد على بيانات موثَّقة؛ عند غيابها يُذكر ذلك ولا تُحتسب نسب.</p>
+              </>
+            )}
+            <div className="sm:col-span-2"><label className="label">عنوان مخصّص (اختياري)</label><input className="input" maxLength={200} value={f.title ?? ""} onChange={(e) => setF({ ...f, title: e.target.value })} /></div>
+          </div>
+        )}
+
+        <div className="flex justify-end gap-2 border-t border-gray-100 pt-3">
+          <button className="btn btn-ghost btn-sm" onClick={onClose}>إلغاء</button>
+          <button className="btn btn-primary btn-sm" disabled={!valid || busy} onClick={submit}>{busy && <Loader2 className="h-3.5 w-3.5 animate-spin" />} توليد التقرير</button>
+        </div>
+      </div>
+    </Modal>
   );
 }

@@ -6,19 +6,8 @@ import { useRouter, usePathname } from "next/navigation";
 import Sidebar from "@/components/layout/sidebar";
 import TopBar from "@/components/layout/topbar";
 import RifadLogo from "@/components/brand/rifad-logo";
+import { navFor } from "@/lib/nav";
 
-const NAV_ITEMS = [
-  { key: "dashboard", label: "لوحة التحكم", href: "/dashboard", icon: "Layout" },
-  { key: "schools", label: "المدارس", href: "/schools", icon: "Building" },
-  { key: "visits", label: "الزيارات الميدانية", href: "/visits", icon: "Calendar" },
-  { key: "evaluation", label: "التقييم الميداني", href: "/evaluation", icon: "ClipboardList" },
-  { key: "evidence", label: "الأدلة والشواهد", href: "/evidence", icon: "FileText" },
-  { key: "reports", label: "التقارير", href: "/reports", icon: "BarChart" },
-  { key: "improvement", label: "خطط التحسين", href: "/improvement", icon: "RefreshCw" },
-  { key: "communication", label: "التواصل", href: "/communication", icon: "Mail" },
-  { key: "settings", label: "الإعدادات", href: "/settings", icon: "Settings" },
-  { key: "users", label: "المستخدمون والأدوار", href: "/users", icon: "ShieldCheck" },
-];
 
 export default function AppShell({ children }: { children: ReactNode }) {
   const { user, logout, loading } = useSession();
@@ -66,24 +55,30 @@ export default function AppShell({ children }: { children: ReactNode }) {
     );
   }
 
-  const can = (key: string) => {
-    if (!user) return false;
-    if (user.roleKey === "SUPER_ADMIN") return true;
-    if (key === "users") return false; // إدارة المستخدمين لمدير النظام فقط
-    return true;
-  };
 
   return (
     <div className="relative flex h-screen overflow-hidden bg-background">
       <Sidebar
-        items={NAV_ITEMS.filter((x) => can(x.key))}
+        items={navFor(user?.roleKey, (user as any)?.permissions)}
         open={sidebarOpen}
         onToggle={() => setSidebarOpen((o) => !o)}
         onLogout={logout}
         user={user}
       />
 
-      <div className="flex min-w-0 flex-1 flex-col">
+      {sidebarOpen && (
+        <button
+          aria-label="إغلاق القائمة"
+          onClick={() => setSidebarOpen(false)}
+          className="fixed inset-0 z-30 bg-navy-deep/55 backdrop-blur-[2px] lg:hidden animate-fade-in"
+        />
+      )}
+
+      <div
+        className={`flex min-w-0 flex-1 flex-col transition-[margin] duration-300 ease-out ${
+          sidebarOpen ? "lg:mr-[268px]" : ""
+        }`}
+      >
         <TopBar user={user} onLogout={logout} onToggleSidebar={() => setSidebarOpen((o) => !o)} />
         <main className="flex-1 overflow-y-auto">
           <div className="mx-auto max-w-[1500px] px-4 py-6 lg:px-8 lg:py-8">{children}</div>

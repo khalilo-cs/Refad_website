@@ -226,6 +226,7 @@ h1, h2, h3, h4, h5, h6, .font-heading {
   background-size: 22px 22px;
 }
 
+@layer components {
 /* ==========================================================
    البطاقات والأسطح
    ========================================================== */
@@ -420,6 +421,8 @@ h1, h2, h3, h4, h5, h6, .font-heading {
 .badge-info    { background: var(--info-soft);    color: var(--info);    border-color: rgba(29, 111, 184, 0.18); }
 .badge-gold    { background: var(--gold-soft);    color: #7A6112;        border-color: rgba(201, 162, 39, 0.28); }
 .badge-neutral { background: var(--gray-100);     color: var(--gray-600); border-color: var(--gray-200); }
+
+}
 
 /* ==========================================================
    الحركات

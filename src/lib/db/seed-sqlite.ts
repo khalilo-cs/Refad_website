@@ -13,12 +13,23 @@ import {
   DEFAULT_SYSTEM_SETTINGS,
 } from "../../../prisma/seed/data";
 import bcrypt from "bcryptjs";
+import { randomBytes } from "crypto";
 
-const DEMO_PASSWORD = "R!f@d_2026_DemoAccess";
 
 type Row = { sql: string; params: unknown[] };
 
-export async function seedDatabase(db: Database.Database): Promise<void> {
+export type SeedOptions = {
+  /** يضيف مدارس ومستخدمين وزيارات توضيحية. يُستخدم للعرض الأول فقط. */
+  demo?: boolean;
+  /** كلمة مرور الحسابات التوضيحية؛ إن لم تُحدَّد تُولَّد عشوائياً وتُطبع مرة واحدة. */
+  demoPassword?: string;
+};
+
+export async function seedDatabase(db: Database.Database, opts: SeedOptions = {}): Promise<{ demoPassword?: string }> {
+  const DEMO_PASSWORD =
+    opts.demoPassword ??
+    // 16 حرفاً عشوائياً: أحرف كبيرة وصغيرة وأرقام ورمز
+    randomBytes(12).toString("base64url") + "!9a";
   const insert = (rows: Row[]) => {
     const tx = db.transaction((rs: Row[]) => {
       for (const r of rs) db.prepare(r.sql).run(...r.params);
@@ -292,26 +303,32 @@ export async function seedDatabase(db: Database.Database): Promise<void> {
     params: [directorateId, "الجراحي", "JARAHI", nowISO()],
   });
 
-  const schoolId = uuid();
-  rows.push({
-    sql: `INSERT INTO schools (id, code, name, governorate_id, directorate_id, type, stage, contact_phone, data_source, status, notes, last_updated_at, created_at)
-          VALUES (?, ?, ?, (SELECT id FROM governorates WHERE code = 'HUDAIDAH'),
-                  (SELECT id FROM directorates WHERE code = 'JARAHI'),
-                  ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(code) DO NOTHING`,
-    params: [
-      schoolId,
-      "RIFAD-DEMO-001",
-      "مدرسة رِفاد التجريبية (بيانات وهمية للعرض فقط — ليست مدرسة حقيقية)",
-      "حكومية",
-      "أساسي",
-      "000-000000",
-      "MANUAL",
-      "ACTIVE",
-      "سجل توضيحي للعرض الأول فقط. يُحذف أو يُستبدل بسجلات المدارس الفعلية عبر استيراد Excel/CSV أو الإدخال اليدوي.",
-      nowISO(),
-      nowISO(),
-    ],
-  });
+  if (!opts.demo) {
+    insert(rows);
+    rows.length = 0;
+    console.log("تم بذر المعايير والمؤشرات والأدوار والإعدادات. أنشئ حساب المسؤول الأول من صفحة /setup.");
+    return {};
+  }
+
+  // ثلاث مدارس تجريبية بمواضع توضيحية للخريطة فقط (ليست مواقع حقيقية).
+  const DEMO_NOTE =
+    "سجل توضيحي للعرض الأول فقط. يُحذف أو يُستبدل بسجلات المدارس الفعلية عبر استيراد Excel/CSV أو الإدخال اليدوي.";
+  const demoSchools = [
+    { id: uuid(), code: "RIFAD-DEMO-001", name: "مدرسة رِفاد التجريبية (أ) — بيانات وهمية للعرض فقط", stage: "أساسي", lat: 14.945, lng: 43.455, type: "حكومية" },
+    { id: uuid(), code: "RIFAD-DEMO-002", name: "مدرسة رِفاد التجريبية (ب) — بيانات وهمية للعرض فقط", stage: "ثانوي", lat: 14.9, lng: 43.5, type: "حكومية" },
+    { id: uuid(), code: "RIFAD-DEMO-003", name: "مدرسة رِفاد التجريبية (ج) — بيانات وهمية للعرض فقط", stage: "أساسي", lat: 14.985, lng: 43.52, type: "حكومية" },
+  ];
+  for (const sc of demoSchools) {
+    rows.push({
+      sql: `INSERT INTO schools (id, code, name, governorate_id, directorate_id, type, stage, latitude, longitude, contact_phone, data_source, status, notes, last_updated_at, created_at)
+            VALUES (?, ?, ?, (SELECT id FROM governorates WHERE code = 'HUDAIDAH'),
+                    (SELECT id FROM directorates WHERE code = 'JARAHI'),
+                    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(code) DO NOTHING`,
+      params: [sc.id, sc.code, sc.name, sc.type, sc.stage, sc.lat, sc.lng, "000-000000", "MANUAL", "ACTIVE",
+        DEMO_NOTE + " الإحداثيات توضيحية.", nowISO(), nowISO()],
+    });
+  }
+  const schoolId = demoSchools[0].id;
 
   // ----------------------------------------------------------
   // 6. مستخدمون تجريبيون لكل دور (كلمة مرور واحدة للعرض التوضيحي)
@@ -398,55 +415,104 @@ export async function seedDatabase(db: Database.Database): Promise<void> {
   rows.length = 0;
 
   // ----------------------------------------------------------
-  // 7. سجل توضيحي واحد للزيارة والتقييم (لعرض واجهة النظام فقط)
+  // 7. بيانات توضيحية للزيارات والتقييم وخطط التحسين (للعرض الأول فقط)
   // ----------------------------------------------------------
   const inspectorId = createdUserIds["INSPECTOR"];
-  if (inspectorId && schoolId) {
-    const visitId = uuid();
-    db.prepare(
-      `INSERT INTO visits (id, school_id, inspector_id, type, purpose, status, scheduled_at, started_at, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-    ).run(
-      visitId,
-      schoolId,
-      inspectorId,
-      "PERIODIC",
-      "زيارة تعريفية للمنصة",
-      "COMPLETED",
-      nowISO(),
-      nowISO(),
-      nowISO(),
-      nowISO()
-    );
+  const directorId = createdUserIds["EDUCATION_DIRECTOR"];
+  const principalId = createdUserIds["SCHOOL_PRINCIPAL"];
+  const dayMs = 86400000;
+  const iso = (offsetDays: number) => new Date(Date.now() + offsetDays * dayMs).toISOString();
+  const DEMO_FLAG = "مثال توضيحي فقط — ليس تقييماً فعلياً";
 
-    const sampleIndicators = ["1-1-1", "2-1-1", "3-1", "4-1-1", "5-1-4"];
-    for (const code of sampleIndicators) {
-      const ind = db
-        .prepare("SELECT id, code FROM indicators WHERE code = ?")
-        .get(code) as { id: string; code: string } | undefined;
-      if (!ind) continue;
-      const evalId = uuid();
+  if (inspectorId) {
+    // إسناد المدارس للمفتش وإنشاء ملف تعريفي أولي لكل مدرسة (غير موثّق)
+    for (const sc of demoSchools) {
+      db.prepare("INSERT OR IGNORE INTO school_assignments (id, user_id, school_id, assigned_by_id) VALUES (?,?,?,?)").run(uuid(), inspectorId, sc.id, directorId ?? null);
       db.prepare(
-        `INSERT INTO evaluations (id, visit_id, indicator_id, status, score, notes, rated_by_id, rated_at, updated_at, version)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`
+        `INSERT OR IGNORE INTO school_profiles (school_id, students_count, teachers_count, admin_staff_count, service_staff_count, classes_count,
+           has_science_lab, has_computer_lab, has_library, has_canteen, has_playground, info_source, verified)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,0)`
+      ).run(sc.id, null, null, null, null, null, null, null, null, null, null, "بيانات توضيحية — لم تُدخل بعد");
+    }
+
+    const indicators = db.prepare("SELECT id, code FROM indicators ORDER BY order_index").all() as { id: string; code: string }[];
+    // درجات حتمية (بلا عشوائية) حتى تتكرر نتائج العرض نفسها في كل تثبيت
+    const scoreFor = (schoolIdx: number, i: number) => {
+      const base = [3, 2, 3, 1, 3, 2, 3, 0, 2, 3][(i * 7 + schoolIdx * 3) % 10];
+      return schoolIdx === 1 ? Math.max(0, base - 1) : base;
+    };
+    const makeVisit = (schoolIdx: number, status: string, coverage: number, daysAgo: number) => {
+      const visitId = uuid();
+      const when = iso(-daysAgo);
+      db.prepare(
+        `INSERT INTO visits (id, school_id, inspector_id, type, purpose, status, scheduled_at, started_at, ended_at, submitted_at, submitted_by_id, completion, created_at, updated_at)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
       ).run(
-        evalId,
-        visitId,
-        ind.id,
-        "MET",
-        3,
-        "مثال توضيحي فقط — ليس تقييمًا فعليًا",
-        inspectorId,
-        nowISO(),
-        nowISO()
+        visitId, demoSchools[schoolIdx].id, inspectorId, "PERIODIC", "زيارة تعريفية للمنصة (توضيحية)", status,
+        when, when, ["SUBMITTED", "COMPLETED"].includes(status) ? when : null,
+        ["SUBMITTED", "COMPLETED"].includes(status) ? when : null,
+        ["SUBMITTED", "COMPLETED"].includes(status) ? inspectorId : null,
+        Math.round(coverage * 100), when, when
       );
+      const n = Math.round(indicators.length * coverage);
+      indicators.slice(0, n).forEach((ind, i) => {
+        db.prepare(
+          `INSERT INTO evaluations (id, visit_id, indicator_id, status, score, notes, verification_methods, rated_by_id, rated_at, created_by_id, created_at, updated_at, version)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,1)`
+        ).run(uuid(), visitId, ind.id, "EVALUATED", scoreFor(schoolIdx, i), i % 9 === 0 ? DEMO_FLAG : null,
+          JSON.stringify(["فحص وثائق"]), inspectorId, when, inspectorId, when, when);
+      });
+      return visitId;
+    };
+
+    const v1 = makeVisit(0, "COMPLETED", 1, 40);
+    makeVisit(0, "COMPLETED", 1, 130); // زيارة أقدم لإظهار اتجاه التحسن
+    makeVisit(1, "SUBMITTED", 0.7, 6);
+    makeVisit(2, "IN_PROGRESS", 0.2, 1);
+    // زيارة قادمة وأخرى متأخرة (للتنبيهات)
+    for (const [idx, off, st] of [[0, 3, "SCHEDULED"], [2, -9, "SCHEDULED"]] as [number, number, string][]) {
+      db.prepare(
+        `INSERT INTO visits (id, school_id, inspector_id, type, purpose, status, scheduled_at, created_at, updated_at)
+         VALUES (?,?,?,?,?,?,?,?,?)`
+      ).run(uuid(), demoSchools[idx].id, inspectorId, "FOLLOW_UP", "زيارة متابعة (توضيحية)", st, iso(off), nowISO(), nowISO());
+    }
+
+    // خطة تحسين توضيحية بإجراءين: أحدهما متأخر
+    if (principalId) {
+      const planId = uuid();
+      db.prepare(
+        `INSERT INTO improvement_plans (id, school_id, title, description, status, created_by_id) VALUES (?,?,?,?,?,?)`
+      ).run(planId, demoSchools[0].id, "خطة تحسين توضيحية", DEMO_FLAG, "ACTIVE", principalId);
+      const weakInd = db.prepare(
+        `SELECT i.id, e.id AS eid FROM evaluations e JOIN indicators i ON i.id = e.indicator_id
+         WHERE e.visit_id = ? AND e.score <= 1 ORDER BY i.order_index LIMIT 2`
+      ).all(v1) as { id: string; eid: string }[];
+      weakInd.forEach((w, i) => {
+        db.prepare(
+          `INSERT INTO corrective_actions (id, plan_id, evaluation_id, indicator_id, problem_description, priority, proposed_action,
+             responsible_id, due_date, success_indicator, status) VALUES (?,?,?,?,?,?,?,?,?,?,?)`
+        ).run(uuid(), planId, w.eid, w.id, "قصور مكتشف في الزيارة التوضيحية", i === 0 ? "HIGH" : "MEDIUM",
+          "إجراء تصحيحي توضيحي", principalId, iso(i === 0 ? -5 : 14).slice(0, 10), "رفع دليل جديد يثبت المعالجة", "IN_PROGRESS");
+      });
     }
   }
 
-  console.log("تم بذر البيانات الأولية لقاعدة بيانات SQLite.");
-  console.log("حساب الدخول التجريبي المشترك لجميع المستخدمين التجريبيين:");
-  console.log(`  البريد: <أي بريد أعلاه>   كلمة المرور: ${DEMO_PASSWORD}`);
-  console.log("تنبيه: هذه بيانات تجريبية للعرض فقط ولا تمثل مدارس أو أفرادًا حقيقيين.");
+  // طالب وولي أمر توضيحيان لربط حساب ولي الأمر (بيانات وهمية)
+  const parentUserId = createdUserIds["PARENT"];
+  if (parentUserId) {
+    const studentId = uuid();
+    const parentId = uuid();
+    db.prepare("INSERT INTO students (id, school_id, name, grade, section) VALUES (?,?,?,?,?)").run(studentId, schoolId, "طالب توضيحي", "الصف الخامس", "أ");
+    db.prepare("INSERT INTO parents (id, name, user_id) VALUES (?,?,?)").run(parentId, "ولي أمر تجريبي", parentUserId);
+    db.prepare("INSERT INTO parent_student (id, parent_id, student_id) VALUES (?,?,?)").run(uuid(), parentId, studentId);
+  }
+
+  console.log("تم بذر البيانات الأولية والبيانات التوضيحية لقاعدة بيانات SQLite.");
+  console.log("الحسابات التوضيحية (كلمة المرور موحَّدة وتُعرض هنا مرة واحدة فقط — احفظها):");
+  for (const u of demoUsers) console.log(`  ${u.email}`);
+  console.log(`  كلمة المرور: ${DEMO_PASSWORD}`);
+  console.log("تنبيه: هذه بيانات تجريبية للعرض فقط ولا تمثل مدارس أو أفرادًا حقيقيين. احذفها قبل الاستخدام الفعلي.");
+  return { demoPassword: DEMO_PASSWORD };
 }
 
 function subOrder(code: string): number {
@@ -454,7 +520,12 @@ function subOrder(code: string): number {
   return m ? parseInt(m[1]) * 100 + parseInt(m[2]) : 0;
 }
 
+/**
+ * ترتيب المؤشر: رمز المؤشر في الاستمارة بصيغة «رقم المؤشر-المعيار الفرعي-المعيار» (مثال 18-2-1)،
+ * أو «رقم المؤشر-المعيار» للمعايير بلا معايير فرعية (مثال 5-3). الترتيب: المعيار ثم الفرعي ثم رقم المؤشر.
+ */
 function indCodeOrder(code: string): number {
-  const parts = code.split("-").map(Number);
-  return (parts[0] || 0) * 10000 + (parts[1] || 0) * 100 + (parts[2] || 0);
+  const p = code.split("-").map(Number);
+  if (p.length === 3) return (p[2] || 0) * 10000 + (p[1] || 0) * 100 + (p[0] || 0);
+  return (p[1] || 0) * 10000 + (p[0] || 0);
 }

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import NotificationsBell from "@/components/layout/notifications-bell";
 import { Menu, LogOut, LayoutDashboard, ShieldCheck, Sparkles, ChevronDown } from "lucide-react";
 
 type Props = {
@@ -48,6 +49,7 @@ export default function TopBar({ user, onLogout, onToggleSidebar }: Props) {
       </div>
 
       <div className="flex items-center gap-2">
+        <NotificationsBell />
         {user?.roleKey === "SUPER_ADMIN" && (
           <Link
             href="/admin"

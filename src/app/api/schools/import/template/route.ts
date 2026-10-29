@@ -34,6 +34,8 @@ export async function GET() {
     { header: "الهاتف", key: "phone", width: 16 },
     { header: "البريد الإلكتروني", key: "email", width: 26 },
     { header: "مدير المدرسة", key: "principal", width: 24 },
+    { header: "خط العرض (اختياري)", key: "lat", width: 18 },
+    { header: "خط الطول (اختياري)", key: "lng", width: 18 },
   ];
 
   ws.getRow(1).eachCell((cell) => {
@@ -54,6 +56,8 @@ export async function GET() {
     phone: "77XXXXXXX",
     email: "",
     principal: "اسم مدير المدرسة",
+    lat: "",
+    lng: "",
   });
 
   ws.eachRow((row, i) => {

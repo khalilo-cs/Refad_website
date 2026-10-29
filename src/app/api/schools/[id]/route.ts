@@ -6,6 +6,7 @@ import {
   auditLog,
 } from "@/lib/auth";
 import { query, queryOne, exec, uuid, nowISO, getDb } from "@/lib/db/sqlite";
+import { canAccessSchool } from "@/lib/scope";
 
 export const runtime = "nodejs";
 
@@ -25,21 +26,6 @@ const schoolSchema = z.object({
   principalName: z.string().optional().nullable(),
   status: z.enum(["ACTIVE", "INACTIVE", "SUSPENDED"]).optional(),
 });
-
-function canAccessSchool(session: { roleKey: string; schoolId: string | null; directorateId: string | null }, schoolId: string): boolean {
-  if (session.roleKey === "SUPER_ADMIN") return true;
-  if (session.roleKey === "EDUCATION_DIRECTOR") {
-    // يتحقق من انتماء المدرسة لمديريته
-    const row = queryOne<{ directorate_id: string }>("SELECT directorate_id FROM schools WHERE id = ?", [schoolId]);
-    return !!row && row.directorate_id === session.directorateId;
-  }
-  if (session.roleKey === "SCHOOL_PRINCIPAL") return session.schoolId === schoolId;
-  if (session.roleKey === "INSPECTOR" && session.directorateId) {
-    const row = queryOne<{ directorate_id: string }>("SELECT directorate_id FROM schools WHERE id = ?", [schoolId]);
-    return !!row && row.directorate_id === session.directorateId;
-  }
-  return false;
-}
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getServerSession();
@@ -79,6 +65,12 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   if (!canAccessSchool(session, id)) {
     return NextResponse.json({ message: "لا يمكنك تعديل هذه المدرسة" }, { status: 403 });
   }
+  const isManager = ["SUPER_ADMIN", "EDUCATION_DIRECTOR"].includes(session.roleKey);
+  const isPrincipal =
+    session.roleKey === "SCHOOL_PRINCIPAL" && (session.permissions?.manageSchoolProfile === true || session.permissions?.all === true);
+  if (!isManager && !isPrincipal) {
+    return NextResponse.json({ message: "لا تملك صلاحية تعديل بيانات المدرسة" }, { status: 403 });
+  }
 
   const old = queryOne("SELECT * FROM schools WHERE id = ?", [id]);
   if (!old) return NextResponse.json({ message: "المدرسة غير موجودة" }, { status: 404 });
@@ -92,7 +84,14 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
   const fields: string[] = [];
   const values: unknown[] = [];
-  const setField = (col: string, val: unknown) => { if (val !== undefined) { fields.push(`${col} = ?`); values.push(val); } };
+  // مدير المدرسة يعدّل بيانات الاتصال والعنوان فقط؛ الرمز والحالة والتبعية الإدارية للإدارة.
+  const PRINCIPAL_COLS = new Set(["address", "contact_phone", "contact_email", "principal_name"]);
+  const setField = (col: string, val: unknown) => {
+    if (val === undefined) return;
+    if (!isManager && !PRINCIPAL_COLS.has(col)) return;
+    fields.push(`${col} = ?`);
+    values.push(val);
+  };
   setField("code", parsed.data.code);
   setField("name", parsed.data.name);
   setField("governorate_id", parsed.data.governorateId);

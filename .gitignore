@@ -24,3 +24,8 @@ uploads/
 
 # مخرجات تايب سكربت
 *.tsbuildinfo
+data/
+
+# ملفات تُولَّد تلقائياً بواسطة أدوات التطوير
+AGENTS.md
+CLAUDE.md

@@ -7,7 +7,7 @@ import { getServerSession } from "@/lib/auth";
 const schema = z.object({
   name: z.string().min(2, "الاسم الكامل مطلوب"),
   email: z.string().email("بريد إلكتروني صالح"),
-  password: z.string().min(8, "كلمة المرور 8 أحرف على الأقل"),
+  password: z.string().min(10, "كلمة المرور 10 أحرف على الأقل"),
 });
 
 export const runtime = "nodejs";

@@ -24,8 +24,8 @@ export default function SetupPage() {
       setError("تأكيد كلمة المرور غير متطابق");
       return;
     }
-    if (password.length < 8) {
-      setError("كلمة المرور يجب أن تكون 8 أحرف على الأقل");
+    if (password.length < 10) {
+      setError("كلمة المرور يجب أن تكون 10 أحرف على الأقل");
       return;
     }
     setLoading(true);
@@ -116,7 +116,7 @@ export default function SetupPage() {
                   autoComplete="new-password"
                 />
               </div>
-              <p className="text-xs text-gray-500">8 أحرف على الأقل، تحتوي على رقم وحرف</p>
+              <p className="text-xs text-gray-500">10 أحرف على الأقل، تحتوي على رقم وحرف</p>
             </div>
 
             <div className="space-y-2">
