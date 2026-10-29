@@ -8,11 +8,13 @@ import {
   auditLog,
 } from "@/lib/auth";
 import { clientIp, rateLimit } from "@/lib/security";
-import { exec, uuid } from "@/lib/db/sqlite";
+import { exec, queryOne, uuid } from "@/lib/db/sqlite";
+import { decryptSecret, verifyTotp } from "@/lib/totp";
 
 const schema = z.object({
   email: z.string().email("أدخل بريدًا إلكترونيًا صالحًا"),
   password: z.string().min(1, "أدخل كلمة المرور"),
+  totp: z.string().optional(),
 });
 
 export const runtime = "nodejs";
@@ -70,6 +72,20 @@ export async function POST(request: NextRequest) {
     }
 
     const user = result.user;
+
+    // المصادقة الثنائية: تُطلب لمن فعّلها بعد نجاح كلمة المرور
+    const tf = queryOne<{ two_factor_enabled: number; two_factor_secret: string | null; two_factor_last_step: number | null }>(
+      "SELECT two_factor_enabled, two_factor_secret, two_factor_last_step FROM users WHERE id = ?", [user.userId]);
+    if (tf?.two_factor_enabled && tf.two_factor_secret) {
+      if (!parsed.data.totp) return NextResponse.json({ message: "أدخل رمز المصادقة الثنائية", needTotp: true }, { status: 401 });
+      if (!rateLimit(`totp:${user.userId}`, 8, 15 * 60_000).ok) return NextResponse.json({ message: "محاولات كثيرة. حاول لاحقاً." }, { status: 429 });
+      const step = verifyTotp(decryptSecret(tf.two_factor_secret), parsed.data.totp);
+      // الرمز لا يُستخدم مرتين (منع إعادة الاستخدام)
+      if (step === null || (tf.two_factor_last_step != null && step <= tf.two_factor_last_step)) {
+        return NextResponse.json({ message: "رمز المصادقة غير صحيح", needTotp: true }, { status: 401 });
+      }
+      exec("UPDATE users SET two_factor_last_step = ? WHERE id = ?", [step, user.userId]);
+    }
     const accessToken = signAccessToken(user);
     const refreshToken = signRefreshToken(user.userId, user.tokenVersion);
     await setAuthCookies(accessToken, refreshToken);

@@ -41,6 +41,16 @@ console.log('نسخة متسقة: ' + process.argv[2]);
 gzip -f "$OUT"
 echo "تم إنشاء النسخة الاحتياطية: $OUT.gz"
 
+# أرشيف الأدلة المرفوعة (مجلد خاص خارج public)
+if [[ -d "$DB_DIR/data/uploads" ]]; then
+  tar -czf "$DEST_DIR/rifad-uploads-$STAMP.tar.gz" -C "$DB_DIR/data" uploads
+  echo "تم أرشفة الأدلة: $DEST_DIR/rifad-uploads-$STAMP.tar.gz"
+elif [[ -d "$DB_DIR/uploads" ]]; then
+  tar -czf "$DEST_DIR/rifad-uploads-$STAMP.tar.gz" -C "$DB_DIR" uploads
+  echo "تم أرشفة الأدلة: $DEST_DIR/rifad-uploads-$STAMP.tar.gz"
+fi
+ls -1t "$DEST_DIR"/rifad-uploads-*.tar.gz 2>/dev/null | tail -n +31 | xargs -r rm -f
+
 # الاحتفاظ بآخر 30 نسخة فقط
 ls -1t "$DEST_DIR"/rifad-*.db.gz 2>/dev/null | tail -n +31 | xargs -r rm -f
 echo "عدد النسخ المحفوظة: $(ls -1 "$DEST_DIR"/rifad-*.db.gz 2>/dev/null | wc -l)"

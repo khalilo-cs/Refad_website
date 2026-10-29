@@ -233,6 +233,13 @@ export const MIGRATIONS: Migration[] = [
       ALTER TABLE shared_materials ADD COLUMN audience TEXT NOT NULL DEFAULT 'SCHOOL';
     `,
   },
+  {
+    id: 6,
+    name: "two-factor-replay-protection",
+    sql: `
+      ALTER TABLE users ADD COLUMN two_factor_last_step INTEGER;
+    `,
+  },
 ];
 
 /** يطبّق الترحيلات المعلّقة. لا يفعل شيئاً إن لم تُهيَّأ قاعدة البيانات بعد. */

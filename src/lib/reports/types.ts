@@ -41,11 +41,11 @@ export type ReportContent = {
 export const SPECIAL_TOPICS: Record<string, { label: string; kind: "attendance" | "results" | "indicators"; codes?: string[]; criterionCodes?: string[]; note?: string }> = {
   attendance: { label: "الحضور والغياب المدرسي", kind: "attendance" },
   results: { label: "نتائج التحصيل الدراسي", kind: "results" },
-  training: { label: "التدريب والتنمية المهنية", kind: "indicators", codes: ["3-1-2", "4-1-2", "5-1-2", "8-1-2", "3-2-2", "4-2-2", "5-2-2", "8-2-2", "13-3"] },
+  training: { label: "التدريب والتنمية المهنية", kind: "indicators", codes: ["2-1-3", "2-1-4", "2-1-8", "2-2-3", "2-2-4", "2-2-8", "4-2-4", "5-2-2"] },
   facilities: { label: "المرافق والبنية التحتية", kind: "indicators", criterionCodes: ["5-1"] },
-  maintenance: { label: "الصيانة والجوانب الجمالية", kind: "indicators", codes: ["15-1-5", "4-1-5", "13-1-5", "11-1-5", "12-1-5", "17-1-5"] },
-  safety: { label: "الأمن والسلامة", kind: "indicators", criterionCodes: ["5-2"], codes: ["12-3", "13-3"] },
-  parents: { label: "التواصل مع أولياء الأمور", kind: "indicators", codes: ["9-2-1", "14-2-1", "15-2-1", "18-2-1", "4-6", "2-6", "5-6"] },
-  activities: { label: "الأنشطة الطلابية", kind: "indicators", codes: ["6-3", "7-3", "8-3", "9-3", "10-3", "11-3"] },
+  maintenance: { label: "الصيانة والجوانب الجمالية", kind: "indicators", codes: ["5-1-15", "5-1-13", "5-1-12", "5-1-17", "5-1-16"] },
+  safety: { label: "الأمن والسلامة", kind: "indicators", criterionCodes: ["5-2"], codes: ["3-12", "3-13", "3-4"] },
+  parents: { label: "التواصل مع أولياء الأمور", kind: "indicators", codes: ["1-2-14", "1-2-15", "1-2-18", "6-1", "6-2", "6-4"] },
+  activities: { label: "الأنشطة الطلابية", kind: "indicators", codes: ["3-8", "3-9", "3-10", "3-11", "5-1-14"] },
   community: { label: "الشراكة المجتمعية", kind: "indicators", criterionCodes: ["6"] },
 };

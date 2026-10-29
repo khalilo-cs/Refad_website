@@ -17,7 +17,8 @@ function LoginForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [remember, setRemember] = useState(true);
+  const [needTotp, setNeedTotp] = useState(false);
+  const [totp, setTotp] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -30,10 +31,11 @@ function LoginForm() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ email: email.trim(), password }),
+        body: JSON.stringify({ email: email.trim(), password, totp: needTotp ? totp.trim() : undefined }),
       });
       const data = await res.json();
       if (!res.ok) {
+        if (data.needTotp) setNeedTotp(true);
         setError(data.message || "تعذّر تسجيل الدخول");
         return;
       }
@@ -141,7 +143,7 @@ function LoginForm() {
                   autoComplete="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="name@rifad.demo"
+                  placeholder="name@example.com"
                   className="input pr-10"
                   dir="ltr"
                 />
@@ -176,15 +178,13 @@ function LoginForm() {
               </div>
             </div>
 
-            <label className="flex cursor-pointer items-center gap-2 text-[12.5px] text-gray-600">
-              <input
-                type="checkbox"
-                checked={remember}
-                onChange={(e) => setRemember(e.target.checked)}
-                className="h-3.5 w-3.5 rounded border-gray-300 text-turquoise focus:ring-turquoise"
-              />
-              إبقاء الجلسة مفتوحة على هذا الجهاز
-            </label>
+            {needTotp && (
+              <div className="animate-fade-up">
+                <label htmlFor="totp" className="label">رمز المصادقة الثنائية</label>
+                <input id="totp" inputMode="numeric" autoComplete="one-time-code" maxLength={6} autoFocus value={totp} onChange={(e) => setTotp(e.target.value.replace(/\D/g, ""))} placeholder="000000" className="input text-center font-mono text-lg tracking-[0.4em]" dir="ltr" />
+                <p className="mt-1 text-[11.5px] text-gray-500">افتح تطبيق المصادقة وأدخل الرمز المكوّن من 6 أرقام.</p>
+              </div>
+            )}
 
             <button type="submit" disabled={loading} className="btn btn-primary w-full py-3">
               {loading ? (

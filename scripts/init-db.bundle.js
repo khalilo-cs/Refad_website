@@ -34,6 +34,268 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
   mod
 ));
 
+// src/lib/db/migrations.ts
+function runMigrations(db) {
+  const hasUsers = db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='users'").get();
+  if (!hasUsers) return 0;
+  db.exec(
+    "CREATE TABLE IF NOT EXISTS schema_migrations (id INTEGER PRIMARY KEY, name TEXT NOT NULL, applied_at TEXT NOT NULL DEFAULT (datetime('now')))"
+  );
+  const applied = new Set(
+    db.prepare("SELECT id FROM schema_migrations").all().map((r) => r.id)
+  );
+  let count = 0;
+  for (const m of MIGRATIONS) {
+    if (applied.has(m.id)) continue;
+    const tx = db.transaction(() => {
+      db.exec(m.sql);
+      db.prepare("INSERT INTO schema_migrations (id, name) VALUES (?, ?)").run(m.id, m.name);
+    });
+    tx();
+    count++;
+  }
+  return count;
+}
+var MIGRATIONS;
+var init_migrations = __esm({
+  "src/lib/db/migrations.ts"() {
+    "use strict";
+    MIGRATIONS = [
+      {
+        id: 1,
+        name: "evaluation-history-evidence-private-storage-security",
+        sql: `
+      -- \u0627\u0644\u062A\u0642\u064A\u064A\u0645: \u0648\u0633\u0627\u0626\u0644 \u0627\u0644\u062A\u062D\u0642\u0642 \u0627\u0644\u0645\u0633\u062A\u062E\u062F\u0645\u0629\u060C \u0648\u0645\u0646 \u0623\u0646\u0634\u0623 \u0627\u0644\u062A\u0642\u064A\u064A\u0645
+      ALTER TABLE evaluations ADD COLUMN verification_methods TEXT;
+      ALTER TABLE evaluations ADD COLUMN created_by_id TEXT REFERENCES users(id);
+      ALTER TABLE evaluations ADD COLUMN created_at TEXT;
+      UPDATE evaluations SET created_at = COALESCE(rated_at, updated_at) WHERE created_at IS NULL;
+
+      -- \u0633\u062C\u0644 \u062A\u0639\u062F\u064A\u0644\u0627\u062A \u0627\u0644\u062A\u0642\u064A\u064A\u0645: \u0633\u0628\u0628 \u0627\u0644\u062A\u0639\u062F\u064A\u0644 \u0648\u0631\u0628\u0637\u0647 \u0628\u0627\u0644\u0632\u064A\u0627\u0631\u0629 \u0648\u0627\u0644\u0645\u0624\u0634\u0631
+      ALTER TABLE evaluation_history ADD COLUMN reason TEXT;
+      ALTER TABLE evaluation_history ADD COLUMN visit_id TEXT;
+      ALTER TABLE evaluation_history ADD COLUMN indicator_id TEXT;
+
+      -- \u0627\u0644\u0632\u064A\u0627\u0631\u0629: \u062A\u0627\u0631\u064A\u062E \u0627\u0644\u062A\u0642\u062F\u064A\u0645 \u0644\u0644\u0645\u0631\u0627\u062C\u0639\u0629
+      ALTER TABLE visits ADD COLUMN submitted_at TEXT;
+      ALTER TABLE visits ADD COLUMN submitted_by_id TEXT REFERENCES users(id);
+      ALTER TABLE visits ADD COLUMN strengths TEXT;
+      ALTER TABLE visits ADD COLUMN gaps TEXT;
+
+      -- \u0627\u0644\u0623\u062F\u0644\u0629: \u0631\u0628\u0637 \u0628\u0627\u0644\u0645\u0624\u0634\u0631 \u0648\u0627\u0644\u0645\u0639\u064A\u0627\u0631\u060C \u0646\u0648\u0639 \u0627\u0644\u0645\u0633\u062A\u0646\u062F\u060C \u062A\u0642\u064A\u064A\u0645 \u0627\u0644\u0635\u0644\u0627\u062D\u064A\u0629\u060C \u0627\u0644\u0635\u0644\u0627\u062D\u064A\u0627\u062A
+      ALTER TABLE evidence ADD COLUMN indicator_id TEXT REFERENCES indicators(id) ON DELETE SET NULL;
+      ALTER TABLE evidence ADD COLUMN document_type TEXT;
+      ALTER TABLE evidence ADD COLUMN description TEXT;
+      ALTER TABLE evidence ADD COLUMN sha256 TEXT;
+      ALTER TABLE evidence ADD COLUMN validity TEXT;
+      ALTER TABLE evidence ADD COLUMN plan_id TEXT;
+      ALTER TABLE evidence ADD COLUMN report_id TEXT;
+      ALTER TABLE evidence ADD COLUMN visibility TEXT NOT NULL DEFAULT 'SCHOOL';
+      ALTER TABLE evidence ADD COLUMN can_download INTEGER NOT NULL DEFAULT 1;
+      CREATE INDEX IF NOT EXISTS idx_evidence_indicator ON evidence(indicator_id);
+      CREATE INDEX IF NOT EXISTS idx_evidence_subcriterion ON evidence(sub_criterion_id);
+
+      CREATE TABLE IF NOT EXISTS evidence_versions (
+        id TEXT PRIMARY KEY,
+        evidence_id TEXT NOT NULL REFERENCES evidence(id) ON DELETE CASCADE,
+        version INTEGER NOT NULL,
+        storage_key TEXT NOT NULL,
+        original_name TEXT NOT NULL,
+        mime_type TEXT NOT NULL,
+        size INTEGER NOT NULL,
+        sha256 TEXT,
+        uploaded_by_id TEXT REFERENCES users(id),
+        change_note TEXT,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        UNIQUE (evidence_id, version)
+      );
+      CREATE INDEX IF NOT EXISTS idx_evidence_versions_ev ON evidence_versions(evidence_id);
+
+      -- \u0627\u0644\u062D\u0633\u0627\u0628\u0627\u062A: \u0642\u0641\u0644 \u0645\u0624\u0642\u062A \u0628\u062F\u0644 \u0627\u0644\u0642\u0641\u0644 \u0627\u0644\u062F\u0627\u0626\u0645
+      ALTER TABLE users ADD COLUMN locked_until TEXT;
+      ALTER TABLE users ADD COLUMN password_changed_at TEXT;
+      ALTER TABLE users ADD COLUMN must_change_password INTEGER NOT NULL DEFAULT 0;
+
+      -- \u0645\u062D\u0627\u0648\u0644\u0627\u062A \u0627\u0644\u062F\u062E\u0648\u0644 (\u062A\u062D\u062F\u064A\u062F \u0627\u0644\u0645\u0639\u062F\u0644 \u0648\u0627\u0644\u062A\u062F\u0642\u064A\u0642)
+      CREATE TABLE IF NOT EXISTS login_attempts (
+        id TEXT PRIMARY KEY,
+        email TEXT NOT NULL,
+        ip TEXT,
+        success INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+      CREATE INDEX IF NOT EXISTS idx_login_attempts_email ON login_attempts(email, created_at);
+      CREATE INDEX IF NOT EXISTS idx_login_attempts_ip ON login_attempts(ip, created_at);
+
+      -- \u0627\u0644\u062D\u0648\u0627\u062F\u062B \u0627\u0644\u0623\u0645\u0646\u064A\u0629
+      CREATE TABLE IF NOT EXISTS security_incidents (
+        id TEXT PRIMARY KEY,
+        title TEXT NOT NULL,
+        description TEXT NOT NULL,
+        severity TEXT NOT NULL DEFAULT 'MEDIUM',
+        status TEXT NOT NULL DEFAULT 'OPEN',
+        related_user_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+        reported_by_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+        resolution TEXT,
+        resolved_by_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+        resolved_at TEXT,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+      CREATE INDEX IF NOT EXISTS idx_incidents_status ON security_incidents(status);
+
+      -- \u0633\u062C\u0644 \u0627\u0644\u062A\u062F\u0642\u064A\u0642 \u063A\u064A\u0631 \u0642\u0627\u0628\u0644 \u0644\u0644\u062A\u0639\u062F\u064A\u0644 \u0623\u0648 \u0627\u0644\u062D\u0630\u0641 \u0645\u0646 \u0623\u064A \u0645\u0633\u062A\u062E\u062F\u0645
+      CREATE TRIGGER IF NOT EXISTS trg_audit_no_update BEFORE UPDATE ON audit_logs
+      WHEN NOT (NEW.user_id IS NULL AND NEW.action = OLD.action AND NEW.entity_type = OLD.entity_type
+                AND IFNULL(NEW.entity_id,'') = IFNULL(OLD.entity_id,'')
+                AND IFNULL(NEW.old_values,'') = IFNULL(OLD.old_values,'')
+                AND IFNULL(NEW.new_values,'') = IFNULL(OLD.new_values,'')
+                AND NEW.created_at = OLD.created_at)
+      BEGIN SELECT RAISE(ABORT, '\u0633\u062C\u0644 \u0627\u0644\u062A\u062F\u0642\u064A\u0642 \u063A\u064A\u0631 \u0642\u0627\u0628\u0644 \u0644\u0644\u062A\u0639\u062F\u064A\u0644'); END;
+      CREATE TRIGGER IF NOT EXISTS trg_audit_no_delete BEFORE DELETE ON audit_logs
+      BEGIN SELECT RAISE(ABORT, '\u0633\u062C\u0644 \u0627\u0644\u062A\u062F\u0642\u064A\u0642 \u063A\u064A\u0631 \u0642\u0627\u0628\u0644 \u0644\u0644\u062D\u0630\u0641'); END;
+      CREATE TRIGGER IF NOT EXISTS trg_evalhist_no_update BEFORE UPDATE ON evaluation_history
+      BEGIN SELECT RAISE(ABORT, '\u0633\u062C\u0644 \u062A\u0639\u062F\u064A\u0644\u0627\u062A \u0627\u0644\u062A\u0642\u064A\u064A\u0645 \u063A\u064A\u0631 \u0642\u0627\u0628\u0644 \u0644\u0644\u062A\u0639\u062F\u064A\u0644'); END;
+    `
+      },
+      {
+        id: 2,
+        name: "school-profiles-assignments-meetings",
+        sql: `
+      -- \u0645\u0644\u0641 \u0627\u0644\u0645\u062F\u0631\u0633\u0629 \u0627\u0644\u062A\u0641\u0635\u064A\u0644\u064A: \u0627\u0644\u0643\u0648\u0627\u062F\u0631 \u0648\u0627\u0644\u0641\u0635\u0648\u0644 \u0648\u0627\u0644\u0645\u0631\u0627\u0641\u0642 (\u064A\u064F\u062F\u062E\u0644 \u0648\u064A\u064F\u062A\u062D\u0642\u0642 \u0645\u0646\u0647 \u064A\u062F\u0648\u064A\u0627\u064B)
+      CREATE TABLE IF NOT EXISTS school_profiles (
+        school_id TEXT PRIMARY KEY REFERENCES schools(id) ON DELETE CASCADE,
+        students_count INTEGER,
+        teachers_count INTEGER,
+        admin_staff_count INTEGER,
+        service_staff_count INTEGER,
+        classes_count INTEGER,
+        has_science_lab INTEGER,
+        has_computer_lab INTEGER,
+        has_library INTEGER,
+        has_resource_room INTEGER,
+        has_canteen INTEGER,
+        has_clinic INTEGER,
+        has_playground INTEGER,
+        has_power INTEGER,
+        has_water INTEGER,
+        sanitation_units INTEGER,
+        special_needs_access INTEGER,
+        facilities_notes TEXT,
+        info_source TEXT,
+        verified INTEGER NOT NULL DEFAULT 0,
+        verified_by_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+        verified_at TEXT,
+        updated_by_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+
+      -- \u0625\u0633\u0646\u0627\u062F \u0627\u0644\u0645\u062F\u0627\u0631\u0633 \u0644\u0644\u0645\u0641\u062A\u0634\u064A\u0646
+      CREATE TABLE IF NOT EXISTS school_assignments (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        school_id TEXT NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+        assigned_by_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        UNIQUE (user_id, school_id)
+      );
+      CREATE INDEX IF NOT EXISTS idx_assign_user ON school_assignments(user_id);
+      CREATE INDEX IF NOT EXISTS idx_assign_school ON school_assignments(school_id);
+
+      -- \u0631\u0628\u0637 \u0623\u062F\u0644\u0629 \u0628\u0625\u062C\u0631\u0627\u0621 \u062A\u0635\u062D\u064A\u062D\u064A \u0644\u0625\u062B\u0628\u0627\u062A \u0627\u0644\u0625\u0646\u062C\u0627\u0632
+      ALTER TABLE evidence ADD COLUMN action_id TEXT REFERENCES corrective_actions(id) ON DELETE SET NULL;
+      CREATE INDEX IF NOT EXISTS idx_evidence_action ON evidence(action_id);
+
+      -- \u0633\u062C\u0644 \u0627\u0644\u0627\u062C\u062A\u0645\u0627\u0639\u0627\u062A \u0648\u0627\u0644\u0645\u062A\u0627\u0628\u0639\u0627\u062A
+      CREATE TABLE IF NOT EXISTS meetings (
+        id TEXT PRIMARY KEY,
+        school_id TEXT REFERENCES schools(id) ON DELETE CASCADE,
+        title TEXT NOT NULL,
+        meeting_date TEXT NOT NULL,
+        attendees TEXT,
+        minutes TEXT,
+        decisions TEXT,
+        follow_up TEXT,
+        created_by_id TEXT NOT NULL REFERENCES users(id),
+        created_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+      CREATE INDEX IF NOT EXISTS idx_meetings_school ON meetings(school_id);
+
+      -- \u0645\u0648\u0627\u062F \u062A\u0639\u0644\u064A\u0645\u064A\u0629 \u0645\u0634\u062A\u0631\u0643\u0629
+      CREATE TABLE IF NOT EXISTS shared_materials (
+        id TEXT PRIMARY KEY,
+        school_id TEXT REFERENCES schools(id) ON DELETE CASCADE,
+        title TEXT NOT NULL,
+        description TEXT,
+        evidence_id TEXT REFERENCES evidence(id) ON DELETE SET NULL,
+        created_by_id TEXT NOT NULL REFERENCES users(id),
+        created_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+
+      -- \u0642\u0631\u0627\u0621\u0629 \u0627\u0644\u0625\u0639\u0644\u0627\u0646\u0627\u062A
+      CREATE TABLE IF NOT EXISTS announcement_reads (
+        announcement_id TEXT NOT NULL REFERENCES announcements(id) ON DELETE CASCADE,
+        user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        read_at TEXT NOT NULL DEFAULT (datetime('now')),
+        PRIMARY KEY (announcement_id, user_id)
+      );
+    `
+      },
+      {
+        id: 3,
+        name: "reports-content-snapshots",
+        sql: `
+      -- \u0644\u0642\u0637\u0629 \u0645\u062D\u062A\u0648\u0649 \u0627\u0644\u062A\u0642\u0631\u064A\u0631 \u062A\u064F\u062B\u0628\u064E\u0651\u062A \u0639\u0646\u062F \u0627\u0644\u0625\u0646\u0634\u0627\u0621 \u0641\u0644\u0627 \u064A\u062A\u063A\u064A\u0631 \u0627\u0644\u062A\u0642\u0631\u064A\u0631 \u0627\u0644\u0645\u0639\u062A\u0645\u062F \u0644\u0627\u062D\u0642\u0627\u064B
+      ALTER TABLE reports ADD COLUMN content TEXT;
+      ALTER TABLE reports ADD COLUMN visit_id TEXT REFERENCES visits(id) ON DELETE SET NULL;
+      ALTER TABLE reports ADD COLUMN params TEXT;
+      ALTER TABLE reports ADD COLUMN submitted_at TEXT;
+      ALTER TABLE reports ADD COLUMN submitted_by_id TEXT REFERENCES users(id) ON DELETE SET NULL;
+      CREATE INDEX IF NOT EXISTS idx_reports_visit ON reports(visit_id);
+      CREATE INDEX IF NOT EXISTS idx_reports_created ON reports(created_at);
+    `
+      },
+      {
+        id: 4,
+        name: "evidence-library",
+        sql: `
+      CREATE TABLE IF NOT EXISTS evidence_library_items (
+        id TEXT PRIMARY KEY,
+        title TEXT NOT NULL,
+        description TEXT,
+        indicator_codes TEXT NOT NULL DEFAULT '[]',
+        document_type TEXT,
+        is_active INTEGER NOT NULL DEFAULT 1,
+        created_by_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+        created_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+      ALTER TABLE evidence ADD COLUMN library_item_id TEXT REFERENCES evidence_library_items(id) ON DELETE SET NULL;
+      CREATE INDEX IF NOT EXISTS idx_evidence_library_item ON evidence(library_item_id);
+    `
+      },
+      {
+        id: 5,
+        name: "communication-center",
+        sql: `
+      ALTER TABLE conversations ADD COLUMN kind TEXT NOT NULL DEFAULT 'GENERAL';
+      ALTER TABLE conversations ADD COLUMN created_by_id TEXT REFERENCES users(id) ON DELETE SET NULL;
+      ALTER TABLE conversations ADD COLUMN status TEXT NOT NULL DEFAULT 'OPEN';
+      ALTER TABLE conversations ADD COLUMN last_message_at TEXT;
+      CREATE INDEX IF NOT EXISTS idx_conversations_kind ON conversations(kind);
+      ALTER TABLE shared_materials ADD COLUMN audience TEXT NOT NULL DEFAULT 'SCHOOL';
+    `
+      },
+      {
+        id: 6,
+        name: "two-factor-replay-protection",
+        sql: `
+      ALTER TABLE users ADD COLUMN two_factor_last_step INTEGER;
+    `
+      }
+    ];
+  }
+});
+
 // prisma/seed/data.ts
 var RATING_SCALE, VERIFICATION_TOOLS, DEFAULT_VERIFICATION_TOOLS, criterion1Sub1, criterion1Sub2, criterion2Sub1, criterion2Sub2, criterion3Flat, criterion4Sub1, criterion4Sub2, criterion4Sub3, criterion4Sub4, criterion5Sub1, criterion5Sub2, criterion6Flat, criterion7Sub1, criterion7Sub2, SEED_CRITERIA, DEFAULT_SYSTEM_SETTINGS;
 var init_data = __esm({
@@ -2607,7 +2869,9 @@ var seed_sqlite_exports = {};
 __export(seed_sqlite_exports, {
   seedDatabase: () => seedDatabase
 });
-async function seedDatabase(db) {
+async function seedDatabase(db, opts = {}) {
+  const DEMO_PASSWORD = opts.demoPassword ?? // 16 حرفاً عشوائياً: أحرف كبيرة وصغيرة وأرقام ورمز
+  (0, import_crypto2.randomBytes)(12).toString("base64url") + "!9a";
   const insert = (rows2) => {
     const tx = db.transaction((rs) => {
       for (const r of rs) db.prepare(r.sql).run(...r.params);
@@ -2847,26 +3111,42 @@ async function seedDatabase(db) {
           ON CONFLICT(code) DO NOTHING`,
     params: [directorateId, "\u0627\u0644\u062C\u0631\u0627\u062D\u064A", "JARAHI", nowISO()]
   });
-  const schoolId = uuid();
-  rows.push({
-    sql: `INSERT INTO schools (id, code, name, governorate_id, directorate_id, type, stage, contact_phone, data_source, status, notes, last_updated_at, created_at)
-          VALUES (?, ?, ?, (SELECT id FROM governorates WHERE code = 'HUDAIDAH'),
-                  (SELECT id FROM directorates WHERE code = 'JARAHI'),
-                  ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(code) DO NOTHING`,
-    params: [
-      schoolId,
-      "RIFAD-DEMO-001",
-      "\u0645\u062F\u0631\u0633\u0629 \u0631\u0650\u0641\u0627\u062F \u0627\u0644\u062A\u062C\u0631\u064A\u0628\u064A\u0629 (\u0628\u064A\u0627\u0646\u0627\u062A \u0648\u0647\u0645\u064A\u0629 \u0644\u0644\u0639\u0631\u0636 \u0641\u0642\u0637 \u2014 \u0644\u064A\u0633\u062A \u0645\u062F\u0631\u0633\u0629 \u062D\u0642\u064A\u0642\u064A\u0629)",
-      "\u062D\u0643\u0648\u0645\u064A\u0629",
-      "\u0623\u0633\u0627\u0633\u064A",
-      "000-000000",
-      "MANUAL",
-      "ACTIVE",
-      "\u0633\u062C\u0644 \u062A\u0648\u0636\u064A\u062D\u064A \u0644\u0644\u0639\u0631\u0636 \u0627\u0644\u0623\u0648\u0644 \u0641\u0642\u0637. \u064A\u064F\u062D\u0630\u0641 \u0623\u0648 \u064A\u064F\u0633\u062A\u0628\u062F\u0644 \u0628\u0633\u062C\u0644\u0627\u062A \u0627\u0644\u0645\u062F\u0627\u0631\u0633 \u0627\u0644\u0641\u0639\u0644\u064A\u0629 \u0639\u0628\u0631 \u0627\u0633\u062A\u064A\u0631\u0627\u062F Excel/CSV \u0623\u0648 \u0627\u0644\u0625\u062F\u062E\u0627\u0644 \u0627\u0644\u064A\u062F\u0648\u064A.",
-      nowISO(),
-      nowISO()
-    ]
-  });
+  if (!opts.demo) {
+    insert(rows);
+    rows.length = 0;
+    console.log("\u062A\u0645 \u0628\u0630\u0631 \u0627\u0644\u0645\u0639\u0627\u064A\u064A\u0631 \u0648\u0627\u0644\u0645\u0624\u0634\u0631\u0627\u062A \u0648\u0627\u0644\u0623\u062F\u0648\u0627\u0631 \u0648\u0627\u0644\u0625\u0639\u062F\u0627\u062F\u0627\u062A. \u0623\u0646\u0634\u0626 \u062D\u0633\u0627\u0628 \u0627\u0644\u0645\u0633\u0624\u0648\u0644 \u0627\u0644\u0623\u0648\u0644 \u0645\u0646 \u0635\u0641\u062D\u0629 /setup.");
+    return {};
+  }
+  const DEMO_NOTE = "\u0633\u062C\u0644 \u062A\u0648\u0636\u064A\u062D\u064A \u0644\u0644\u0639\u0631\u0636 \u0627\u0644\u0623\u0648\u0644 \u0641\u0642\u0637. \u064A\u064F\u062D\u0630\u0641 \u0623\u0648 \u064A\u064F\u0633\u062A\u0628\u062F\u0644 \u0628\u0633\u062C\u0644\u0627\u062A \u0627\u0644\u0645\u062F\u0627\u0631\u0633 \u0627\u0644\u0641\u0639\u0644\u064A\u0629 \u0639\u0628\u0631 \u0627\u0633\u062A\u064A\u0631\u0627\u062F Excel/CSV \u0623\u0648 \u0627\u0644\u0625\u062F\u062E\u0627\u0644 \u0627\u0644\u064A\u062F\u0648\u064A.";
+  const demoSchools = [
+    { id: uuid(), code: "RIFAD-DEMO-001", name: "\u0645\u062F\u0631\u0633\u0629 \u0631\u0650\u0641\u0627\u062F \u0627\u0644\u062A\u062C\u0631\u064A\u0628\u064A\u0629 (\u0623) \u2014 \u0628\u064A\u0627\u0646\u0627\u062A \u0648\u0647\u0645\u064A\u0629 \u0644\u0644\u0639\u0631\u0636 \u0641\u0642\u0637", stage: "\u0623\u0633\u0627\u0633\u064A", lat: 14.945, lng: 43.455, type: "\u062D\u0643\u0648\u0645\u064A\u0629" },
+    { id: uuid(), code: "RIFAD-DEMO-002", name: "\u0645\u062F\u0631\u0633\u0629 \u0631\u0650\u0641\u0627\u062F \u0627\u0644\u062A\u062C\u0631\u064A\u0628\u064A\u0629 (\u0628) \u2014 \u0628\u064A\u0627\u0646\u0627\u062A \u0648\u0647\u0645\u064A\u0629 \u0644\u0644\u0639\u0631\u0636 \u0641\u0642\u0637", stage: "\u062B\u0627\u0646\u0648\u064A", lat: 14.9, lng: 43.5, type: "\u062D\u0643\u0648\u0645\u064A\u0629" },
+    { id: uuid(), code: "RIFAD-DEMO-003", name: "\u0645\u062F\u0631\u0633\u0629 \u0631\u0650\u0641\u0627\u062F \u0627\u0644\u062A\u062C\u0631\u064A\u0628\u064A\u0629 (\u062C) \u2014 \u0628\u064A\u0627\u0646\u0627\u062A \u0648\u0647\u0645\u064A\u0629 \u0644\u0644\u0639\u0631\u0636 \u0641\u0642\u0637", stage: "\u0623\u0633\u0627\u0633\u064A", lat: 14.985, lng: 43.52, type: "\u062D\u0643\u0648\u0645\u064A\u0629" }
+  ];
+  for (const sc of demoSchools) {
+    rows.push({
+      sql: `INSERT INTO schools (id, code, name, governorate_id, directorate_id, type, stage, latitude, longitude, contact_phone, data_source, status, notes, last_updated_at, created_at)
+            VALUES (?, ?, ?, (SELECT id FROM governorates WHERE code = 'HUDAIDAH'),
+                    (SELECT id FROM directorates WHERE code = 'JARAHI'),
+                    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(code) DO NOTHING`,
+      params: [
+        sc.id,
+        sc.code,
+        sc.name,
+        sc.type,
+        sc.stage,
+        sc.lat,
+        sc.lng,
+        "000-000000",
+        "MANUAL",
+        "ACTIVE",
+        DEMO_NOTE + " \u0627\u0644\u0625\u062D\u062F\u0627\u062B\u064A\u0627\u062A \u062A\u0648\u0636\u064A\u062D\u064A\u0629.",
+        nowISO(),
+        nowISO()
+      ]
+    });
+  }
+  const schoolId = demoSchools[0].id;
   const demoUsers = [
     {
       key: "SUPER_ADMIN",
@@ -2945,65 +3225,140 @@ async function seedDatabase(db) {
   insert(rows);
   rows.length = 0;
   const inspectorId = createdUserIds["INSPECTOR"];
-  if (inspectorId && schoolId) {
-    const visitId = uuid();
-    db.prepare(
-      `INSERT INTO visits (id, school_id, inspector_id, type, purpose, status, scheduled_at, started_at, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-    ).run(
-      visitId,
-      schoolId,
-      inspectorId,
-      "PERIODIC",
-      "\u0632\u064A\u0627\u0631\u0629 \u062A\u0639\u0631\u064A\u0641\u064A\u0629 \u0644\u0644\u0645\u0646\u0635\u0629",
-      "COMPLETED",
-      nowISO(),
-      nowISO(),
-      nowISO(),
-      nowISO()
-    );
-    const sampleIndicators = ["1-1-1", "2-1-1", "3-1", "4-1-1", "5-1-4"];
-    for (const code of sampleIndicators) {
-      const ind = db.prepare("SELECT id, code FROM indicators WHERE code = ?").get(code);
-      if (!ind) continue;
-      const evalId = uuid();
+  const directorId = createdUserIds["EDUCATION_DIRECTOR"];
+  const principalId = createdUserIds["SCHOOL_PRINCIPAL"];
+  const dayMs = 864e5;
+  const iso = (offsetDays) => new Date(Date.now() + offsetDays * dayMs).toISOString();
+  const DEMO_FLAG = "\u0645\u062B\u0627\u0644 \u062A\u0648\u0636\u064A\u062D\u064A \u0641\u0642\u0637 \u2014 \u0644\u064A\u0633 \u062A\u0642\u064A\u064A\u0645\u0627\u064B \u0641\u0639\u0644\u064A\u0627\u064B";
+  if (inspectorId) {
+    for (const sc of demoSchools) {
+      db.prepare("INSERT OR IGNORE INTO school_assignments (id, user_id, school_id, assigned_by_id) VALUES (?,?,?,?)").run(uuid(), inspectorId, sc.id, directorId ?? null);
       db.prepare(
-        `INSERT INTO evaluations (id, visit_id, indicator_id, status, score, notes, rated_by_id, rated_at, updated_at, version)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`
+        `INSERT OR IGNORE INTO school_profiles (school_id, students_count, teachers_count, admin_staff_count, service_staff_count, classes_count,
+           has_science_lab, has_computer_lab, has_library, has_canteen, has_playground, info_source, verified)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,0)`
+      ).run(sc.id, null, null, null, null, null, null, null, null, null, null, "\u0628\u064A\u0627\u0646\u0627\u062A \u062A\u0648\u0636\u064A\u062D\u064A\u0629 \u2014 \u0644\u0645 \u062A\u064F\u062F\u062E\u0644 \u0628\u0639\u062F");
+    }
+    const indicators = db.prepare("SELECT id, code FROM indicators ORDER BY order_index").all();
+    const scoreFor = (schoolIdx, i) => {
+      const base = [3, 2, 3, 1, 3, 2, 3, 0, 2, 3][(i * 7 + schoolIdx * 3) % 10];
+      return schoolIdx === 1 ? Math.max(0, base - 1) : base;
+    };
+    const makeVisit = (schoolIdx, status, coverage, daysAgo) => {
+      const visitId = uuid();
+      const when = iso(-daysAgo);
+      db.prepare(
+        `INSERT INTO visits (id, school_id, inspector_id, type, purpose, status, scheduled_at, started_at, ended_at, submitted_at, submitted_by_id, completion, created_at, updated_at)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
       ).run(
-        evalId,
         visitId,
-        ind.id,
-        "MET",
-        3,
-        "\u0645\u062B\u0627\u0644 \u062A\u0648\u0636\u064A\u062D\u064A \u0641\u0642\u0637 \u2014 \u0644\u064A\u0633 \u062A\u0642\u064A\u064A\u0645\u064B\u0627 \u0641\u0639\u0644\u064A\u064B\u0627",
+        demoSchools[schoolIdx].id,
         inspectorId,
-        nowISO(),
-        nowISO()
+        "PERIODIC",
+        "\u0632\u064A\u0627\u0631\u0629 \u062A\u0639\u0631\u064A\u0641\u064A\u0629 \u0644\u0644\u0645\u0646\u0635\u0629 (\u062A\u0648\u0636\u064A\u062D\u064A\u0629)",
+        status,
+        when,
+        when,
+        ["SUBMITTED", "COMPLETED"].includes(status) ? when : null,
+        ["SUBMITTED", "COMPLETED"].includes(status) ? when : null,
+        ["SUBMITTED", "COMPLETED"].includes(status) ? inspectorId : null,
+        Math.round(coverage * 100),
+        when,
+        when
       );
+      const n = Math.round(indicators.length * coverage);
+      indicators.slice(0, n).forEach((ind, i) => {
+        db.prepare(
+          `INSERT INTO evaluations (id, visit_id, indicator_id, status, score, notes, verification_methods, rated_by_id, rated_at, created_by_id, created_at, updated_at, version)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,1)`
+        ).run(
+          uuid(),
+          visitId,
+          ind.id,
+          "EVALUATED",
+          scoreFor(schoolIdx, i),
+          i % 9 === 0 ? DEMO_FLAG : null,
+          JSON.stringify(["\u0641\u062D\u0635 \u0648\u062B\u0627\u0626\u0642"]),
+          inspectorId,
+          when,
+          inspectorId,
+          when,
+          when
+        );
+      });
+      return visitId;
+    };
+    const v1 = makeVisit(0, "COMPLETED", 1, 40);
+    makeVisit(0, "COMPLETED", 1, 130);
+    makeVisit(1, "SUBMITTED", 0.7, 6);
+    makeVisit(2, "IN_PROGRESS", 0.2, 1);
+    for (const [idx, off, st] of [[0, 3, "SCHEDULED"], [2, -9, "SCHEDULED"]]) {
+      db.prepare(
+        `INSERT INTO visits (id, school_id, inspector_id, type, purpose, status, scheduled_at, created_at, updated_at)
+         VALUES (?,?,?,?,?,?,?,?,?)`
+      ).run(uuid(), demoSchools[idx].id, inspectorId, "FOLLOW_UP", "\u0632\u064A\u0627\u0631\u0629 \u0645\u062A\u0627\u0628\u0639\u0629 (\u062A\u0648\u0636\u064A\u062D\u064A\u0629)", st, iso(off), nowISO(), nowISO());
+    }
+    if (principalId) {
+      const planId = uuid();
+      db.prepare(
+        `INSERT INTO improvement_plans (id, school_id, title, description, status, created_by_id) VALUES (?,?,?,?,?,?)`
+      ).run(planId, demoSchools[0].id, "\u062E\u0637\u0629 \u062A\u062D\u0633\u064A\u0646 \u062A\u0648\u0636\u064A\u062D\u064A\u0629", DEMO_FLAG, "ACTIVE", principalId);
+      const weakInd = db.prepare(
+        `SELECT i.id, e.id AS eid FROM evaluations e JOIN indicators i ON i.id = e.indicator_id
+         WHERE e.visit_id = ? AND e.score <= 1 ORDER BY i.order_index LIMIT 2`
+      ).all(v1);
+      weakInd.forEach((w, i) => {
+        db.prepare(
+          `INSERT INTO corrective_actions (id, plan_id, evaluation_id, indicator_id, problem_description, priority, proposed_action,
+             responsible_id, due_date, success_indicator, status) VALUES (?,?,?,?,?,?,?,?,?,?,?)`
+        ).run(
+          uuid(),
+          planId,
+          w.eid,
+          w.id,
+          "\u0642\u0635\u0648\u0631 \u0645\u0643\u062A\u0634\u0641 \u0641\u064A \u0627\u0644\u0632\u064A\u0627\u0631\u0629 \u0627\u0644\u062A\u0648\u0636\u064A\u062D\u064A\u0629",
+          i === 0 ? "HIGH" : "MEDIUM",
+          "\u0625\u062C\u0631\u0627\u0621 \u062A\u0635\u062D\u064A\u062D\u064A \u062A\u0648\u0636\u064A\u062D\u064A",
+          principalId,
+          iso(i === 0 ? -5 : 14).slice(0, 10),
+          "\u0631\u0641\u0639 \u062F\u0644\u064A\u0644 \u062C\u062F\u064A\u062F \u064A\u062B\u0628\u062A \u0627\u0644\u0645\u0639\u0627\u0644\u062C\u0629",
+          "IN_PROGRESS"
+        );
+      });
     }
   }
-  console.log("\u062A\u0645 \u0628\u0630\u0631 \u0627\u0644\u0628\u064A\u0627\u0646\u0627\u062A \u0627\u0644\u0623\u0648\u0644\u064A\u0629 \u0644\u0642\u0627\u0639\u062F\u0629 \u0628\u064A\u0627\u0646\u0627\u062A SQLite.");
-  console.log("\u062D\u0633\u0627\u0628 \u0627\u0644\u062F\u062E\u0648\u0644 \u0627\u0644\u062A\u062C\u0631\u064A\u0628\u064A \u0627\u0644\u0645\u0634\u062A\u0631\u0643 \u0644\u062C\u0645\u064A\u0639 \u0627\u0644\u0645\u0633\u062A\u062E\u062F\u0645\u064A\u0646 \u0627\u0644\u062A\u062C\u0631\u064A\u0628\u064A\u064A\u0646:");
-  console.log(`  \u0627\u0644\u0628\u0631\u064A\u062F: <\u0623\u064A \u0628\u0631\u064A\u062F \u0623\u0639\u0644\u0627\u0647>   \u0643\u0644\u0645\u0629 \u0627\u0644\u0645\u0631\u0648\u0631: ${DEMO_PASSWORD}`);
-  console.log("\u062A\u0646\u0628\u064A\u0647: \u0647\u0630\u0647 \u0628\u064A\u0627\u0646\u0627\u062A \u062A\u062C\u0631\u064A\u0628\u064A\u0629 \u0644\u0644\u0639\u0631\u0636 \u0641\u0642\u0637 \u0648\u0644\u0627 \u062A\u0645\u062B\u0644 \u0645\u062F\u0627\u0631\u0633 \u0623\u0648 \u0623\u0641\u0631\u0627\u062F\u064B\u0627 \u062D\u0642\u064A\u0642\u064A\u064A\u0646.");
+  const parentUserId = createdUserIds["PARENT"];
+  if (parentUserId) {
+    const studentId = uuid();
+    const parentId = uuid();
+    db.prepare("INSERT INTO students (id, school_id, name, grade, section) VALUES (?,?,?,?,?)").run(studentId, schoolId, "\u0637\u0627\u0644\u0628 \u062A\u0648\u0636\u064A\u062D\u064A", "\u0627\u0644\u0635\u0641 \u0627\u0644\u062E\u0627\u0645\u0633", "\u0623");
+    db.prepare("INSERT INTO parents (id, name, user_id) VALUES (?,?,?)").run(parentId, "\u0648\u0644\u064A \u0623\u0645\u0631 \u062A\u062C\u0631\u064A\u0628\u064A", parentUserId);
+    db.prepare("INSERT INTO parent_student (id, parent_id, student_id) VALUES (?,?,?)").run(uuid(), parentId, studentId);
+  }
+  console.log("\u062A\u0645 \u0628\u0630\u0631 \u0627\u0644\u0628\u064A\u0627\u0646\u0627\u062A \u0627\u0644\u0623\u0648\u0644\u064A\u0629 \u0648\u0627\u0644\u0628\u064A\u0627\u0646\u0627\u062A \u0627\u0644\u062A\u0648\u0636\u064A\u062D\u064A\u0629 \u0644\u0642\u0627\u0639\u062F\u0629 \u0628\u064A\u0627\u0646\u0627\u062A SQLite.");
+  console.log("\u0627\u0644\u062D\u0633\u0627\u0628\u0627\u062A \u0627\u0644\u062A\u0648\u0636\u064A\u062D\u064A\u0629 (\u0643\u0644\u0645\u0629 \u0627\u0644\u0645\u0631\u0648\u0631 \u0645\u0648\u062D\u064E\u0651\u062F\u0629 \u0648\u062A\u064F\u0639\u0631\u0636 \u0647\u0646\u0627 \u0645\u0631\u0629 \u0648\u0627\u062D\u062F\u0629 \u0641\u0642\u0637 \u2014 \u0627\u062D\u0641\u0638\u0647\u0627):");
+  for (const u of demoUsers) console.log(`  ${u.email}`);
+  console.log(`  \u0643\u0644\u0645\u0629 \u0627\u0644\u0645\u0631\u0648\u0631: ${DEMO_PASSWORD}`);
+  console.log("\u062A\u0646\u0628\u064A\u0647: \u0647\u0630\u0647 \u0628\u064A\u0627\u0646\u0627\u062A \u062A\u062C\u0631\u064A\u0628\u064A\u0629 \u0644\u0644\u0639\u0631\u0636 \u0641\u0642\u0637 \u0648\u0644\u0627 \u062A\u0645\u062B\u0644 \u0645\u062F\u0627\u0631\u0633 \u0623\u0648 \u0623\u0641\u0631\u0627\u062F\u064B\u0627 \u062D\u0642\u064A\u0642\u064A\u064A\u0646. \u0627\u062D\u0630\u0641\u0647\u0627 \u0642\u0628\u0644 \u0627\u0644\u0627\u0633\u062A\u062E\u062F\u0627\u0645 \u0627\u0644\u0641\u0639\u0644\u064A.");
+  return { demoPassword: DEMO_PASSWORD };
 }
 function subOrder(code) {
   const m = code.match(/^(\d+)-(\d+)$/);
   return m ? parseInt(m[1]) * 100 + parseInt(m[2]) : 0;
 }
 function indCodeOrder(code) {
-  const parts = code.split("-").map(Number);
-  return (parts[0] || 0) * 1e4 + (parts[1] || 0) * 100 + (parts[2] || 0);
+  const p = code.split("-").map(Number);
+  if (p.length === 3) return (p[2] || 0) * 1e4 + (p[1] || 0) * 100 + (p[0] || 0);
+  return (p[1] || 0) * 1e4 + (p[0] || 0);
 }
-var DEMO_PASSWORD;
+var import_crypto2;
 var init_seed_sqlite = __esm({
   "src/lib/db/seed-sqlite.ts"() {
     "use strict";
     init_sqlite();
     init_data();
     init_bcryptjs();
-    DEMO_PASSWORD = "R!f@d_2026_DemoAccess";
+    import_crypto2 = require("crypto");
   }
 });
 
@@ -3018,11 +3373,12 @@ function getDb() {
   db.pragma("foreign_keys = ON");
   db.pragma("journal_mode = WAL");
   db.pragma("busy_timeout = 5000");
+  runMigrations(db);
   dbInstance = db;
   return db;
 }
 function uuid() {
-  return (0, import_crypto2.randomUUID)();
+  return (0, import_crypto3.randomUUID)();
 }
 function nowISO() {
   return (/* @__PURE__ */ new Date()).toISOString();
@@ -3035,19 +3391,21 @@ async function initDatabase(opts) {
   const schema = import_fs.default.readFileSync(schemaPath, "utf8");
   const db = getDb();
   db.exec(schema);
+  runMigrations(db);
   if (opts?.seed) {
     const { seedDatabase: seedDatabase2 } = await Promise.resolve().then(() => (init_seed_sqlite(), seed_sqlite_exports));
-    await seedDatabase2(db);
+    await seedDatabase2(db, { demo: opts.demo, demoPassword: opts.demoPassword });
   }
 }
-var import_better_sqlite3, import_crypto2, import_path, import_fs, dbInstance;
+var import_better_sqlite3, import_crypto3, import_path, import_fs, dbInstance;
 var init_sqlite = __esm({
   "src/lib/db/sqlite.ts"() {
     "use strict";
     import_better_sqlite3 = __toESM(require("better-sqlite3"));
-    import_crypto2 = require("crypto");
+    import_crypto3 = require("crypto");
     import_path = __toESM(require("path"));
     import_fs = __toESM(require("fs"));
+    init_migrations();
     dbInstance = null;
   }
 });
@@ -3055,7 +3413,8 @@ var init_sqlite = __esm({
 // scripts/init-db.ts
 init_sqlite();
 async function main() {
-  await initDatabase({ seed: true });
+  const demo = process.argv.includes("--demo");
+  await initDatabase({ seed: true, demo, demoPassword: process.env.DEMO_PASSWORD });
   try {
     getDb().pragma("wal_checkpoint(TRUNCATE)");
   } catch {
