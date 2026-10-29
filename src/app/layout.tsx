@@ -4,15 +4,15 @@ import ServiceWorkerRegister from "@/components/pwa/service-worker";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "منصة رِفاد للمتابعة والجودة المدرسية — مديرية الجراحي، محافظة الحديدة",
+  title: "منصة إتقان للاعتماد المدرسي وضمان جودة التعليم — مديرية الجراحي، محافظة الحديدة",
   description:
     "نظام إلكتروني متكامل لمتابعة وتقييم جودة المدارس وفق استمارة التقييم الذاتي للمدارس الصادرة عن مجلس الاعتماد الأكاديمي وضمان جودة التعليم، الجمهورية اليمنية.",
   metadataBase: new URL(process.env.APP_URL ?? "http://localhost:3000"),
   manifest: "/manifest.webmanifest",
-  applicationName: "منصة رِفاد",
+  applicationName: "منصة إتقان",
   appleWebApp: {
     capable: true,
-    title: "رِفاد",
+    title: "إتقان",
     statusBarStyle: "black-translucent",
   },
   icons: {
@@ -26,8 +26,8 @@ export const metadata: Metadata = {
   openGraph: {
     locale: "ar_YE",
     type: "website",
-    siteName: "منصة رِفاد",
-    title: "منصة رِفاد للمتابعة والجودة المدرسية",
+    siteName: "منصة إتقان",
+    title: "منصة إتقان للاعتماد المدرسي وضمان جودة التعليم",
     description: "منصة متقدمة لإدارة ومتابعة وتقييم جودة المدارس في مديرية الجراحي بمحافظة الحديدة.",
   },
 };

@@ -1,5 +1,5 @@
 /**
- * شعار منصة رِفاد.
+ * شعار منصة إتقان.
  * الشعار الأساسي هو شعار مجلس الاعتماد الأكاديمي وضمان جودة التعليم،
  * ويُرافقه اسم المنصة. شعار الوزارة يُعرض بجانبه عبر InstitutionLogos.
  */
@@ -43,11 +43,11 @@ export default function RifadLogo({
       {withText && (
         <span className="flex flex-col leading-tight">
           <span className="font-heading text-[19px] font-bold" style={{ color: nameColor }}>
-            رِفاد
+            إتقان
           </span>
           {withTagline && (
             <span className="text-[10px]" style={{ color: subColor }}>
-              للمتابعة والجودة المدرسية
+              للاعتماد المدرسي وضمان جودة التعليم
             </span>
           )}
         </span>

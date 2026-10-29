@@ -2,8 +2,8 @@ import { Suspense } from "react";
 import VerifyClient from "./verify-client";
 
 export const metadata = {
-  title: "التحقق من تقرير — منصة رِفاد",
-  description: "تحقّق من صحة تقرير صادر عن منصة رِفاد برمز التحقق المطبوع عليه.",
+  title: "التحقق من تقرير — منصة إتقان",
+  description: "تحقّق من صحة تقرير صادر عن منصة إتقان برمز التحقق المطبوع عليه.",
 };
 
 export default function VerifyPage() {

@@ -4,7 +4,7 @@ import { renderReportPdf } from "../reports/render-pdf";
 
 describe("تهيئة النص العربي للـ PDF", () => {
   it("يشكّل الحروف إلى صيغ العرض (اتصال الحروف)", () => {
-    const out = shape("منصة رِفاد");
+    const out = shape("منصة إتقان");
     // نطاق الصيغ العربية التقديمية (FB50–FEFF)
     expect(/[ﭐ-﻿]/.test(out)).toBe(true);
     expect(out).not.toContain("منصة");

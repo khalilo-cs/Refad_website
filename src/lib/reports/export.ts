@@ -30,7 +30,7 @@ export function contentToCsv(c: ReportContent, extra: [string, string][] = []): 
 /** Excel: ورقة ملخص وورقة لكل جدول، من اليمين لليسار. */
 export async function contentToXlsx(c: ReportContent, extra: [string, string][] = []): Promise<Buffer> {
   const wb = new ExcelJS.Workbook();
-  wb.creator = "منصة رِفاد";
+  wb.creator = "منصة إتقان";
   wb.created = new Date();
   const head = (row: ExcelJS.Row) => row.eachCell((cell) => {
     cell.font = { bold: true, color: { argb: "FFFFFFFF" } };

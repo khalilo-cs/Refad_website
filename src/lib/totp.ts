@@ -52,7 +52,7 @@ export function verifyTotp(secretB32: string, token: string, now = Date.now(), w
   return null;
 }
 
-export function otpauthUri(secret: string, account: string, issuer = "منصة رِفاد"): string {
+export function otpauthUri(secret: string, account: string, issuer = "منصة إتقان"): string {
   const label = encodeURIComponent(`${issuer}:${account}`);
   return `otpauth://totp/${label}?secret=${secret}&issuer=${encodeURIComponent(issuer)}&algorithm=SHA1&digits=6&period=${STEP}`;
 }

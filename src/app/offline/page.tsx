@@ -2,7 +2,7 @@ import Link from "next/link";
 import { WifiOff, RotateCw, HardDrive, ShieldCheck } from "lucide-react";
 import RifadLogo from "@/components/brand/rifad-logo";
 
-export const metadata = { title: "لا يوجد اتصال — منصة رِفاد" };
+export const metadata = { title: "لا يوجد اتصال — منصة إتقان" };
 
 export default function OfflinePage() {
   return (
@@ -48,7 +48,7 @@ export default function OfflinePage() {
         </div>
 
         <p className="mt-5 text-center text-[10px] leading-relaxed text-white/30">
-          منصة رِفاد — مديرية الجراحي، الحديدة
+          منصة إتقان — مديرية الجراحي، الحديدة
           <br />
           تصميم وتطوير: المهندس محمد خليل · <span dir="ltr" className="font-mono">736390203</span>
         </p>

@@ -42,7 +42,7 @@ export default function TopBar({ user, onLogout, onToggleSidebar }: Props) {
 
         <div className="hidden min-w-0 md:block">
           <p className="truncate text-[13px] font-semibold text-navy">
-            منصة رِفاد للمتابعة والجودة المدرسية
+            منصة إتقان للاعتماد المدرسي وضمان جودة التعليم
           </p>
           <p className="truncate text-[11px] text-gray-400">{today}</p>
         </div>

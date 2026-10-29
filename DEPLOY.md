@@ -1,4 +1,4 @@
-# دليل النشر على خادم — منصة رِفاد
+# دليل النشر على خادم — منصة إتقان
 
 هذا الدليل ينقل المنصة من الكود إلى خدمة تعمل على خادم حقيقي بعنوان IP.
 
@@ -52,7 +52,7 @@ sudo usermod -aG docker $USER && newgrp docker
 ### 2. جلب المشروع
 ```bash
 sudo mkdir -p /opt/rifad && sudo chown $USER:$USER /opt/rifad
-git clone -b main https://github.com/khalilo-cs/-.git /opt/rifad
+git clone -b main https://github.com/khalilo-cs/Refad_website.git /opt/rifad
 cd /opt/rifad
 ```
 
@@ -129,7 +129,7 @@ sudo chown -R rifad:rifad /opt/rifad
 
 ### 3. جلب المشروع والبناء
 ```bash
-sudo -u rifad git clone -b main https://github.com/khalilo-cs/-.git /opt/rifad
+sudo -u rifad git clone -b main https://github.com/khalilo-cs/Refad_website.git /opt/rifad
 cd /opt/rifad
 sudo -u rifad npm ci --ignore-scripts
 sudo -u rifad npm rebuild better-sqlite3

@@ -13,7 +13,7 @@ export async function GET() {
   }
   return NextResponse.json({
     status: dbOk ? "ok" : "db_error",
-    service: "rifad-platform",
+    service: "itqan-platform",
     database: dbOk ? "connected" : "disconnected",
   });
 }

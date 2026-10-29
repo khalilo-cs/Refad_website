@@ -1,5 +1,5 @@
 /**
- * طبقة المصادقة والجلسات لمنصة رِفاد.
+ * طبقة المصادقة والجلسات لمنصة إتقان.
  * - رموز JWT موقعة ( الوصول قصير الأمد، التجديد طويل الأمد في كوكيز HttpOnly).
  * - كلمة المرور تُجزأ بـ bcrypt بتكلفة عالية.
  * - إصدار الرمز (token version) يُ増 عند تغيير كلمة المرور أو قفل الحساب لإبطال جميع الجلسات السابقة.
@@ -88,7 +88,7 @@ export function validatePassword(password: string): { ok: boolean; message?: str
   if (password.length > 128) {
     return { ok: false, message: "كلمة المرور طويلة جداً" };
   }
-  if (/^(.)\1+$/.test(password) || /password|123456|qwerty|رفاد|rifad/i.test(password)) {
+  if (/^(.)\1+$/.test(password) || /password|123456|qwerty|رفاد|rifad|إتقان|اتقان|itqan/i.test(password)) {
     return { ok: false, message: "كلمة المرور شائعة أو متوقعة، اختر غيرها" };
   }
   if (!/[0-9]/.test(password)) {

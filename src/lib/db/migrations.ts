@@ -240,6 +240,15 @@ export const MIGRATIONS: Migration[] = [
       ALTER TABLE users ADD COLUMN two_factor_last_step INTEGER;
     `,
   },
+  {
+    id: 7,
+    name: "rename-platform-itqan",
+    sql: `
+      UPDATE settings SET value = replace(replace(value, 'منصة رِفاد للمتابعة والجودة المدرسية', 'منصة إتقان للاعتماد المدرسي وضمان جودة التعليم'), 'رِفاد', 'إتقان')
+      WHERE key IN ('system.name', 'system.institution') AND value LIKE '%رِفاد%';
+      UPDATE schools SET name = replace(name, 'مدرسة رِفاد التجريبية', 'مدرسة إتقان التجريبية') WHERE code LIKE 'RIFAD-DEMO-%';
+    `,
+  },
 ];
 
 /** يطبّق الترحيلات المعلّقة. لا يفعل شيئاً إن لم تُهيَّأ قاعدة البيانات بعد. */
