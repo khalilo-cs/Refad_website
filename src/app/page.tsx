@@ -4,6 +4,7 @@ import Link from "next/link";
 import { verifyAccessToken } from "@/lib/auth";
 import { queryOne } from "@/lib/db/sqlite";
 import RifadLogo from "@/components/brand/rifad-logo";
+import { BRAND } from "@/lib/brand";
 import {
   ShieldCheck,
   BarChart3,
@@ -99,6 +100,12 @@ export default async function LandingPage() {
           <RifadLogo size={42} withText tone="light" id="rf-home-head" />
           <div className="flex items-center gap-2">
             <Link
+              href="/about"
+              className="hidden rounded-xl px-3 py-2 text-[13px] font-semibold text-white/75 transition hover:text-white sm:block"
+            >
+              عن المنصة
+            </Link>
+            <Link
               href="/login"
               className="rounded-xl border border-white/20 px-4 py-2 text-[13px] font-semibold text-white/85 transition hover:border-white/40 hover:bg-white/10"
             >
@@ -128,6 +135,7 @@ export default async function LandingPage() {
               </h1>
 
               <p className="mt-5 max-w-xl text-[15px] leading-[1.9] text-white/70">
+                <span className="mb-2 block font-semibold text-gold-bright/90">{BRAND.slogan}</span>
                 منصة رِفاد تحوّل استمارة التقييم الذاتي المدرسية إلى نظام رقمي متكامل:
                 تقييم ميداني على 109 مؤشراً، حساب دقيق للدرجات، تقارير عربية معتمدة،
                 وتتبّع مستمر للتحسين — كل شيء موثّق وقابل للتحقق.
@@ -150,7 +158,7 @@ export default async function LandingPage() {
               </div>
 
               <div className="mt-9 flex flex-wrap items-center gap-x-6 gap-y-2 text-[12px] text-white/50">
-                {["109 مؤشراً موثّقاً", "7 معايير بأوزان رسمية", "8 أدوار صلاحيات"].map((t) => (
+                {[`مستهدف ${BRAND.targetSchools} مدرسة`, "109 مؤشراً موثّقاً", "7 معايير بأوزان رسمية", "8 أدوار صلاحيات"].map((t) => (
                   <span key={t} className="inline-flex items-center gap-1.5">
                     <CheckCircle2 className="h-3.5 w-3.5 text-turquoise" />
                     {t}

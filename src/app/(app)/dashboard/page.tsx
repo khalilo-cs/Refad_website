@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { useSession } from "@/components/providers";
 import { Alert, EmptyState, PageHeader } from "@/components/ui";
+import { BRAND } from "@/lib/brand";
 import { AnimatedNumber, Rise, ScoreBar, ScoreRing, Stagger } from "@/components/ui/extra";
 import { REPORT_STATUS, SCORE_COLOR, VISIT_STATUS, VISIT_TYPE, fmtPercent, scoreTone } from "@/lib/labels";
 import RoleHome from "@/components/dashboard/role-home";
@@ -145,6 +146,34 @@ export default function DashboardPage() {
 
       {loading && !stats ? <DashSkeleton /> : stats && (
         <Stagger className="space-y-6">
+          {["SUPER_ADMIN", "EDUCATION_DIRECTOR"].includes(user.roleKey) && (
+            <Rise>
+              <section className="card p-5">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <h2 className="font-heading text-[15px] font-bold text-navy">تقدّم الانضمام إلى المنصة</h2>
+                  <Link href="/about" className="text-[12px] font-semibold text-turquoise hover:underline">خطة التدشين</Link>
+                </div>
+                {(() => {
+                  const target = BRAND.targetSchools;
+                  const registered = stats.schools?.total ?? 0;
+                  const evaluated = stats.scoring?.basisSchools ?? 0;
+                  const row = (label: string, v: number, color: string) => (
+                    <div>
+                      <div className="mb-1 flex justify-between text-[12px]"><span className="text-gray-600">{label}</span><span className="font-mono font-semibold text-navy">{v} / {target}</span></div>
+                      <div className="h-2 overflow-hidden rounded-full bg-gray-100"><div className={`h-full rounded-full ${color} transition-all duration-700`} style={{ width: `${Math.min(100, Math.round((v / target) * 100))}%` }} /></div>
+                    </div>
+                  );
+                  return (
+                    <div className="mt-3 grid gap-4 md:grid-cols-2">
+                      {row("مدارس مسجّلة في المنصة", registered, "bg-turquoise")}
+                      {row("مدارس لها تقييم مقدَّم أو معتمد", evaluated, "bg-gold")}
+                    </div>
+                  );
+                })()}
+                <p className="mt-3 text-[11.5px] text-gray-400">الهدف ({BRAND.targetSchools} مدرسة) مأخوذ من وثيقة خطة المشروع؛ الأرقام المعروضة من السجلات الفعلية فقط.</p>
+              </section>
+            </Rise>
+          )}
           {/* ===== الشريط البطولي ===== */}
           <Rise>
             <section className="relative overflow-hidden rounded-3xl bg-aurora p-6 text-white shadow-lg sm:p-8">
