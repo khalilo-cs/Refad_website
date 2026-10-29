@@ -53,9 +53,9 @@ export default function Sidebar({ items, open, onToggle, onLogout, user }: Props
 
   return (
     <aside
-      className={`fixed inset-y-0 right-0 z-40 flex w-[268px] flex-col bg-aurora text-white shadow-2xl transition-transform duration-300 ease-out
-        [dir="rtl"]:translate-x-full [dir="ltr"]:-translate-x-full
-        ${open ? "translate-x-0" : ""}`}
+      data-open={open ? "true" : "false"}
+      aria-hidden={!open}
+      className="sidebar-panel fixed inset-y-0 right-0 z-40 flex w-[268px] flex-col bg-aurora text-white shadow-2xl"
       aria-label="التنقل الرئيسي"
     >
       {/* توهج علوي */}

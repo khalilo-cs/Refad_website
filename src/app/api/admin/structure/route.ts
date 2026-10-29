@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getServerSession, authorize, auditLog } from "@/lib/auth";
-import { query, queryOne, getDb } from "@/lib/db/sqlite";
+import { query, queryOne , exec } from "@/lib/db/sqlite";
 import { randomUUID } from "crypto";
 
 export const runtime = "nodejs";
@@ -36,13 +36,13 @@ export async function GET() {
   const { allowed } = authorize(session, { roles: ["SUPER_ADMIN"] });
   if (!allowed) return bad("هذه الشاشة مخصّصة لمدير النظام", 403);
 
-  const criteria = query<any>(
+  const criteria = await query<any>(
     `SELECT id, code, title, weight, order_index FROM criteria ORDER BY order_index, code`
   );
-  const subs = query<any>(
+  const subs = await query<any>(
     `SELECT id, code, title, weight, order_index, criterion_id FROM sub_criteria ORDER BY order_index, code`
   );
-  const indicators = query<any>(
+  const indicators = await query<any>(
     `SELECT id, code, title, evidence, verification_tools, order_index, criterion_id, sub_criterion_id,
             (SELECT COUNT(*) FROM evaluations e WHERE e.indicator_id = indicators.id) AS evaluations_count
      FROM indicators ORDER BY order_index, code`
@@ -124,68 +124,61 @@ export async function POST(request: Request) {
   if (kind !== "indicator" && !/^[0-9]+(-[0-9]+)?$/.test(code))
     return bad("الرمز يجب أن يكون رقماً (مثل 8) أو رقماً بفاصلة (مثل 8-1)");
 
-  const db = getDb();
   const id = randomUUID();
 
   try {
     if (kind === "criterion") {
-      if (queryOne("SELECT id FROM criteria WHERE code = ?", [code]))
+      if (await queryOne("SELECT id FROM criteria WHERE code = ?", [code]))
         return bad("رمز المعيار مستخدم مسبقاً");
       const weight = Number(body.weight ?? 0);
       if (!Number.isFinite(weight) || weight < 0 || weight > 100)
         return bad("الوزن يجب أن يكون بين 0 و100");
       const next =
-        (queryOne<{ m: number | null }>("SELECT MAX(order_index) m FROM criteria")?.m ?? 0) + 1;
-      db.prepare(
-        "INSERT INTO criteria (id, code, title, weight, order_index) VALUES (?,?,?,?,?)"
-      ).run(id, code, name, Math.round(weight), next);
+        ((await queryOne<{ m: number | null }>("SELECT MAX(order_index) m FROM criteria"))?.m ?? 0) + 1;
+      await exec("INSERT INTO criteria (id, code, title, weight, order_index) VALUES (?,?,?,?,?)", [id, code, name, Math.round(weight), next]);
     } else if (kind === "subCriterion") {
       const criterionId = String(body.criterionId ?? "");
-      if (!queryOne("SELECT id FROM criteria WHERE id = ?", [criterionId]))
+      if (!await queryOne("SELECT id FROM criteria WHERE id = ?", [criterionId]))
         return bad("المعيار الأب غير موجود");
-      if (queryOne("SELECT id FROM sub_criteria WHERE code = ?", [code]))
+      if (await queryOne("SELECT id FROM sub_criteria WHERE code = ?", [code]))
         return bad("رمز المعيار الفرعي مستخدم مسبقاً");
       const weight = Number(body.weight ?? 0);
       if (!Number.isFinite(weight) || weight <= 0)
         return bad("وزن المعيار الفرعي يجب أن يكون أكبر من صفر");
       const next =
-        (queryOne<{ m: number | null }>(
+        ((await queryOne<{ m: number | null }>(
           "SELECT MAX(order_index) m FROM sub_criteria WHERE criterion_id = ?",
           [criterionId]
-        )?.m ?? 0) + 1;
-      db.prepare(
-        "INSERT INTO sub_criteria (id, code, title, weight, order_index, criterion_id) VALUES (?,?,?,?,?,?)"
-      ).run(id, code, name, Math.round(weight), next, criterionId);
+        ))?.m ?? 0) + 1;
+      await exec("INSERT INTO sub_criteria (id, code, title, weight, order_index, criterion_id) VALUES (?,?,?,?,?,?)", [id, code, name, Math.round(weight), next, criterionId]);
     } else {
       let criterionId = String(body.criterionId ?? "");
       const subId = body.subCriterionId ? String(body.subCriterionId) : null;
       if (subId) {
-        const sub = queryOne<{ criterion_id: string }>(
+        const sub = await queryOne<{ criterion_id: string }>(
           "SELECT criterion_id FROM sub_criteria WHERE id = ?",
           [subId]
         );
         if (!sub) return bad("المعيار الفرعي غير موجود");
         criterionId = sub.criterion_id;
       }
-      if (!criterionId || !queryOne("SELECT id FROM criteria WHERE id = ?", [criterionId]))
+      if (!criterionId || !await queryOne("SELECT id FROM criteria WHERE id = ?", [criterionId]))
         return bad("يجب تحديد المعيار أو المعيار الفرعي التابع له المؤشر");
-      if (queryOne("SELECT id FROM indicators WHERE code = ?", [code]))
+      if (await queryOne("SELECT id FROM indicators WHERE code = ?", [code]))
         return bad("رمز المؤشر مستخدم مسبقاً");
       const evidence = parseJsonArray(body.evidence);
       const tools = parseJsonArray(body.verificationTools);
       if (evidence === null || tools === null) return bad("صيغة قائمة الأدلة غير صحيحة");
       const next =
-        (queryOne<{ m: number | null }>(
+        ((await queryOne<{ m: number | null }>(
           "SELECT MAX(order_index) m FROM indicators WHERE criterion_id = ?",
           [criterionId]
-        )?.m ?? 0) + 1;
-      db.prepare(
-        `INSERT INTO indicators (id, code, title, evidence, verification_tools, order_index, criterion_id, sub_criterion_id)
-         VALUES (?,?,?,?,?,?,?,?)`
-      ).run(id, code, name, evidence, tools, next, criterionId, subId);
+        ))?.m ?? 0) + 1;
+      await exec(`INSERT INTO indicators (id, code, title, evidence, verification_tools, order_index, criterion_id, sub_criterion_id)
+         VALUES (?,?,?,?,?,?,?,?)`, [id, code, name, evidence, tools, next, criterionId, subId]);
     }
 
-    auditLog({
+    await auditLog({
       userId: session.userId,
       action: `CREATE_${kind.toUpperCase()}`,
       entityType: kind === "subCriterion" ? "sub_criterion" : kind,

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession, authorize, auditLog } from "@/lib/auth";
-import { queryOne, getDb, nowISO } from "@/lib/db/sqlite";
+import { queryOne, nowISO , exec } from "@/lib/db/sqlite";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -35,7 +35,7 @@ export async function PATCH(
     }
 
     const table = TABLES[type];
-    const existing = queryOne<{ id: string; name: string }>(
+    const existing = await queryOne<{ id: string; name: string }>(
       `SELECT id, name FROM ${table} WHERE id = ?`,
       [id]
     );
@@ -65,13 +65,13 @@ export async function PATCH(
 
     // نقل مديرية إلى محافظة أخرى، أو منطقة إلى مديرية أخرى
     if (type === "directorate" && parentId) {
-      const gov = queryOne<{ id: string }>("SELECT id FROM governorates WHERE id = ?", [parentId]);
+      const gov = await queryOne<{ id: string }>("SELECT id FROM governorates WHERE id = ?", [parentId]);
       if (!gov) return NextResponse.json({ message: "المحافظة غير موجودة" }, { status: 404 });
       sets.push("governorate_id = ?");
       args.push(parentId);
     }
     if (type === "area" && parentId) {
-      const dir = queryOne<{ id: string }>("SELECT id FROM directorates WHERE id = ?", [parentId]);
+      const dir = await queryOne<{ id: string }>("SELECT id FROM directorates WHERE id = ?", [parentId]);
       if (!dir) return NextResponse.json({ message: "المديرية غير موجودة" }, { status: 404 });
       sets.push("directorate_id = ?");
       args.push(parentId);
@@ -82,11 +82,9 @@ export async function PATCH(
     }
 
     args.push(id);
-    getDb()
-      .prepare(`UPDATE ${table} SET ${sets.join(", ")} WHERE id = ?`)
-      .run(...args);
+    await exec(`UPDATE ${table} SET ${sets.join(", ")} WHERE id = ?`, [...args]);
 
-    auditLog({
+    await auditLog({
       userId: session.userId,
       action: `${type.toUpperCase()}_UPDATED`,
       entityType: type,
@@ -129,7 +127,7 @@ export async function DELETE(
     }
 
     const table = TABLES[type];
-    const existing = queryOne<{ id: string; name: string }>(
+    const existing = await queryOne<{ id: string; name: string }>(
       `SELECT id, name FROM ${table} WHERE id = ?`,
       [id]
     );
@@ -141,31 +139,31 @@ export async function DELETE(
     let blockers: { schools: number; children: number };
     if (type === "governorate") {
       blockers = {
-        schools: queryOne<{ n: number }>(
+        schools: (await queryOne<{ n: number }>(
           "SELECT COUNT(*) AS n FROM schools WHERE governorate_id = ?",
           [id]
-        )?.n ?? 0,
-        children: queryOne<{ n: number }>(
+        ))?.n ?? 0,
+        children: (await queryOne<{ n: number }>(
           "SELECT COUNT(*) AS n FROM directorates WHERE governorate_id = ?",
           [id]
-        )?.n ?? 0,
+        ))?.n ?? 0,
       };
     } else if (type === "directorate") {
       blockers = {
-        schools: queryOne<{ n: number }>(
+        schools: (await queryOne<{ n: number }>(
           "SELECT COUNT(*) AS n FROM schools WHERE directorate_id = ?",
           [id]
-        )?.n ?? 0,
-        children: queryOne<{ n: number }>("SELECT COUNT(*) AS n FROM areas WHERE directorate_id = ?", [
+        ))?.n ?? 0,
+        children: (await queryOne<{ n: number }>("SELECT COUNT(*) AS n FROM areas WHERE directorate_id = ?", [
           id,
-        ])?.n ?? 0,
+        ]))?.n ?? 0,
       };
     } else {
       blockers = {
-        schools: queryOne<{ n: number }>(
+        schools: (await queryOne<{ n: number }>(
           "SELECT COUNT(*) AS n FROM schools WHERE area_id = ?",
           [id]
-        )?.n ?? 0,
+        ))?.n ?? 0,
         children: 0,
       };
     }
@@ -189,9 +187,9 @@ export async function DELETE(
       );
     }
 
-    getDb().prepare(`DELETE FROM ${table} WHERE id = ?`).run(id);
+    await exec(`DELETE FROM ${table} WHERE id = ?`, [id]);
 
-    auditLog({
+    await auditLog({
       userId: session.userId,
       action: `${type.toUpperCase()}_DELETED`,
       entityType: type,

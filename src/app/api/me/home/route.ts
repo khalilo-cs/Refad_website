@@ -11,11 +11,11 @@ export async function GET() {
   const session = await getServerSession();
   if (!session) return NextResponse.json({ message: "غير مصدق" }, { status: 401 });
 
-  const announcements = publishedFor(session);
+  const announcements = await publishedFor(session);
 
   let children: any[] = [];
   if (session.roleKey === "PARENT") {
-    children = query<any>(
+    children = await query<any>(
       `SELECT st.id, st.name, st.grade, st.section, s.name AS school_name,
               (SELECT COUNT(*) FROM attendance_records ar WHERE ar.student_id = st.id AND ar.status = 'ABSENT') AS absences,
               (SELECT COUNT(*) FROM attendance_records ar WHERE ar.student_id = st.id) AS attendance_days
@@ -25,7 +25,7 @@ export async function GET() {
       [session.userId]
     );
     for (const c of children) {
-      c.results = query<any>(
+      c.results = await query<any>(
         "SELECT subject, term, score, max_score FROM academic_results WHERE student_id = ? ORDER BY recorded_at DESC LIMIT 12",
         [c.id]
       );
@@ -33,10 +33,10 @@ export async function GET() {
   }
 
   const school = session.schoolId
-    ? queryOne<any>("SELECT id, name, code FROM schools WHERE id = ?", [session.schoolId])
+    ? await queryOne<any>("SELECT id, name, code FROM schools WHERE id = ?", [session.schoolId])
     : null;
   const myEvidence = session.roleKey === "TEACHER"
-    ? queryOne<any>(
+    ? await queryOne<any>(
         `SELECT COUNT(*) AS total, COALESCE(SUM(CASE WHEN review_status='ACCEPTED' THEN 1 ELSE 0 END),0) AS accepted,
                 COALESCE(SUM(CASE WHEN review_status='PENDING' THEN 1 ELSE 0 END),0) AS pending
          FROM evidence WHERE uploaded_by_id = ?`, [session.userId])

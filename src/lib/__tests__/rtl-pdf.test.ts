@@ -39,7 +39,7 @@ describe("توليد PDF", () => {
         meta: [["المدرسة", "مدرسة اختبار"]], notices: ["ملاحظة"],
         sections: [{ kind: "table", title: "جدول", columns: [{ key: "a", label: "الرمز" }, { key: "b", label: "النص", width: 4 }, { key: "c", label: "التقدير" }], rows }],
       },
-      { number: "RIF-2026-0001", status: "DRAFT", verificationCode: "ABCDEFGHJK", verifyUrl: "http://localhost/verify?code=ABCDEFGHJK" }
+      { number: "ITQ-2026-0001", status: "DRAFT", verificationCode: "ABCDEFGHJK", verifyUrl: "http://localhost/verify?code=ABCDEFGHJK" }
     );
     expect(buf.subarray(0, 5).toString()).toBe("%PDF-");
     expect(buf.length).toBeGreaterThan(20_000);

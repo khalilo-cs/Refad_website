@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getServerSession, auditLog } from "@/lib/auth";
-import { getDb } from "@/lib/db/sqlite";
+import { exec } from "@/lib/db/sqlite";
 import { canAccessSchool } from "@/lib/scope";
 import { clientIp } from "@/lib/security";
 
@@ -33,7 +33,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
   const session = await getServerSession();
   if (!session) return NextResponse.json({ message: "غير مصدق" }, { status: 401 });
   const { id } = await params;
-  if (!canAccessSchool(session, id)) return NextResponse.json({ message: "خارج نطاق صلاحيتك" }, { status: 403 });
+  if (!await canAccessSchool(session, id)) return NextResponse.json({ message: "خارج نطاق صلاحيتك" }, { status: 403 });
 
   const canEdit =
     ["SUPER_ADMIN", "EDUCATION_DIRECTOR", "INSPECTOR"].includes(session.roleKey) ||
@@ -44,8 +44,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
   if (!parsed.success) return NextResponse.json({ message: "بيانات غير صحيحة", errors: parsed.error.flatten().fieldErrors }, { status: 400 });
 
   const canVerify = ["SUPER_ADMIN", "EDUCATION_DIRECTOR", "INSPECTOR"].includes(session.roleKey);
-  const db = getDb();
-  db.prepare("INSERT OR IGNORE INTO school_profiles (school_id) VALUES (?)").run(id);
+  await exec("INSERT OR IGNORE INTO school_profiles (school_id) VALUES (?)", [id]);
   const sets: string[] = [];
   const vals: unknown[] = [];
   for (const [k, col] of Object.entries(COLS)) {
@@ -63,9 +62,9 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
   }
   sets.push("updated_by_id = ?", "updated_at = datetime('now')");
   vals.push(session.userId, id);
-  db.prepare(`UPDATE school_profiles SET ${sets.join(", ")} WHERE school_id = ?`).run(...vals);
-  db.prepare("UPDATE schools SET last_updated_at = datetime('now') WHERE id = ?").run(id);
+  await exec(`UPDATE school_profiles SET ${sets.join(", ")} WHERE school_id = ?`, [...vals]);
+  await exec("UPDATE schools SET last_updated_at = datetime('now') WHERE id = ?", [id]);
 
-  auditLog({ userId: session.userId, action: "SCHOOL_PROFILE_UPDATE", entityType: "School", entityId: id, newValues: parsed.data, ipAddress: clientIp(request) });
+  await auditLog({ userId: session.userId, action: "SCHOOL_PROFILE_UPDATE", entityType: "School", entityId: id, newValues: parsed.data, ipAddress: clientIp(request) });
   return NextResponse.json({ message: "تم حفظ ملف المدرسة" });
 }

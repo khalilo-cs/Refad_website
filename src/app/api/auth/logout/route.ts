@@ -10,7 +10,7 @@ export async function POST(request: NextRequest) {
   try {
     if (token) {
       const payload = JSON.parse(Buffer.from(token.split(".")[1], "base64url").toString("utf8"));
-      auditLog({
+      await auditLog({
         userId: payload.userId,
         action: "LOGOUT",
         entityType: "User",

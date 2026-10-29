@@ -17,6 +17,6 @@ export async function GET(request: Request) {
     params.push(session.directorateId);
   }
   sql += " ORDER BY name";
-  const rows = query<any>(sql, params);
+  const rows = await query<any>(sql, params);
   return NextResponse.json(rows);
 }

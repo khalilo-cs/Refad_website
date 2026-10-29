@@ -4,7 +4,6 @@
  * وتُطبَّق تلقائياً عند أول اتصال بقاعدة بيانات مهيّأة.
  * لإضافة تغيير جديد: أضف عنصراً جديداً في نهاية المصفوفة ولا تعدّل ما سبق.
  */
-import type Database from "better-sqlite3";
 
 export type Migration = { id: number; name: string; sql: string };
 
@@ -251,27 +250,29 @@ export const MIGRATIONS: Migration[] = [
   },
 ];
 
-/** يطبّق الترحيلات المعلّقة. لا يفعل شيئاً إن لم تُهيَّأ قاعدة البيانات بعد. */
-export function runMigrations(db: Database.Database): number {
-  const hasUsers = db
-    .prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='users'")
-    .get();
-  if (!hasUsers) return 0;
+/** واجهة تنفيذ مستقلة عن المحرّك (SQLite محلي أو libSQL). */
+export type MigrationRunner = {
+  all<T>(sql: string): Promise<T[]>;
+  script(sql: string): Promise<void>;
+  inTransaction(fn: () => Promise<void>): Promise<void>;
+};
 
-  db.exec(
+/** يطبّق الترحيلات المعلّقة. لا يفعل شيئاً إن لم تُهيَّأ قاعدة البيانات بعد. */
+export async function runMigrations(db: MigrationRunner): Promise<number> {
+  const hasUsers = await db.all("SELECT 1 FROM sqlite_master WHERE type='table' AND name='users'");
+  if (!hasUsers.length) return 0;
+
+  await db.script(
     "CREATE TABLE IF NOT EXISTS schema_migrations (id INTEGER PRIMARY KEY, name TEXT NOT NULL, applied_at TEXT NOT NULL DEFAULT (datetime('now')))"
   );
-  const applied = new Set(
-    (db.prepare("SELECT id FROM schema_migrations").all() as { id: number }[]).map((r) => r.id)
-  );
+  const applied = new Set((await db.all<{ id: number }>("SELECT id FROM schema_migrations")).map((r) => Number(r.id)));
   let count = 0;
   for (const m of MIGRATIONS) {
     if (applied.has(m.id)) continue;
-    const tx = db.transaction(() => {
-      db.exec(m.sql);
-      db.prepare("INSERT INTO schema_migrations (id, name) VALUES (?, ?)").run(m.id, m.name);
+    await db.inTransaction(async () => {
+      await db.script(m.sql);
+      await db.script(`INSERT INTO schema_migrations (id, name) VALUES (${m.id}, '${m.name.replace(/'/g, "''")}')`);
     });
-    tx();
     count++;
   }
   return count;

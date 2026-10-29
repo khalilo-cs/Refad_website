@@ -1,5 +1,5 @@
 {
-  "name": "rifad-platform",
+  "name": "itqan-platform",
   "version": "0.1.0",
   "private": true,
   "author": {
@@ -16,16 +16,19 @@
   "license": "UNLICENSED",
   "scripts": {
     "dev": "next dev",
-    "build": "next build && npm run db:bundle",
+    "build": "node scripts/embed-schema.mjs && next build && npm run db:bundle",
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
     "test:watch": "vitest",
     "db:init": "tsx scripts/init-db.ts",
     "db:demo": "tsx scripts/init-db.ts --demo",
-    "db:bundle": "esbuild scripts/init-db.ts --bundle --platform=node --format=cjs --outfile=scripts/init-db.bundle.js --external:better-sqlite3"
+    "db:bundle": "esbuild scripts/init-db.ts --bundle --platform=node --format=cjs --outfile=scripts/init-db.bundle.js --external:better-sqlite3",
+    "db:embed-schema": "node scripts/embed-schema.mjs"
   },
   "dependencies": {
+    "@libsql/client": "^0.18.0",
+    "@vercel/blob": "^2.8.2",
     "arabic-reshaper": "^1.1.0",
     "bcryptjs": "^3.0.3",
     "better-sqlite3": "^13.0.3",

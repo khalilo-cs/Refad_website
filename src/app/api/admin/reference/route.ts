@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession, authorize, auditLog } from "@/lib/auth";
-import { query, queryOne, getDb, uuid, nowISO } from "@/lib/db/sqlite";
+import { query, queryOne, uuid, nowISO , exec } from "@/lib/db/sqlite";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -32,13 +32,13 @@ export async function GET() {
       );
     }
 
-    const governorates = query<{ id: string; name: string; code: string; usage: number }>(
+    const governorates = await query<{ id: string; name: string; code: string; usage: number }>(
       `SELECT g.id, g.name, g.code,
               (SELECT COUNT(*) FROM schools s WHERE s.governorate_id = g.id) AS usage
        FROM governorates g ORDER BY g.name`
     );
 
-    const directorates = query<{
+    const directorates = await query<{
       id: string;
       name: string;
       code: string;
@@ -53,7 +53,7 @@ export async function GET() {
        ORDER BY g.name, d.name`
     );
 
-    const areas = query<{
+    const areas = await query<{
       id: string;
       name: string;
       directorate_id: string;
@@ -105,14 +105,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ message: "الاسم مطلوب (حرفان على الأقل)" }, { status: 400 });
     }
 
-    const db = getDb();
     const id = uuid();
     const now = nowISO();
     const cleanName = name.trim();
 
     if (type === "governorate") {
       const cleanCode = (typeof code === "string" && code.trim()) || cleanName.slice(0, 3);
-      const dup = queryOne<{ id: string }>(
+      const dup = await queryOne<{ id: string }>(
         "SELECT id FROM governorates WHERE name = ? OR code = ?",
         [cleanName, cleanCode]
       );
@@ -122,13 +121,11 @@ export async function POST(request: NextRequest) {
           { status: 409 }
         );
       }
-      db.prepare("INSERT INTO governorates (id, name, code, created_at) VALUES (?, ?, ?, ?)").run(
-        id,
+      await exec("INSERT INTO governorates (id, name, code, created_at) VALUES (?, ?, ?, ?)", [id,
         cleanName,
         cleanCode,
-        now
-      );
-      auditLog({
+        now]);
+      await auditLog({
         userId: session.userId,
         action: "GOVERNORATE_CREATED",
         entityType: "governorate",
@@ -142,14 +139,14 @@ export async function POST(request: NextRequest) {
       if (!governorateId) {
         return NextResponse.json({ message: "المحافظة مطلوبة" }, { status: 400 });
       }
-      const gov = queryOne<{ id: string }>("SELECT id FROM governorates WHERE id = ?", [
+      const gov = await queryOne<{ id: string }>("SELECT id FROM governorates WHERE id = ?", [
         governorateId,
       ]);
       if (!gov) {
         return NextResponse.json({ message: "المحافظة غير موجودة" }, { status: 404 });
       }
       const cleanCode = (typeof code === "string" && code.trim()) || cleanName.slice(0, 4);
-      const dup = queryOne<{ id: string }>(
+      const dup = await queryOne<{ id: string }>(
         "SELECT id FROM directorates WHERE name = ? AND governorate_id = ?",
         [cleanName, governorateId]
       );
@@ -159,10 +156,8 @@ export async function POST(request: NextRequest) {
           { status: 409 }
         );
       }
-      db.prepare(
-        "INSERT INTO directorates (id, name, code, governorate_id, created_at) VALUES (?, ?, ?, ?, ?)"
-      ).run(id, cleanName, cleanCode, governorateId, now);
-      auditLog({
+      await exec("INSERT INTO directorates (id, name, code, governorate_id, created_at) VALUES (?, ?, ?, ?, ?)", [id, cleanName, cleanCode, governorateId, now]);
+      await auditLog({
         userId: session.userId,
         action: "DIRECTORATE_CREATED",
         entityType: "directorate",
@@ -176,13 +171,13 @@ export async function POST(request: NextRequest) {
     if (!directorateId) {
       return NextResponse.json({ message: "المديرية مطلوبة" }, { status: 400 });
     }
-    const dir = queryOne<{ id: string }>("SELECT id FROM directorates WHERE id = ?", [
+    const dir = await queryOne<{ id: string }>("SELECT id FROM directorates WHERE id = ?", [
       directorateId,
     ]);
     if (!dir) {
       return NextResponse.json({ message: "المديرية غير موجودة" }, { status: 404 });
     }
-    const dupArea = queryOne<{ id: string }>(
+    const dupArea = await queryOne<{ id: string }>(
       "SELECT id FROM areas WHERE name = ? AND directorate_id = ?",
       [cleanName, directorateId]
     );
@@ -192,13 +187,11 @@ export async function POST(request: NextRequest) {
         { status: 409 }
       );
     }
-    db.prepare("INSERT INTO areas (id, name, directorate_id, created_at) VALUES (?, ?, ?, ?)").run(
-      id,
+    await exec("INSERT INTO areas (id, name, directorate_id, created_at) VALUES (?, ?, ?, ?)", [id,
       cleanName,
       directorateId,
-      now
-    );
-    auditLog({
+      now]);
+    await auditLog({
       userId: session.userId,
       action: "AREA_CREATED",
       entityType: "area",

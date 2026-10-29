@@ -10,6 +10,7 @@ import {
 import { clientIp, rateLimit } from "@/lib/security";
 import { exec, queryOne, uuid } from "@/lib/db/sqlite";
 import { decryptSecret, verifyTotp } from "@/lib/totp";
+import { dbReadyOr503 } from "@/lib/db/ready";
 
 const schema = z.object({
   email: z.string().email("أدخل بريدًا إلكترونيًا صالحًا"),
@@ -18,8 +19,12 @@ const schema = z.object({
 });
 
 export const runtime = "nodejs";
+// أول طلب على استضافة بلا خادم قد يُنشئ المخطط ويبذر البيانات المرجعية.
+export const maxDuration = 60;
 
 export async function POST(request: NextRequest) {
+  const notReady = await dbReadyOr503();
+  if (notReady) return notReady;
   try {
     const ip = clientIp(request);
     const ipLimit = rateLimit(`login:ip:${ip}`, 30, 15 * 60_000);
@@ -50,7 +55,7 @@ export async function POST(request: NextRequest) {
       );
     }
     const result = await authenticateUser(email, password);
-    exec("INSERT INTO login_attempts (id, email, ip, success) VALUES (?,?,?,?)", [
+    await exec("INSERT INTO login_attempts (id, email, ip, success) VALUES (?,?,?,?)", [
       uuid(),
       email.toLowerCase(),
       ip,
@@ -74,7 +79,7 @@ export async function POST(request: NextRequest) {
     const user = result.user;
 
     // المصادقة الثنائية: تُطلب لمن فعّلها بعد نجاح كلمة المرور
-    const tf = queryOne<{ two_factor_enabled: number; two_factor_secret: string | null; two_factor_last_step: number | null }>(
+    const tf = await queryOne<{ two_factor_enabled: number; two_factor_secret: string | null; two_factor_last_step: number | null }>(
       "SELECT two_factor_enabled, two_factor_secret, two_factor_last_step FROM users WHERE id = ?", [user.userId]);
     if (tf?.two_factor_enabled && tf.two_factor_secret) {
       if (!parsed.data.totp) return NextResponse.json({ message: "أدخل رمز المصادقة الثنائية", needTotp: true }, { status: 401 });
@@ -84,13 +89,13 @@ export async function POST(request: NextRequest) {
       if (step === null || (tf.two_factor_last_step != null && step <= tf.two_factor_last_step)) {
         return NextResponse.json({ message: "رمز المصادقة غير صحيح", needTotp: true }, { status: 401 });
       }
-      exec("UPDATE users SET two_factor_last_step = ? WHERE id = ?", [step, user.userId]);
+      await exec("UPDATE users SET two_factor_last_step = ? WHERE id = ?", [step, user.userId]);
     }
     const accessToken = signAccessToken(user);
     const refreshToken = signRefreshToken(user.userId, user.tokenVersion);
     await setAuthCookies(accessToken, refreshToken);
 
-    auditLog({
+    await auditLog({
       userId: user.userId,
       action: "LOGIN",
       entityType: "User",

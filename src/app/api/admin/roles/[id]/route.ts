@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession, authorize, auditLog } from "@/lib/auth";
-import { queryOne, getDb } from "@/lib/db/sqlite";
+import { queryOne , exec } from "@/lib/db/sqlite";
 import { normalizePermissions } from "@/lib/permissions";
 
 export const runtime = "nodejs";
@@ -36,7 +36,7 @@ export async function PATCH(request: NextRequest, { params }: Ctx) {
     }
 
     const { id } = await params;
-    const role = queryOne<{
+    const role = await queryOne<{
       id: string;
       key: string;
       name: string;
@@ -80,21 +80,15 @@ export async function PATCH(request: NextRequest, { params }: Ctx) {
       }
     }
 
-    getDb()
-      .prepare(
-        `UPDATE roles SET name = COALESCE(?, name),
+    await exec(`UPDATE roles SET name = COALESCE(?, name),
                           description = COALESCE(?, description),
                           permissions = COALESCE(?, permissions)
-         WHERE id = ?`
-      )
-      .run(
-        name ?? null,
+         WHERE id = ?`, [name ?? null,
         description === undefined ? null : description,
         permissions ? JSON.stringify(permissions) : null,
-        id
-      );
+        id]);
 
-    auditLog({
+    await auditLog({
       userId: session.userId,
       action: "ROLE_UPDATED",
       entityType: "Role",
@@ -124,7 +118,7 @@ export async function DELETE(request: NextRequest, { params }: Ctx) {
     }
 
     const { id } = await params;
-    const role = queryOne<{ id: string; key: string; is_system: number; name: string }>(
+    const role = await queryOne<{ id: string; key: string; is_system: number; name: string }>(
       "SELECT id, key, is_system, name FROM roles WHERE id = ?",
       [id]
     );
@@ -139,7 +133,7 @@ export async function DELETE(request: NextRequest, { params }: Ctx) {
       );
     }
 
-    const used = queryOne<{ c: number }>(
+    const used = await queryOne<{ c: number }>(
       "SELECT COUNT(*) AS c FROM users WHERE role_id = ?",
       [id]
     );
@@ -153,9 +147,9 @@ export async function DELETE(request: NextRequest, { params }: Ctx) {
       );
     }
 
-    getDb().prepare("DELETE FROM roles WHERE id = ?").run(id);
+    await exec("DELETE FROM roles WHERE id = ?", [id]);
 
-    auditLog({
+    await auditLog({
       userId: session.userId,
       action: "ROLE_DELETED",
       entityType: "Role",

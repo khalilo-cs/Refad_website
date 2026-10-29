@@ -38,7 +38,7 @@ export async function GET(request: Request) {
     };
 
     // مدارس النطاق + المرشحات
-    const sc = schoolScope(session, "s");
+    const sc = await schoolScope(session, "s");
     const sWhere: string[] = [sc.sql];
     const sParams: unknown[] = [...sc.params];
     if (f.directorateId) { sWhere.push("s.directorate_id = ?"); sParams.push(f.directorateId); }
@@ -56,30 +56,30 @@ export async function GET(request: Request) {
     const visitWhere = [schoolWhere, ...vWhere].join(" AND ");
     const visitParams = [...sParams, ...vParams];
 
-    const num = (sql: string, p: unknown[] = []) => queryOne<{ n: number }>(sql, p)?.n ?? 0;
+    const num = async (sql: string, p: unknown[] = []) => (await queryOne<{ n: number }>(sql, p))?.n ?? 0;
 
     // 1) المدارس
-    const schoolsTotal = num(`SELECT COUNT(*) n FROM schools s WHERE ${schoolWhere}`, sParams);
-    const schoolsActive = num(`SELECT COUNT(*) n FROM schools s WHERE s.status = 'ACTIVE' AND ${schoolWhere}`, sParams);
+    const schoolsTotal = await num(`SELECT COUNT(*) n FROM schools s WHERE ${schoolWhere}`, sParams);
+    const schoolsActive = await num(`SELECT COUNT(*) n FROM schools s WHERE s.status = 'ACTIVE' AND ${schoolWhere}`, sParams);
 
     // 2-3) الزيارات
-    const byStatusRows = query<{ status: string; n: number }>(
+    const byStatusRows = await query<{ status: string; n: number }>(
       `SELECT v.status, COUNT(*) n FROM visits v JOIN schools s ON s.id = v.school_id WHERE ${visitWhere} GROUP BY v.status`,
       visitParams
     );
     const byStatus: Record<string, number> = Object.fromEntries(byStatusRows.map((r) => [r.status, r.n]));
-    const visitsToday = num(
+    const visitsToday = await num(
       `SELECT COUNT(*) n FROM visits v JOIN schools s ON s.id = v.school_id
        WHERE ${visitWhere} AND v.status <> 'CANCELLED'
          AND (date(v.started_at) = date('now') OR date(v.scheduled_at) = date('now'))`,
       visitParams
     );
-    const overdueVisits = num(
+    const overdueVisits = await num(
       `SELECT COUNT(*) n FROM visits v JOIN schools s ON s.id = v.school_id
        WHERE ${visitWhere} AND v.status = 'SCHEDULED' AND v.scheduled_at IS NOT NULL AND datetime(v.scheduled_at) < datetime('now','-1 day')`,
       visitParams
     );
-    const visitedToday = num(
+    const visitedToday = await num(
       `SELECT COUNT(DISTINCT v.school_id) n FROM visits v JOIN schools s ON s.id = v.school_id
        WHERE ${visitWhere} AND v.status <> 'CANCELLED' AND (date(v.started_at) = date('now') OR date(v.ended_at) = date('now'))`,
       visitParams
@@ -87,7 +87,7 @@ export async function GET(request: Request) {
 
     // الزيارات المعتمدة/المقدَّمة هي أساس الدرجات
     const rStatusClause = f.reportStatus === "APPROVED" ? "v.status = 'COMPLETED'" : f.reportStatus === "PENDING" ? "v.status = 'SUBMITTED'" : "v.status IN ('SUBMITTED','COMPLETED')";
-    const basisVisits = query<{ id: string; school_id: string; school_name: string; school_code: string; lat: number | null; lng: number | null; directorate: string; at: string; status: string }>(
+    const basisVisits = await query<{ id: string; school_id: string; school_name: string; school_code: string; lat: number | null; lng: number | null; directorate: string; at: string; status: string }>(
       `SELECT v.id, v.school_id, s.name AS school_name, s.code AS school_code, s.latitude AS lat, s.longitude AS lng,
               d.name AS directorate, COALESCE(v.ended_at, v.submitted_at, v.updated_at) AS at, v.status
        FROM visits v JOIN schools s ON s.id = v.school_id JOIN directorates d ON d.id = s.directorate_id
@@ -95,8 +95,8 @@ export async function GET(request: Request) {
        ORDER BY at DESC`,
       visitParams
     );
-    const tree = loadTree();
-    const results = computeVisitResults(basisVisits.map((v) => v.id), tree);
+    const tree = await loadTree();
+    const results = await computeVisitResults(basisVisits.map((v) => v.id), tree);
 
     // آخر زيارة لكل مدرسة
     const latestBySchool = new Map<string, (typeof basisVisits)[number]>();
@@ -124,7 +124,7 @@ export async function GET(request: Request) {
     const completeCount = latest.filter((v) => results.get(v.id)?.isComplete).length;
 
     // 5) اكتمال الأدلة: مؤشرات مقيَّمة لها دليل مقبول
-    const ev = queryOne<{ evaluated: number; withAccepted: number; withAny: number; pending: number }>(
+    const ev = await queryOne<{ evaluated: number; withAccepted: number; withAny: number; pending: number }>(
       `SELECT COUNT(*) AS evaluated,
               SUM(CASE WHEN EXISTS (SELECT 1 FROM evidence x WHERE x.evaluation_id = e.id AND x.review_status = 'ACCEPTED') THEN 1 ELSE 0 END) AS withAccepted,
               SUM(CASE WHEN EXISTS (SELECT 1 FROM evidence x WHERE x.evaluation_id = e.id) THEN 1 ELSE 0 END) AS withAny,
@@ -136,28 +136,28 @@ export async function GET(request: Request) {
     const evidenceCompletion = ev && ev.evaluated ? Math.round(((ev.withAccepted ?? 0) / ev.evaluated) * 100) : null;
 
     // 6) خطط التحسين والإجراءات
-    const plansOpen = num(`SELECT COUNT(*) n FROM improvement_plans p JOIN schools s ON s.id = p.school_id WHERE p.status = 'ACTIVE' AND ${schoolWhere}`, sParams);
-    const actionsByStatus = query<{ status: string; n: number }>(
+    const plansOpen = await num(`SELECT COUNT(*) n FROM improvement_plans p JOIN schools s ON s.id = p.school_id WHERE p.status = 'ACTIVE' AND ${schoolWhere}`, sParams);
+    const actionsByStatus = await query<{ status: string; n: number }>(
       `SELECT a.status, COUNT(*) n FROM corrective_actions a JOIN improvement_plans p ON p.id = a.plan_id JOIN schools s ON s.id = p.school_id
        WHERE ${schoolWhere} GROUP BY a.status`, sParams
     );
-    const actionsOverdue = num(
+    const actionsOverdue = await num(
       `SELECT COUNT(*) n FROM corrective_actions a JOIN improvement_plans p ON p.id = a.plan_id JOIN schools s ON s.id = p.school_id
        WHERE a.status NOT IN ('COMPLETED','CLOSED_VERIFIED','CLOSED_REJECTED') AND date(a.due_date) < date('now') AND ${schoolWhere}`, sParams
     );
-    const actionsDueSoon = num(
+    const actionsDueSoon = await num(
       `SELECT COUNT(*) n FROM corrective_actions a JOIN improvement_plans p ON p.id = a.plan_id JOIN schools s ON s.id = p.school_id
        WHERE a.status NOT IN ('COMPLETED','CLOSED_VERIFIED','CLOSED_REJECTED') AND date(a.due_date) BETWEEN date('now') AND date('now','+7 day') AND ${schoolWhere}`, sParams
     );
 
     // 7) مدارس تحتاج متابعة عاجلة — بمعايير صريحة قابلة للتدقيق
     const overdueBySchool = new Map(
-      query<{ school_id: string; n: number }>(
+      (await query<{ school_id: string; n: number }>(
         `SELECT p.school_id, COUNT(*) n FROM corrective_actions a JOIN improvement_plans p ON p.id = a.plan_id JOIN schools s ON s.id = p.school_id
          WHERE a.status NOT IN ('COMPLETED','CLOSED_VERIFIED','CLOSED_REJECTED') AND date(a.due_date) < date('now') AND ${schoolWhere} GROUP BY p.school_id`, sParams
-      ).map((r) => [r.school_id, r.n])
+      )).map((r) => [r.school_id, r.n])
     );
-    const allSchools = query<{ id: string; name: string; code: string }>(`SELECT s.id, s.name, s.code FROM schools s WHERE s.status = 'ACTIVE' AND ${schoolWhere}`, sParams);
+    const allSchools = await query<{ id: string; name: string; code: string }>(`SELECT s.id, s.name, s.code FROM schools s WHERE s.status = 'ACTIVE' AND ${schoolWhere}`, sParams);
     const urgent: { id: string; name: string; code: string; score: number | null; reasons: string[]; href: string }[] = [];
     for (const s of allSchools) {
       const v = latestBySchool.get(s.id);
@@ -193,7 +193,7 @@ export async function GET(request: Request) {
     const improvementDelta = current !== null && previous !== null ? Math.round((current - previous) * 10) / 10 : null;
 
     // 9) الخريطة والتوزيع الجغرافي
-    const mapRows = query<{ id: string; code: string; name: string; latitude: number; longitude: number; directorate: string }>(
+    const mapRows = await query<{ id: string; code: string; name: string; latitude: number; longitude: number; directorate: string }>(
       `SELECT s.id, s.code, s.name, s.latitude, s.longitude, d.name AS directorate FROM schools s JOIN directorates d ON d.id = s.directorate_id
        WHERE s.latitude IS NOT NULL AND s.longitude IS NOT NULL AND s.status = 'ACTIVE' AND ${schoolWhere}`, sParams
     );
@@ -201,13 +201,13 @@ export async function GET(request: Request) {
       const v = latestBySchool.get(m.id);
       return { ...m, score: v ? results.get(v.id)?.evaluatedPartPercent ?? null : null, href: `/schools/${m.id}` };
     });
-    const byDirectorate = query<{ id: string; name: string; count: number }>(
+    const byDirectorate = (await query<{ id: string; name: string; count: number }>(
       `SELECT d.id, d.name, COUNT(s.id) AS count FROM schools s JOIN directorates d ON d.id = s.directorate_id
        WHERE s.status = 'ACTIVE' AND ${schoolWhere} GROUP BY d.id ORDER BY count DESC LIMIT 12`, sParams
-    ).map((r) => ({ ...r, href: `/schools?directorateId=${r.id}` }));
+    )).map((r) => ({ ...r, href: `/schools?directorateId=${r.id}` }));
 
     // 10) نشاط المفتشين: المخطط مقابل المنفَّذ
-    const inspectors = query<{ id: string; name: string; planned: number; done: number; overdue: number }>(
+    const inspectors = (await query<{ id: string; name: string; planned: number; done: number; overdue: number }>(
       `SELECT u.id, u.name,
               COUNT(v.id) AS planned,
               SUM(CASE WHEN v.status IN ('SUBMITTED','COMPLETED') THEN 1 ELSE 0 END) AS done,
@@ -215,10 +215,10 @@ export async function GET(request: Request) {
        FROM visits v JOIN users u ON u.id = v.inspector_id JOIN schools s ON s.id = v.school_id
        WHERE ${visitWhere} AND v.status <> 'CANCELLED'
        GROUP BY u.id ORDER BY planned DESC LIMIT 10`, visitParams
-    ).map((r) => ({ ...r, done: r.done ?? 0, overdue: r.overdue ?? 0, rate: r.planned ? Math.round(((r.done ?? 0) / r.planned) * 100) : 0, href: `/visits?inspectorId=${r.id}` }));
+    )).map((r) => ({ ...r, done: r.done ?? 0, overdue: r.overdue ?? 0, rate: r.planned ? Math.round(((r.done ?? 0) / r.planned) * 100) : 0, href: `/visits?inspectorId=${r.id}` }));
 
     // 11) المشكلات المتكررة: مؤشرات ضعيفة/غير متحققة عبر عدة مدارس + تجميع بالموضوع
-    const weak = query<{ indicator_id: string; code: string; title: string; sub_code: string | null; crit_code: string; schools: number }>(
+    const weak = (await query<{ indicator_id: string; code: string; title: string; sub_code: string | null; crit_code: string; schools: number }>(
       `SELECT i.id AS indicator_id, i.code, i.title, sc.code AS sub_code, c.code AS crit_code, COUNT(DISTINCT v.school_id) AS schools
        FROM evaluations e JOIN visits v ON v.id = e.visit_id JOIN schools s ON s.id = v.school_id
        JOIN indicators i ON i.id = e.indicator_id
@@ -226,7 +226,7 @@ export async function GET(request: Request) {
        JOIN criteria c ON c.id = COALESCE(i.criterion_id, sc.criterion_id)
        WHERE e.status = 'EVALUATED' AND e.score <= 1 AND ${visitWhere}
        GROUP BY i.id ORDER BY schools DESC, i.order_index LIMIT 8`, visitParams
-    ).map((r) => ({ ...r, href: `/reports?indicatorId=${r.indicator_id}` }));
+    )).map((r) => ({ ...r, href: `/reports?indicatorId=${r.indicator_id}` }));
     const topicCounts = new Map<string, { label: string; n: number }>();
     for (const w of weak) {
       const t = TOPIC_OF_SUB[w.sub_code ?? ""] ?? TOPIC_OF_SUB[w.crit_code];
@@ -234,9 +234,9 @@ export async function GET(request: Request) {
     }
 
     // 12) التدريب والتواصل والشراكة المجتمعية (متوسط تحقق مؤشرات محددة من الاستمارة)
-    const groupAvg = (codes: string[]) => {
+    const groupAvg = async (codes: string[]) => {
       const marks = codes.map(() => "?").join(",");
-      const r = queryOne<{ a: number | null; n: number }>(
+      const r = await queryOne<{ a: number | null; n: number }>(
         `SELECT AVG(e.score * 100.0 / ?) AS a, COUNT(*) n FROM evaluations e JOIN indicators i ON i.id = e.indicator_id
          JOIN visits v ON v.id = e.visit_id JOIN schools s ON s.id = v.school_id
          WHERE e.status = 'EVALUATED' AND i.code IN (${marks}) AND ${visitWhere}`,
@@ -245,13 +245,13 @@ export async function GET(request: Request) {
       return { average: r?.a != null ? Math.round(r.a * 10) / 10 : null, evaluated: r?.n ?? 0 };
     };
     const programs = {
-      training: { label: "التدريب والتنمية المهنية", ...groupAvg(["3-1-2", "4-1-2", "8-1-2", "3-2-2", "4-2-2", "8-2-2"]) },
-      communication: { label: "التواصل مع المجتمع وأولياء الأمور", ...groupAvg(["9-2-1", "14-2-1", "15-2-1", "18-2-1", "4-6"]) },
-      community: { label: "الشراكة المجتمعية", ...groupAvg(["1-6", "2-6", "3-6", "4-6", "5-6", "6-6"]) },
+      training: { label: "التدريب والتنمية المهنية", ...await groupAvg(["3-1-2", "4-1-2", "8-1-2", "3-2-2", "4-2-2", "8-2-2"]) },
+      communication: { label: "التواصل مع المجتمع وأولياء الأمور", ...await groupAvg(["9-2-1", "14-2-1", "15-2-1", "18-2-1", "4-6"]) },
+      community: { label: "الشراكة المجتمعية", ...await groupAvg(["1-6", "2-6", "3-6", "4-6", "5-6", "6-6"]) },
     };
 
     // التقارير
-    const reportsByStatus = query<{ status: string; n: number }>(
+    const reportsByStatus = await query<{ status: string; n: number }>(
       `SELECT r.status, COUNT(*) n FROM reports r LEFT JOIN schools s ON s.id = r.school_id
        WHERE (r.school_id IS NULL OR ${schoolWhere}) GROUP BY r.status`, sParams
     );

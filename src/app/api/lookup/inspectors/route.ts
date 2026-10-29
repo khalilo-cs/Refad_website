@@ -13,5 +13,5 @@ export async function GET() {
   const params: unknown[] = [];
   if (session.roleKey === "EDUCATION_DIRECTOR" && session.directorateId) { where.push("u.directorate_id = ?"); params.push(session.directorateId); }
   if (session.roleKey === "INSPECTOR") { where.push("u.id = ?"); params.push(session.userId); }
-  return NextResponse.json(query(`SELECT u.id, u.name FROM users u JOIN roles r ON r.id = u.role_id WHERE ${where.join(" AND ")} ORDER BY u.name`, params));
+  return NextResponse.json(await query(`SELECT u.id, u.name FROM users u JOIN roles r ON r.id = u.role_id WHERE ${where.join(" AND ")} ORDER BY u.name`, params));
 }

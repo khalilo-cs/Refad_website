@@ -33,18 +33,18 @@ const now = () => new Date().toISOString();
 /* ---------------------------------------------------------------------- */
 /* 1) تقرير الزيارة الميدانية اليومية                                     */
 /* ---------------------------------------------------------------------- */
-export function buildVisitDaily(visitId: string): ReportContent {
-  const v = queryOne<any>(
+export async function buildVisitDaily(visitId: string): Promise<ReportContent> {
+  const v = await queryOne<any>(
     `SELECT v.*, s.name AS school_name, s.code AS school_code, d.name AS directorate_name, g.name AS governorate_name,
             u.name AS inspector_name, sb.name AS submitted_by_name
      FROM visits v JOIN schools s ON s.id = v.school_id JOIN directorates d ON d.id = s.directorate_id
      JOIN governorates g ON g.id = s.governorate_id JOIN users u ON u.id = v.inspector_id
      LEFT JOIN users sb ON sb.id = v.submitted_by_id WHERE v.id = ?`, [visitId]);
   if (!v) throw new ReportError("الزيارة غير موجودة", 404);
-  const tree = loadTree();
-  const r: EvaluationResult = computeVisitResult(visitId, tree);
+  const tree = await loadTree();
+  const r: EvaluationResult = await computeVisitResult(visitId, tree);
 
-  const evals = query<any>(
+  const evals = await query<any>(
     `SELECT i.id AS indicator_id, i.code, i.title, i.order_index, e.score, e.notes, e.verification_methods, e.id AS eval_id,
             (SELECT COUNT(*) FROM evidence x WHERE x.evaluation_id = e.id) AS ev_total,
             (SELECT COUNT(*) FROM evidence x WHERE x.evaluation_id = e.id AND x.review_status = 'ACCEPTED') AS ev_ok,
@@ -55,12 +55,12 @@ export function buildVisitDaily(visitId: string): ReportContent {
   const weak = evals.filter((e) => e.score <= 1);
   const strong = evals.filter((e) => e.score === 3);
 
-  const actions = query<any>(
+  const actions = await query<any>(
     `SELECT a.problem_description, a.proposed_action, a.priority, a.due_date, a.status, a.success_indicator, ru.name AS responsible, i.code
      FROM corrective_actions a JOIN evaluations e ON e.id = a.evaluation_id JOIN users ru ON ru.id = a.responsible_id
      LEFT JOIN indicators i ON i.id = a.indicator_id WHERE e.visit_id = ? ORDER BY a.due_date`, [visitId]);
-  const actionIndicators = new Set(query<any>("SELECT a.indicator_id FROM corrective_actions a JOIN evaluations e ON e.id = a.evaluation_id WHERE e.visit_id = ?", [visitId]).map((x) => x.indicator_id));
-  const evidence = query<any>(
+  const actionIndicators = new Set((await query<any>("SELECT a.indicator_id FROM corrective_actions a JOIN evaluations e ON e.id = a.evaluation_id WHERE e.visit_id = ?", [visitId])).map((x) => x.indicator_id));
+  const evidence = await query<any>(
     `SELECT x.name, x.document_type, x.review_status, i.code FROM evidence x LEFT JOIN indicators i ON i.id = x.indicator_id WHERE x.visit_id = ? ORDER BY x.created_at`, [visitId]);
   const EV: Record<string, string> = { PENDING: "بانتظار المراجعة", ACCEPTED: "مقبول", REJECTED: "مرفوض" };
 
@@ -124,24 +124,24 @@ export function buildVisitDaily(visitId: string): ReportContent {
 /* ---------------------------------------------------------------------- */
 /* 2) التقرير اليومي للإدارة التعليمية                                      */
 /* ---------------------------------------------------------------------- */
-export function buildDirectorateDaily(directorateId: string | null, date: string, user: ScopeUser): ReportContent {
+export async function buildDirectorateDaily(directorateId: string | null, date: string, user: ScopeUser): Promise<ReportContent> {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new ReportError("تاريخ غير صالح");
-  const dir = directorateId ? queryOne<any>("SELECT d.name, g.name AS gov FROM directorates d JOIN governorates g ON g.id = d.governorate_id WHERE d.id = ?", [directorateId]) : null;
+  const dir = directorateId ? await queryOne<any>("SELECT d.name, g.name AS gov FROM directorates d JOIN governorates g ON g.id = d.governorate_id WHERE d.id = ?", [directorateId]) : null;
   if (directorateId && !dir) throw new ReportError("المديرية غير موجودة", 404);
-  const sc = schoolScope(user, "s");
+  const sc = await schoolScope(user, "s");
   const where = [sc.sql];
   const params: unknown[] = [...sc.params];
   if (directorateId) { where.push("s.directorate_id = ?"); params.push(directorateId); }
   const W = where.join(" AND ");
 
-  const schoolsTarget = queryOne<{ n: number }>(`SELECT COUNT(*) n FROM schools s WHERE s.status = 'ACTIVE' AND ${W}`, params)?.n ?? 0;
-  const dayVisits = query<any>(
+  const schoolsTarget = (await queryOne<{ n: number }>(`SELECT COUNT(*) n FROM schools s WHERE s.status = 'ACTIVE' AND ${W}`, params))?.n ?? 0;
+  const dayVisits = await query<any>(
     `SELECT v.id, v.type, v.status, v.completion, v.scheduled_at, v.started_at, s.name AS school_name, u.name AS inspector_name
      FROM visits v JOIN schools s ON s.id = v.school_id JOIN users u ON u.id = v.inspector_id
      WHERE ${W} AND v.status <> 'CANCELLED' AND (date(v.scheduled_at) = date(?) OR date(v.started_at) = date(?) OR date(v.ended_at) = date(?))
      ORDER BY s.name`, [...params, date, date, date]);
-  const tree = loadTree();
-  const results = computeVisitResults(dayVisits.map((x) => x.id), tree);
+  const tree = await loadTree();
+  const results = await computeVisitResults(dayVisits.map((x) => x.id), tree);
   const planned = dayVisits.length;
   const executed = dayVisits.filter((x) => ["SUBMITTED", "COMPLETED"].includes(x.status)).length;
   const postponed = dayVisits.filter((x) => x.status === "POSTPONED").length;
@@ -149,18 +149,18 @@ export function buildDirectorateDaily(directorateId: string | null, date: string
   const completeSchools = new Set(dayVisits.filter((x) => results.get(x.id)?.isComplete).map((x) => x.school_name)).size;
   const rate = planned ? Math.round((executed / planned) * 100) : null;
 
-  const recurring = query<any>(
+  const recurring = await query<any>(
     `SELECT i.code, i.title, COUNT(DISTINCT v.school_id) AS schools FROM evaluations e JOIN visits v ON v.id = e.visit_id JOIN schools s ON s.id = v.school_id
      JOIN indicators i ON i.id = e.indicator_id
      WHERE ${W} AND e.status = 'EVALUATED' AND e.score <= 1 AND date(v.updated_at) >= date(?, '-30 day')
      GROUP BY i.id HAVING schools >= 1 ORDER BY schools DESC, i.order_index LIMIT 10`, [...params, date]);
-  const overdueActions = query<any>(
+  const overdueActions = await query<any>(
     `SELECT s.name AS school_name, COUNT(*) AS n FROM corrective_actions a JOIN improvement_plans p ON p.id = a.plan_id JOIN schools s ON s.id = p.school_id
      WHERE ${W} AND a.status NOT IN ('COMPLETED','CLOSED_VERIFIED','CLOSED_REJECTED') AND date(a.due_date) < date(?) GROUP BY s.id ORDER BY n DESC`, [...params, date]);
-  const pendingVisits = query<any>(`SELECT s.name AS school_name, u.name AS inspector_name FROM visits v JOIN schools s ON s.id = v.school_id JOIN users u ON u.id = v.inspector_id WHERE ${W} AND v.status = 'SUBMITTED'`, params);
-  const pendingReports = queryOne<{ n: number }>(`SELECT COUNT(*) n FROM reports r LEFT JOIN schools s ON s.id = r.school_id WHERE r.status = 'UNDER_REVIEW' AND (r.school_id IS NULL OR ${W})`, params)?.n ?? 0;
-  const pendingEvidence = queryOne<{ n: number }>(`SELECT COUNT(*) n FROM evidence x JOIN schools s ON s.id = x.school_id WHERE x.review_status = 'PENDING' AND ${W}`, params)?.n ?? 0;
-  const urgent = urgentSchools(W, params);
+  const pendingVisits = await query<any>(`SELECT s.name AS school_name, u.name AS inspector_name FROM visits v JOIN schools s ON s.id = v.school_id JOIN users u ON u.id = v.inspector_id WHERE ${W} AND v.status = 'SUBMITTED'`, params);
+  const pendingReports = (await queryOne<{ n: number }>(`SELECT COUNT(*) n FROM reports r LEFT JOIN schools s ON s.id = r.school_id WHERE r.status = 'UNDER_REVIEW' AND (r.school_id IS NULL OR ${W})`, params))?.n ?? 0;
+  const pendingEvidence = (await queryOne<{ n: number }>(`SELECT COUNT(*) n FROM evidence x JOIN schools s ON s.id = x.school_id WHERE x.review_status = 'PENDING' AND ${W}`, params))?.n ?? 0;
+  const urgent = await urgentSchools(W, params);
 
   return {
     type: "DIRECTORATE_DAILY",
@@ -200,18 +200,18 @@ export function buildDirectorateDaily(directorateId: string | null, date: string
 }
 
 /** مدارس تحتاج متابعة عاجلة بمعايير صريحة. */
-export function urgentSchools(schoolWhere: string, params: unknown[]) {
-  const tree = loadTree();
-  const schools = query<any>(`SELECT s.id, s.name FROM schools s WHERE s.status = 'ACTIVE' AND ${schoolWhere}`, params);
-  const basis = query<any>(
+export async function urgentSchools(schoolWhere: string, params: unknown[]) {
+  const tree = await loadTree();
+  const schools = await query<any>(`SELECT s.id, s.name FROM schools s WHERE s.status = 'ACTIVE' AND ${schoolWhere}`, params);
+  const basis = await query<any>(
     `SELECT v.id, v.school_id, COALESCE(v.ended_at, v.submitted_at, v.updated_at) AS at FROM visits v JOIN schools s ON s.id = v.school_id
      WHERE v.status IN ('SUBMITTED','COMPLETED') AND ${schoolWhere} ORDER BY at DESC`, params);
   const first = new Map<string, any>();
   for (const b of basis) if (!first.has(b.school_id)) first.set(b.school_id, b);
-  const results = computeVisitResults([...first.values()].map((b) => b.id), tree);
-  const overdue = new Map(query<any>(
+  const results = await computeVisitResults([...first.values()].map((b) => b.id), tree);
+  const overdue = new Map((await query<any>(
     `SELECT p.school_id, COUNT(*) n FROM corrective_actions a JOIN improvement_plans p ON p.id = a.plan_id JOIN schools s ON s.id = p.school_id
-     WHERE a.status NOT IN ('COMPLETED','CLOSED_VERIFIED','CLOSED_REJECTED') AND date(a.due_date) < date('now') AND ${schoolWhere} GROUP BY p.school_id`, params).map((r) => [r.school_id, r.n]));
+     WHERE a.status NOT IN ('COMPLETED','CLOSED_VERIFIED','CLOSED_REJECTED') AND date(a.due_date) < date('now') AND ${schoolWhere} GROUP BY p.school_id`, params)).map((r) => [r.school_id, r.n]));
   const out: { name: string; score: number | null; reasons: string[] }[] = [];
   for (const s of schools) {
     const b = first.get(s.id);
@@ -250,28 +250,28 @@ function periodRange(kind: PeriodKind, anchor: string): { from: string; to: stri
   return { from: iso(from), to: iso(to), pFrom: iso(pFrom), pTo: iso(pTo) };
 }
 
-export function buildPeriodic(kind: PeriodKind, anchor: string, directorateId: string | null, user: ScopeUser): ReportContent {
+export async function buildPeriodic(kind: PeriodKind, anchor: string, directorateId: string | null, user: ScopeUser): Promise<ReportContent> {
   if (!PERIOD_LABEL[kind]) throw new ReportError("نوع الفترة غير صالح");
   const { from, to, pFrom, pTo } = periodRange(kind, anchor);
-  const dir = directorateId ? queryOne<any>("SELECT name FROM directorates WHERE id = ?", [directorateId]) : null;
-  const sc = schoolScope(user, "s");
+  const dir = directorateId ? await queryOne<any>("SELECT name FROM directorates WHERE id = ?", [directorateId]) : null;
+  const sc = await schoolScope(user, "s");
   const where = [sc.sql];
   const params: unknown[] = [...sc.params];
   if (directorateId) { where.push("s.directorate_id = ?"); params.push(directorateId); }
   const W = where.join(" AND ");
-  const tree = loadTree();
+  const tree = await loadTree();
 
-  const load = (a: string, b: string) => {
-    const vs = query<any>(
+  const load = async (a: string, b: string) => {
+    const vs = await query<any>(
       `SELECT v.id, v.school_id, s.name AS school_name, COALESCE(v.ended_at, v.submitted_at, v.updated_at) AS at FROM visits v JOIN schools s ON s.id = v.school_id
        WHERE ${W} AND v.status IN ('SUBMITTED','COMPLETED') AND date(COALESCE(v.ended_at, v.submitted_at, v.updated_at)) BETWEEN date(?) AND date(?) ORDER BY at DESC`, [...params, a, b]);
     const latest = new Map<string, any>();
     for (const v of vs) if (!latest.has(v.school_id)) latest.set(v.school_id, v);
-    const results = computeVisitResults([...latest.values()].map((x) => x.id), tree);
+    const results = await computeVisitResults([...latest.values()].map((x) => x.id), tree);
     return { vs, latest, results };
   };
-  const cur = load(from, to);
-  const prev = load(pFrom, pTo);
+  const cur = await load(from, to);
+  const prev = await load(pFrom, pTo);
   const avg = (m: { latest: Map<string, any>; results: Map<string, EvaluationResult> }) => {
     const a = [...m.latest.values()].map((x) => m.results.get(x.id)?.evaluatedPartPercent).filter((x): x is number => typeof x === "number");
     return a.length ? a.reduce((x, y) => x + y, 0) / a.length : null;
@@ -284,7 +284,7 @@ export function buildPeriodic(kind: PeriodKind, anchor: string, directorateId: s
   const trendWord = (d: number | null) => (d == null ? "—" : d > 2 ? "تحسّن" : d < -2 ? "تراجع" : "ثبات");
   const a1 = avg(cur), a0 = avg(prev);
 
-  const allSchools = query<any>(`SELECT s.id, s.name FROM schools s WHERE s.status = 'ACTIVE' AND ${W} ORDER BY s.name`, params);
+  const allSchools = await query<any>(`SELECT s.id, s.name FROM schools s WHERE s.status = 'ACTIVE' AND ${W} ORDER BY s.name`, params);
   const rows: Cell[][] = allSchools.map((s) => {
     const c = cur.latest.get(s.id) ? cur.results.get(cur.latest.get(s.id).id)?.evaluatedPartPercent ?? null : null;
     const p = prev.latest.get(s.id) ? prev.results.get(prev.latest.get(s.id).id)?.evaluatedPartPercent ?? null : null;
@@ -292,7 +292,7 @@ export function buildPeriodic(kind: PeriodKind, anchor: string, directorateId: s
     const support = c == null ? "لا زيارة في الفترة" : c < 50 ? "نعم — دون 50%" : d != null && d < -10 ? "نعم — تراجع حاد" : "لا";
     return [s.name, pct(c), pct(p), d == null ? "—" : `${d > 0 ? "+" : ""}${d}`, trendWord(d), support];
   });
-  const planned = queryOne<{ n: number }>(`SELECT COUNT(*) n FROM visits v JOIN schools s ON s.id = v.school_id WHERE ${W} AND v.status <> 'CANCELLED' AND date(COALESCE(v.started_at, v.scheduled_at, v.created_at)) BETWEEN date(?) AND date(?)`, [...params, from, to])?.n ?? 0;
+  const planned = (await queryOne<{ n: number }>(`SELECT COUNT(*) n FROM visits v JOIN schools s ON s.id = v.school_id WHERE ${W} AND v.status <> 'CANCELLED' AND date(COALESCE(v.started_at, v.scheduled_at, v.created_at)) BETWEEN date(?) AND date(?)`, [...params, from, to]))?.n ?? 0;
 
   return {
     type: "PERIODIC",
@@ -322,17 +322,17 @@ export function buildPeriodic(kind: PeriodKind, anchor: string, directorateId: s
 /* ---------------------------------------------------------------------- */
 /* 4) تقرير الجودة التفصيلي                                                */
 /* ---------------------------------------------------------------------- */
-export function buildQualityDetailed(schoolId: string, visitId: string | null): ReportContent {
-  const school = queryOne<any>(`SELECT s.*, d.name AS directorate_name FROM schools s JOIN directorates d ON d.id = s.directorate_id WHERE s.id = ?`, [schoolId]);
+export async function buildQualityDetailed(schoolId: string, visitId: string | null): Promise<ReportContent> {
+  const school = await queryOne<any>(`SELECT s.*, d.name AS directorate_name FROM schools s JOIN directorates d ON d.id = s.directorate_id WHERE s.id = ?`, [schoolId]);
   if (!school) throw new ReportError("المدرسة غير موجودة", 404);
   const v = visitId
-    ? queryOne<any>("SELECT v.*, u.name AS inspector_name FROM visits v JOIN users u ON u.id = v.inspector_id WHERE v.id = ? AND v.school_id = ?", [visitId, schoolId])
-    : queryOne<any>(`SELECT v.*, u.name AS inspector_name FROM visits v JOIN users u ON u.id = v.inspector_id WHERE v.school_id = ? AND v.status IN ('SUBMITTED','COMPLETED') ORDER BY COALESCE(v.ended_at, v.submitted_at, v.updated_at) DESC LIMIT 1`, [schoolId]);
+    ? await queryOne<any>("SELECT v.*, u.name AS inspector_name FROM visits v JOIN users u ON u.id = v.inspector_id WHERE v.id = ? AND v.school_id = ?", [visitId, schoolId])
+    : await queryOne<any>(`SELECT v.*, u.name AS inspector_name FROM visits v JOIN users u ON u.id = v.inspector_id WHERE v.school_id = ? AND v.status IN ('SUBMITTED','COMPLETED') ORDER BY COALESCE(v.ended_at, v.submitted_at, v.updated_at) DESC LIMIT 1`, [schoolId]);
   if (!v) throw new ReportError("لا توجد زيارة مقدَّمة أو معتمدة لهذه المدرسة لبناء تقرير الجودة التفصيلي", 409);
-  const tree = loadTree();
-  const r = computeVisitResult(v.id, tree);
+  const tree = await loadTree();
+  const r = await computeVisitResult(v.id, tree);
 
-  const inds = query<any>(
+  const inds = await query<any>(
     `SELECT i.id, i.code, i.title, i.evidence AS required, i.order_index, sc.code AS sub_code, e.id AS eval_id, e.status, e.score, e.notes,
             (SELECT COUNT(*) FROM evidence x WHERE x.evaluation_id = e.id AND x.review_status = 'ACCEPTED') AS ev_ok,
             (SELECT COUNT(*) FROM evidence x WHERE x.evaluation_id = e.id AND x.review_status = 'PENDING') AS ev_pending,
@@ -343,7 +343,7 @@ export function buildQualityDetailed(schoolId: string, visitId: string | null): 
   const evaluated = inds.filter((i) => i.status === "EVALUATED");
   const missing = evaluated.filter((i) => i.ev_ok === 0);
 
-  const plan = query<any>(
+  const plan = await query<any>(
     `SELECT a.problem_description, a.proposed_action, a.priority, a.due_date, a.status, a.success_indicator, a.resources, ru.name AS responsible, i.code
      FROM corrective_actions a JOIN improvement_plans p ON p.id = a.plan_id JOIN users ru ON ru.id = a.responsible_id LEFT JOIN indicators i ON i.id = a.indicator_id
      WHERE p.school_id = ? ORDER BY a.due_date`, [schoolId]);
@@ -387,16 +387,16 @@ export function buildQualityDetailed(schoolId: string, visitId: string | null): 
 /* ---------------------------------------------------------------------- */
 /* 5) التقارير الإدارية الخاصة                                             */
 /* ---------------------------------------------------------------------- */
-export function buildSpecial(topic: string, schoolId: string | null, directorateId: string | null, from: string | null, to: string | null, user: ScopeUser): ReportContent {
+export async function buildSpecial(topic: string, schoolId: string | null, directorateId: string | null, from: string | null, to: string | null, user: ScopeUser): Promise<ReportContent> {
   const cfg = SPECIAL_TOPICS[topic];
   if (!cfg) throw new ReportError("موضوع التقرير غير معروف");
-  const sc = schoolScope(user, "s");
+  const sc = await schoolScope(user, "s");
   const where = [sc.sql];
   const params: unknown[] = [...sc.params];
   if (schoolId) { where.push("s.id = ?"); params.push(schoolId); }
   if (directorateId) { where.push("s.directorate_id = ?"); params.push(directorateId); }
   const W = where.join(" AND ");
-  const scopeName = schoolId ? queryOne<any>("SELECT name FROM schools WHERE id = ?", [schoolId])?.name : directorateId ? `مديرية ${queryOne<any>("SELECT name FROM directorates WHERE id = ?", [directorateId])?.name}` : "كل المدارس ضمن النطاق";
+  const scopeName = schoolId ? (await queryOne<any>("SELECT name FROM schools WHERE id = ?", [schoolId]))?.name : directorateId ? `مديرية ${(await queryOne<any>("SELECT name FROM directorates WHERE id = ?", [directorateId]))?.name}` : "كل المدارس ضمن النطاق";
   const sections: Section[] = [];
   const notices: string[] = ["تقرير إداري مساند: لا يُعدّ جزءاً من التقييم الرسمي الوارد في استمارة التقييم الذاتي، ولا تُنسب إليه معايير لم ترد فيها."];
   const period = from || to ? `${from ? dateAr(from) : "البداية"} — ${to ? dateAr(to) : "اليوم"}` : "كل الفترات";
@@ -404,7 +404,7 @@ export function buildSpecial(topic: string, schoolId: string | null, directorate
   if (cfg.kind === "attendance") {
     const dateCond = [from ? "date(ar.date) >= date(?)" : "", to ? "date(ar.date) <= date(?)" : ""].filter(Boolean);
     const dparams = [from, to].filter(Boolean) as string[];
-    const rows = query<any>(
+    const rows = await query<any>(
       `SELECT s.name, COUNT(*) AS total,
               SUM(CASE WHEN ar.status = 'PRESENT' THEN 1 ELSE 0 END) AS present,
               SUM(CASE WHEN ar.status = 'ABSENT' THEN 1 ELSE 0 END) AS absent,
@@ -417,7 +417,7 @@ export function buildSpecial(topic: string, schoolId: string | null, directorate
     sections.push({ kind: "table", title: "الحضور والغياب حسب المدرسة", columns: [{ key: "s", label: "المدرسة", width: 4 }, { key: "t", label: "السجلات", width: 1.2, align: "center" }, { key: "p", label: "حاضر", width: 1.2, align: "center" }, { key: "a", label: "غائب", width: 1.2, align: "center" }, { key: "r", label: "نسبة الحضور", width: 1.6, align: "center" }],
       rows: rows.map((r) => [r.name, r.total, r.present, r.absent, pct((r.present / r.total) * 100)]), emptyText: "لا بيانات حضور موثَّقة." });
   } else if (cfg.kind === "results") {
-    const rows = query<any>(
+    const rows = await query<any>(
       `SELECT s.name, ar.subject, ar.term, COUNT(*) AS n, AVG(ar.score * 100.0 / ar.max_score) AS avg
        FROM academic_results ar JOIN students st ON st.id = ar.student_id JOIN schools s ON s.id = st.school_id
        WHERE ${W} ${from ? "AND date(ar.recorded_at) >= date(?)" : ""} ${to ? "AND date(ar.recorded_at) <= date(?)" : ""} GROUP BY s.id, ar.subject, ar.term ORDER BY s.name, ar.subject`, [...params, ...([from, to].filter(Boolean) as string[])]);
@@ -431,17 +431,17 @@ export function buildSpecial(topic: string, schoolId: string | null, directorate
     const ip: unknown[] = [];
     if (codes.length) { conds.push(`i.code IN (${codes.map(() => "?").join(",")})`); ip.push(...codes); }
     if (cc.length) { conds.push(`(sc.code IN (${cc.map(() => "?").join(",")}) OR c.code IN (${cc.map(() => "?").join(",")}))`); ip.push(...cc, ...cc); }
-    const inds = query<any>(
+    const inds = await query<any>(
       `SELECT i.id, i.code, i.title FROM indicators i LEFT JOIN sub_criteria sc ON sc.id = i.sub_criterion_id JOIN criteria c ON c.id = COALESCE(i.criterion_id, sc.criterion_id)
        WHERE ${conds.join(" OR ")} ORDER BY i.order_index`, ip);
-    const schools = query<any>(`SELECT s.id, s.name FROM schools s WHERE s.status = 'ACTIVE' AND ${W} ORDER BY s.name`, params);
+    const schools = await query<any>(`SELECT s.id, s.name FROM schools s WHERE s.status = 'ACTIVE' AND ${W} ORDER BY s.name`, params);
     const basisByS = new Map<string, string>();
-    for (const b of query<any>(`SELECT v.id, v.school_id FROM visits v JOIN schools s ON s.id = v.school_id WHERE v.status IN ('SUBMITTED','COMPLETED') AND ${W} ${from ? "AND date(v.updated_at) >= date(?)" : ""} ${to ? "AND date(v.updated_at) <= date(?)" : ""} ORDER BY COALESCE(v.ended_at, v.submitted_at, v.updated_at) DESC`, [...params, ...([from, to].filter(Boolean) as string[])]))
+    for (const b of await query<any>(`SELECT v.id, v.school_id FROM visits v JOIN schools s ON s.id = v.school_id WHERE v.status IN ('SUBMITTED','COMPLETED') AND ${W} ${from ? "AND date(v.updated_at) >= date(?)" : ""} ${to ? "AND date(v.updated_at) <= date(?)" : ""} ORDER BY COALESCE(v.ended_at, v.submitted_at, v.updated_at) DESC`, [...params, ...([from, to].filter(Boolean) as string[])]))
       if (!basisByS.has(b.school_id)) basisByS.set(b.school_id, b.id);
     const evals = new Map<string, any>();
     if (basisByS.size && inds.length) {
       const vids = [...basisByS.values()];
-      for (const e of query<any>(`SELECT e.visit_id, e.indicator_id, e.status, e.score FROM evaluations e WHERE e.visit_id IN (${vids.map(() => "?").join(",")}) AND e.indicator_id IN (${inds.map(() => "?").join(",")})`, [...vids, ...inds.map((i) => i.id)]))
+      for (const e of await query<any>(`SELECT e.visit_id, e.indicator_id, e.status, e.score FROM evaluations e WHERE e.visit_id IN (${vids.map(() => "?").join(",")}) AND e.indicator_id IN (${inds.map(() => "?").join(",")})`, [...vids, ...inds.map((i) => i.id)]))
         evals.set(`${e.visit_id}:${e.indicator_id}`, e);
     }
     const tableRows: Cell[][] = [];
@@ -450,7 +450,7 @@ export function buildSpecial(topic: string, schoolId: string | null, directorate
       const vid = basisByS.get(s.id);
       const sc2: number[] = [];
       for (const i of inds) { const e = vid ? evals.get(`${vid}:${i.id}`) : null; if (e?.status === "EVALUATED") sc2.push(e.score); }
-      const a = sc2.length ? (sc2.reduce((x, y) => x + y, 0) / sc2.length / loadTree().maxScore) * 100 : null;
+      const a = sc2.length ? (sc2.reduce((x, y) => x + y, 0) / sc2.length / (await loadTree()).maxScore) * 100 : null;
       if (a != null) { sum += a; cnt++; }
       tableRows.push([s.name, vid ? `${sc2.length}/${inds.length}` : "لا زيارة", pct(a)]);
     }
@@ -459,7 +459,7 @@ export function buildSpecial(topic: string, schoolId: string | null, directorate
     sections.push({ kind: "table", title: "نتائج المدارس في هذا الموضوع", columns: [{ key: "s", label: "المدرسة", width: 5 }, { key: "n", label: "المؤشرات المقيَّمة", width: 2, align: "center" }, { key: "a", label: "نسبة التحقق", width: 1.6, align: "center" }], rows: tableRows, emptyText: "لا مدارس ضمن النطاق." });
     sections.push({ kind: "table", title: "المؤشرات المعتمدة في هذا التقرير (من الاستمارة)", columns: [{ key: "c", label: "الرمز", width: 1.2, align: "center" }, { key: "t", label: "نص المؤشر", width: 8 }], rows: inds.map((i) => [i.code, trunc(i.title, 150)]) });
     if (topic === "facilities") {
-      const prof = query<any>(`SELECT s.name, p.* FROM school_profiles p JOIN schools s ON s.id = p.school_id WHERE ${W} ORDER BY s.name`, params);
+      const prof = await query<any>(`SELECT s.name, p.* FROM school_profiles p JOIN schools s ON s.id = p.school_id WHERE ${W} ORDER BY s.name`, params);
       const yn = (x: any) => (x == null ? "غير محدد" : x ? "متوفر" : "غير متوفر");
       sections.push({ kind: "table", title: "ملف المرافق المُدخل", columns: [{ key: "s", label: "المدرسة", width: 3 }, { key: "a", label: "معمل علوم", width: 1.2, align: "center" }, { key: "b", label: "معمل حاسوب", width: 1.2, align: "center" }, { key: "c", label: "مكتبة", width: 1.2, align: "center" }, { key: "d", label: "مقصف", width: 1.2, align: "center" }, { key: "v", label: "موثّق", width: 1, align: "center" }],
         rows: prof.map((p) => [p.name, yn(p.has_science_lab), yn(p.has_computer_lab), yn(p.has_library), yn(p.has_canteen), p.verified ? "نعم" : "لا"]), emptyText: "لا ملفات مرافق مُدخلة." });

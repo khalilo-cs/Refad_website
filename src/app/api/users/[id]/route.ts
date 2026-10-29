@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { getServerSession, authorize, auditLog } from "@/lib/auth";
-import { queryOne, getDb, nowISO } from "@/lib/db/sqlite";
+import { queryOne, nowISO , exec } from "@/lib/db/sqlite";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -19,8 +19,8 @@ type UserRow = {
   role_key: string;
 };
 
-function loadUser(id: string) {
-  return queryOne<UserRow>(
+async function loadUser(id: string) {
+  return await queryOne<UserRow>(
     `SELECT u.id, u.name, u.email, u.role_id, u.school_id, u.directorate_id,
             u.is_active, u.is_locked, u.token_version, r.key AS role_key
      FROM users u JOIN roles r ON u.role_id = r.id WHERE u.id = ?`,
@@ -45,7 +45,7 @@ export async function PATCH(
     }
 
     const { id } = await params;
-    const target = loadUser(id);
+    const target = await loadUser(id);
     if (!target) {
       return NextResponse.json({ message: "المستخدم غير موجود" }, { status: 404 });
     }
@@ -70,7 +70,7 @@ export async function PATCH(
       if (typeof email !== "string" || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
         return NextResponse.json({ message: "بريد إلكتروني غير صالح" }, { status: 400 });
       }
-      const dup = queryOne<{ id: string }>("SELECT id FROM users WHERE email = ? AND id != ?", [
+      const dup = await queryOne<{ id: string }>("SELECT id FROM users WHERE email = ? AND id != ?", [
         email.toLowerCase().trim(),
         id,
       ]);
@@ -82,12 +82,12 @@ export async function PATCH(
     }
 
     if (roleKey !== undefined) {
-      const role = queryOne<{ id: string }>("SELECT id FROM roles WHERE key = ?", [roleKey]);
+      const role = await queryOne<{ id: string }>("SELECT id FROM roles WHERE key = ?", [roleKey]);
       if (!role) return NextResponse.json({ message: "الدور غير صالح" }, { status: 400 });
 
       // منع فقدان آخر مدير نظام في المنصة
       if (target.role_key === "SUPER_ADMIN" && roleKey !== "SUPER_ADMIN") {
-        const admins = queryOne<{ n: number }>(
+        const admins = await queryOne<{ n: number }>(
           `SELECT COUNT(*) AS n FROM users u JOIN roles r ON u.role_id = r.id
            WHERE r.key = 'SUPER_ADMIN' AND u.is_active = 1 AND u.id != ?`,
           [id]
@@ -116,7 +116,7 @@ export async function PATCH(
     if (isActive !== undefined) {
       // منع تعطيل آخر مدير نظام نشط أو تعطيل الحساب الذاتي
       if (!isActive && target.role_key === "SUPER_ADMIN") {
-        const admins = queryOne<{ n: number }>(
+        const admins = await queryOne<{ n: number }>(
           `SELECT COUNT(*) AS n FROM users u JOIN roles r ON u.role_id = r.id
            WHERE r.key = 'SUPER_ADMIN' AND u.is_active = 1 AND u.id != ?`,
           [id]
@@ -175,11 +175,9 @@ export async function PATCH(
     }
     args.push(id);
 
-    getDb()
-      .prepare(`UPDATE users SET ${sets.join(", ")} WHERE id = ?`)
-      .run(...args);
+    await exec(`UPDATE users SET ${sets.join(", ")} WHERE id = ?`, [...args]);
 
-    auditLog({
+    await auditLog({
       userId: session.userId,
       action: "USER_UPDATED",
       entityType: "user",

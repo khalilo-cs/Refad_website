@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession, authorize, auditLog } from "@/lib/auth";
-import { query, queryOne, getDb, uuid, nowISO } from "@/lib/db/sqlite";
+import { query, queryOne, uuid, nowISO, transaction , exec } from "@/lib/db/sqlite";
 import { canAccessVisit } from "@/lib/scope";
 import { clientIp } from "@/lib/security";
 import {
@@ -41,8 +41,8 @@ type IndicatorRow = {
 };
 
 /** يقرأ الدرجة العظمى من مقياس التقدير النشط. */
-function getMaxScore(): number {
-  const row = queryOne<{ maxScore: number }>(
+async function getMaxScore(): Promise<number> {
+  const row = await queryOne<{ maxScore: number }>(
     "SELECT MAX(score) AS maxScore FROM rating_scale WHERE is_active = 1"
   );
   return row?.maxScore && row.maxScore > 0 ? row.maxScore : 3;
@@ -63,13 +63,13 @@ export async function GET(
     }
 
     const { visitId } = await params;
-    if (!canAccessVisit(session, visitId)) {
+    if (!await canAccessVisit(session, visitId)) {
       return NextResponse.json({ message: "لا تملك صلاحية الوصول إلى هذه الزيارة" }, { status: 403 });
     }
 
     const historyFor = new URL(request.url).searchParams.get("history");
     if (historyFor) {
-      const rows = query(
+      const rows = await query(
         `SELECT h.field, h.old_value, h.new_value, h.reason, h.changed_at, u.name AS changed_by
          FROM evaluation_history h
          LEFT JOIN users u ON u.id = h.changed_by_id
@@ -80,7 +80,7 @@ export async function GET(
       return NextResponse.json({ history: rows });
     }
 
-    const visit = queryOne<{
+    const visit = await queryOne<{
       id: string;
       school_id: string;
       inspector_id: string;
@@ -106,17 +106,17 @@ export async function GET(
       return NextResponse.json({ message: "الزيارة غير موجودة" }, { status: 404 });
     }
 
-    const criteria = query<CriterionRow>(
+    const criteria = await query<CriterionRow>(
       "SELECT id, code, title, weight, order_index FROM criteria ORDER BY order_index"
     );
-    const subs = query<SubRow>(
+    const subs = await query<SubRow>(
       "SELECT id, code, title, weight, criterion_id, order_index FROM sub_criteria ORDER BY order_index"
     );
-    const indicators = query<IndicatorRow>(
+    const indicators = await query<IndicatorRow>(
       `SELECT id, code, title, sub_criterion_id, criterion_id, order_index
        FROM indicators ORDER BY order_index`
     );
-    const saved = query<{
+    const saved = await query<{
       indicator_id: string;
       status: string;
       score: number;
@@ -140,7 +140,7 @@ export async function GET(
     );
 
     const savedMap = new Map(saved.map((s) => [s.indicator_id, s]));
-    const maxScore = getMaxScore();
+    const maxScore = await getMaxScore();
 
     // بناء البنية: معيار ← معايير فرعية ← مؤشرات، مع معالجة المعايير بلا معايير فرعية.
     const raws: RawCriterionInput[] = criteria.map((c) => {
@@ -195,7 +195,7 @@ export async function GET(
     const weightErrors = validateWeights(normalized);
 
     // نصوص المؤشرات الأصلية وأدلتها للعرض
-    const evidenceRows = query<{ id: string; evidence: string; verification_tools: string }>(
+    const evidenceRows = await query<{ id: string; evidence: string; verification_tools: string }>(
       "SELECT id, evidence, verification_tools FROM indicators"
     );
     const evidenceMap = new Map(evidenceRows.map((e) => [e.id, e]));
@@ -244,7 +244,7 @@ export async function GET(
       result,
       criteria: detail,
       weightErrors,
-      ratingScale: query("SELECT key, label_ar, score FROM rating_scale WHERE is_active = 1 ORDER BY order_index"),
+      ratingScale: await query("SELECT key, label_ar, score FROM rating_scale WHERE is_active = 1 ORDER BY order_index"),
     });
   } catch (e: any) {
     return NextResponse.json(
@@ -277,10 +277,10 @@ export async function PATCH(
     if (!["SUPER_ADMIN", "EDUCATION_DIRECTOR", "INSPECTOR"].includes(session.roleKey)) {
       return NextResponse.json({ message: "التقييم الميداني مقصور على المفتش والإدارة" }, { status: 403 });
     }
-    if (!canAccessVisit(session, visitId)) {
+    if (!await canAccessVisit(session, visitId)) {
       return NextResponse.json({ message: "لا تملك صلاحية التقييم" }, { status: 403 });
     }
-    const visit = queryOne<{ inspector_id: string; status: string; started_at: string | null }>(
+    const visit = await queryOne<{ inspector_id: string; status: string; started_at: string | null }>(
       "SELECT inspector_id, status, started_at FROM visits WHERE id = ?",
       [visitId]
     );
@@ -304,7 +304,7 @@ export async function PATCH(
     if (status !== "EVALUATED" && status !== "NOT_EVALUATED") {
       return NextResponse.json({ message: "الحالة يجب أن تكون EVALUATED أو NOT_EVALUATED" }, { status: 400 });
     }
-    if (!queryOne("SELECT id FROM indicators WHERE id = ?", [indicatorId])) {
+    if (!await queryOne("SELECT id FROM indicators WHERE id = ?", [indicatorId])) {
       return NextResponse.json({ message: "المؤشر غير موجود" }, { status: 404 });
     }
     const VALID_METHODS = ["فحص وثائق", "ملاحظة", "مقابلة"];
@@ -312,7 +312,7 @@ export async function PATCH(
       ? [...new Set<string>(methods.filter((m: unknown): m is string => typeof m === "string" && VALID_METHODS.includes(m)))]
       : [];
 
-    const maxScore = getMaxScore();
+    const maxScore = await getMaxScore();
     let value = 0;
     if (status === "EVALUATED") {
       if (typeof score !== "number" || !Number.isInteger(score)) {
@@ -325,16 +325,14 @@ export async function PATCH(
     }
     const cleanNotes = typeof notes === "string" && notes.trim() ? notes.trim().slice(0, 4000) : null;
     const cleanReason = typeof reason === "string" && reason.trim() ? reason.trim().slice(0, 500) : null;
-
-    const db = getDb();
     const now = nowISO();
-    const existing = queryOne<{
+    const existing = await queryOne<{
       id: string; status: string; score: number; notes: string | null; version: number;
       verification_methods: string | null; rated_by_id: string | null; rated_at: string | null;
     }>("SELECT * FROM evaluations WHERE visit_id = ? AND indicator_id = ?", [visitId, indicatorId]);
 
     if (existing && typeof expectedVersion === "number" && expectedVersion !== existing.version) {
-      const who = queryOne<{ name: string }>("SELECT name FROM users WHERE id = ?", [existing.rated_by_id ?? ""]);
+      const who = await queryOne<{ name: string }>("SELECT name FROM users WHERE id = ?", [existing.rated_by_id ?? ""]);
       return NextResponse.json(
         {
           message: "تعارض: عُدّل هذا المؤشر بعد آخر تحميل لديك",
@@ -355,48 +353,41 @@ export async function PATCH(
 
     const evalId = existing?.id ?? uuid();
     const methodsJson = JSON.stringify(cleanMethods);
-    const tx = db.transaction(() => {
+    await transaction(async () => {
       if (!existing) {
-        db.prepare(
-          `INSERT INTO evaluations (id, visit_id, indicator_id, status, score, notes, verification_methods,
+        await exec(`INSERT INTO evaluations (id, visit_id, indicator_id, status, score, notes, verification_methods,
              rated_by_id, rated_at, created_by_id, created_at, updated_at, version)
-           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,1)`
-        ).run(evalId, visitId, indicatorId, status, value, cleanNotes, methodsJson, session.userId, now, session.userId, now, now);
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,1)`, [evalId, visitId, indicatorId, status, value, cleanNotes, methodsJson, session.userId, now, session.userId, now, now]);
       } else {
-        db.prepare(
-          `UPDATE evaluations SET status = ?, score = ?, notes = ?, verification_methods = ?,
+        await exec(`UPDATE evaluations SET status = ?, score = ?, notes = ?, verification_methods = ?,
              rated_by_id = ?, rated_at = ?, updated_at = ?, version = version + 1
-           WHERE id = ?`
-        ).run(status, value, cleanNotes, methodsJson, session.userId, now, now, evalId);
+           WHERE id = ?`, [status, value, cleanNotes, methodsJson, session.userId, now, now, evalId]);
       }
-      const hist = (field: string, oldV: unknown, newV: unknown) => {
+      const hist = async (field: string, oldV: unknown, newV: unknown) => {
         if (String(oldV ?? "") === String(newV ?? "")) return;
-        db.prepare(
-          `INSERT INTO evaluation_history (id, evaluation_id, field, old_value, new_value, changed_by_id, changed_at, reason, visit_id, indicator_id)
-           VALUES (?,?,?,?,?,?,?,?,?,?)`
-        ).run(uuid(), evalId, field, oldV == null ? null : String(oldV), newV == null ? null : String(newV), session.userId, now, cleanReason, visitId, indicatorId);
+        await exec(`INSERT INTO evaluation_history (id, evaluation_id, field, old_value, new_value, changed_by_id, changed_at, reason, visit_id, indicator_id)
+           VALUES (?,?,?,?,?,?,?,?,?,?)`, [uuid(), evalId, field, oldV == null ? null : String(oldV), newV == null ? null : String(newV), session.userId, now, cleanReason, visitId, indicatorId]);
       };
-      hist("status", existing?.status ?? "NOT_EVALUATED", status);
-      hist("score", existing ? (existing.status === "EVALUATED" ? existing.score : null) : null, status === "EVALUATED" ? value : null);
-      hist("notes", existing?.notes ?? null, cleanNotes);
-      hist("methods", existing?.verification_methods ?? "[]", methodsJson);
+      await hist("status", existing?.status ?? "NOT_EVALUATED", status);
+      await hist("score", existing ? (existing.status === "EVALUATED" ? existing.score : null) : null, status === "EVALUATED" ? value : null);
+      await hist("notes", existing?.notes ?? null, cleanNotes);
+      await hist("methods", existing?.verification_methods ?? "[]", methodsJson);
 
       // بدء الزيارة تلقائياً عند أول حفظ
       if (visit.status === "SCHEDULED" || visit.status === "POSTPONED") {
-        db.prepare("UPDATE visits SET status = 'IN_PROGRESS', started_at = COALESCE(started_at, ?), updated_at = ? WHERE id = ?").run(now, now, visitId);
+        await exec("UPDATE visits SET status = 'IN_PROGRESS', started_at = COALESCE(started_at, ?), updated_at = ? WHERE id = ?", [now, now, visitId]);
       }
     });
-    tx();
 
-    const counts = queryOne<{ total: number; done: number }>(
+    const counts = await queryOne<{ total: number; done: number }>(
       `SELECT (SELECT COUNT(*) FROM indicators) AS total,
               (SELECT COUNT(*) FROM evaluations WHERE visit_id = ? AND status = 'EVALUATED') AS done`,
       [visitId]
     );
     const completion = counts && counts.total > 0 ? Math.round((counts.done / counts.total) * 100) : 0;
-    db.prepare("UPDATE visits SET completion = ?, updated_at = ? WHERE id = ?").run(completion, now, visitId);
+    await exec("UPDATE visits SET completion = ?, updated_at = ? WHERE id = ?", [completion, now, visitId]);
 
-    auditLog({
+    await auditLog({
       userId: session.userId,
       action: "EVALUATION_SCORE_SAVED",
       entityType: "evaluation",
@@ -406,7 +397,7 @@ export async function PATCH(
       userAgent: request.headers.get("user-agent") ?? null,
     });
 
-    const fresh = queryOne<{ version: number; updated_at: string }>("SELECT version, updated_at FROM evaluations WHERE id = ?", [evalId]);
+    const fresh = await queryOne<{ version: number; updated_at: string }>("SELECT version, updated_at FROM evaluations WHERE id = ?", [evalId]);
     return NextResponse.json({
       message: status === "EVALUATED" ? "تم حفظ الدرجة" : "تم تعيين المؤشر غير مقيَّم",
       completion,

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { getServerSession, authorize, auditLog } from "@/lib/auth";
-import { query, queryOne, getDb, uuid, nowISO } from "@/lib/db/sqlite";
+import { query, queryOne, uuid, nowISO , exec } from "@/lib/db/sqlite";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -34,9 +34,9 @@ export async function GET(request: NextRequest) {
       params.push(`%${search}%`, `%${search}%`);
     }
 
-    const total = queryOne<{ n: number }>(`SELECT COUNT(*) AS n FROM users u ${where}`, params);
+    const total = await queryOne<{ n: number }>(`SELECT COUNT(*) AS n FROM users u ${where}`, params);
 
-    const users = query(
+    const users = await query(
       `SELECT u.id, u.name, u.email, u.is_active, u.is_locked, u.last_login_at,
               u.created_at, r.key AS role_key, r.name AS role_name,
               s.name AS school_name, d.name AS directorate_name
@@ -50,7 +50,7 @@ export async function GET(request: NextRequest) {
       [...params, String(limit), String(offset)]
     );
 
-    const roles = query(`SELECT key, name FROM roles ORDER BY name`);
+    const roles = await query(`SELECT key, name FROM roles ORDER BY name`);
 
     return NextResponse.json({ users, roles, total: total?.n ?? 0, page, limit });
   } catch (e: any) {
@@ -99,12 +99,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const role = queryOne<{ id: string }>("SELECT id FROM roles WHERE key = ?", [roleKey]);
+    const role = await queryOne<{ id: string }>("SELECT id FROM roles WHERE key = ?", [roleKey]);
     if (!role) {
       return NextResponse.json({ message: "الدور غير صالح" }, { status: 400 });
     }
 
-    const existing = queryOne<{ id: string }>("SELECT id FROM users WHERE email = ?", [
+    const existing = await queryOne<{ id: string }>("SELECT id FROM users WHERE email = ?", [
       email.toLowerCase().trim(),
     ]);
     if (existing) {
@@ -123,14 +123,9 @@ export async function POST(request: NextRequest) {
     const id = uuid();
     const now = nowISO();
 
-    getDb()
-      .prepare(
-        `INSERT INTO users (id, name, email, password_hash, role_id, school_id, directorate_id,
+    await exec(`INSERT INTO users (id, name, email, password_hash, role_id, school_id, directorate_id,
                             is_active, is_locked, token_version, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, 1, 0, 1, ?, ?)`
-      )
-      .run(
-        id,
+         VALUES (?, ?, ?, ?, ?, ?, ?, 1, 0, 1, ?, ?)`, [id,
         name.trim(),
         email.toLowerCase().trim(),
         hash,
@@ -138,10 +133,9 @@ export async function POST(request: NextRequest) {
         schoolId || null,
         directorateId || null,
         now,
-        now
-      );
+        now]);
 
-    auditLog({
+    await auditLog({
       userId: session.userId,
       action: "USER_CREATED",
       entityType: "user",

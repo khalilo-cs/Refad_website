@@ -4,6 +4,6 @@ import { query } from "@/lib/db/sqlite";
 export const runtime = "nodejs";
 
 export async function GET() {
-  const rows = query<any>("SELECT id, name, code FROM governorates ORDER BY name");
+  const rows = await query<any>("SELECT id, name, code FROM governorates ORDER BY name");
   return NextResponse.json(rows);
 }

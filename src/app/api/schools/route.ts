@@ -5,7 +5,7 @@ import {
   authorize,
   auditLog,
 } from "@/lib/auth";
-import { query, queryOne, exec, uuid, nowISO, toJson, getDb } from "@/lib/db/sqlite";
+import { query, queryOne, exec, uuid, nowISO, toJson } from "@/lib/db/sqlite";
 import { schoolScope } from "@/lib/scope";
 
 export const runtime = "nodejs";
@@ -54,7 +54,7 @@ export async function GET(request: NextRequest) {
   };
   const orderBy = SORTS[sort] ?? "s.name";
 
-  const scope = schoolScope(session, "s");
+  const scope = await schoolScope(session, "s");
   const where: string[] = [scope.sql];
   const params: unknown[] = [...scope.params];
   if (directorateId) {
@@ -72,7 +72,7 @@ export async function GET(request: NextRequest) {
   }
   const whereSql = where.join(" AND ");
 
-  const schools = query<any>(
+  const schools = await query<any>(
     `SELECT s.id, s.code, s.name, s.type, s.stage, s.contact_phone, s.status, s.data_source, s.last_updated_at,
             s.latitude, s.longitude, s.principal_name,
             d.name AS directorate, g.name AS governorate,
@@ -85,7 +85,7 @@ export async function GET(request: NextRequest) {
      LIMIT ? OFFSET ?`,
     [...params, limit, offset]
   );
-  const totalRow = queryOne<{ n: number }>(
+  const totalRow = await queryOne<{ n: number }>(
     `SELECT COUNT(*) n FROM schools s WHERE ${whereSql}`,
     params
   );
@@ -113,18 +113,15 @@ export async function POST(request: NextRequest) {
   }
 
   const { code, name, governorateId, directorateId, areaId, address, latitude, longitude, type, stage, contactPhone, contactEmail, principalName, dataSource } = parsed.data;
-  const exists = queryOne("SELECT id FROM schools WHERE code = ?", [code]);
+  const exists = await queryOne("SELECT id FROM schools WHERE code = ?", [code]);
   if (exists) return NextResponse.json({ message: "الكود المدرسي مستخدم مسبقاً" }, { status: 409 });
 
   const id = uuid();
-  const db = getDb();
   const now = nowISO();
-  db.prepare(
-    `INSERT INTO schools (id, code, name, governorate_id, directorate_id, area_id, address, latitude, longitude, type, stage, contact_phone, contact_email, principal_name, data_source, status, last_updated_at, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-  ).run(id, code, name, governorateId, directorateId, areaId ?? null, address ?? null, latitude ?? null, longitude ?? null, type, stage, contactPhone ?? null, contactEmail ?? null, principalName ?? null, dataSource, "ACTIVE", now, now);
+  await exec(`INSERT INTO schools (id, code, name, governorate_id, directorate_id, area_id, address, latitude, longitude, type, stage, contact_phone, contact_email, principal_name, data_source, status, last_updated_at, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [id, code, name, governorateId, directorateId, areaId ?? null, address ?? null, latitude ?? null, longitude ?? null, type, stage, contactPhone ?? null, contactEmail ?? null, principalName ?? null, dataSource, "ACTIVE", now, now]);
 
-  auditLog({
+  await auditLog({
     userId: session.userId,
     action: "CREATE",
     entityType: "School",

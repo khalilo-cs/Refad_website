@@ -14,7 +14,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
   const { add } = useToast();
   const router = useRouter();
   const pathname = usePathname();
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   // إغلاق الشريط تلقائياً على الشاشات الصغيرة
   useEffect(() => {
@@ -22,6 +22,15 @@ export default function AppShell({ children }: { children: ReactNode }) {
     apply();
     window.addEventListener("resize", apply);
     return () => window.removeEventListener("resize", apply);
+  }, []);
+
+  // Escape يغلق الدرج على الشاشات الصغيرة
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && window.innerWidth < 1024) setSidebarOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
   }, []);
 
   // إشعار ترحيب مرة واحدة لكل جلسة، لا في كل تنقّل

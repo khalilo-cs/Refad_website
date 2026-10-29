@@ -9,8 +9,7 @@
 import bcrypt from "bcryptjs";
 import jwt, { JwtPayload } from "jsonwebtoken";
 import { cookies } from "next/headers";
-import { getDb, uuid, nowISO } from "./db/sqlite";
-import { query, queryOne, exec, toJson } from "./db/sqlite";
+import { query, queryOne, exec, toJson, uuid, nowISO } from "./db/sqlite";
 
 // لا قيمة افتراضية للأسرار: يجب ضبطها في متغيرات البيئة (.env).
 // هذا يمنع تشغيل المنصة بسرّ ضعيف معروف.
@@ -146,15 +145,15 @@ export async function setAuthCookies(accessToken: string, refreshToken: string):
   if (!store) return;
   const isProd = process.env.NODE_ENV === "production";
   const common = { httpOnly: true, sameSite: "lax" as const, path: "/", secure: isProd } as const;
-  await store.set("access_token", accessToken, { ...common, maxAge: 60 * ACCESS_TTL_MINUTES });
-  await store.set("refresh_token", refreshToken, { ...common, maxAge: 60 * 60 * 24 * REFRESH_TTL_DAYS });
+  store.set("access_token", accessToken, { ...common, maxAge: 60 * ACCESS_TTL_MINUTES });
+  store.set("refresh_token", refreshToken, { ...common, maxAge: 60 * 60 * 24 * REFRESH_TTL_DAYS });
 }
 
 export async function clearAuthCookies(): Promise<void> {
   const store = await cookieStore();
   if (!store) return;
-  await store.set("access_token", "", { path: "/", maxAge: 0 });
-  await store.set("refresh_token", "", { path: "/", maxAge: 0 });
+  store.set("access_token", "", { path: "/", maxAge: 0 });
+  store.set("refresh_token", "", { path: "/", maxAge: 0 });
 }
 
 export function verifyAccessToken(token: string): AccessTokenPayload | null {
@@ -182,7 +181,7 @@ export function verifyRefreshToken(token: string): RefreshTokenPayload | null {
 }
 
 async function findUserByEmail(email: string): Promise<UserSession | null> {
-  const row = queryOne<{
+  const row = await queryOne<{
     id: string;
     name: string;
     email: string;
@@ -201,8 +200,8 @@ async function findUserByEmail(email: string): Promise<UserSession | null> {
             u.is_active, u.is_locked, u.token_version,
             r.key AS role_key, r.permissions, r.name AS role_name
      FROM users u JOIN roles r ON u.role_id = r.id
-     WHERE u.email = ?`,
-    [email]
+     WHERE lower(u.email) = ?`,
+    [email.trim().toLowerCase()]
   );
   if (!row) return null;
   return {
@@ -243,7 +242,7 @@ export async function authenticateUser(
   if (user.isLocked) return { ok: false, reason: "locked" };
   if (!user.isActive) return { ok: false, reason: "inactive" };
 
-  const lockRow = queryOne<{ locked_until: string | null }>(
+  const lockRow = await queryOne<{ locked_until: string | null }>(
     "SELECT locked_until FROM users WHERE id = ?",
     [user.userId]
   );
@@ -252,29 +251,24 @@ export async function authenticateUser(
     return { ok: false, reason: "throttled", retryAfterMin: mins };
   }
 
-  const row = queryOne<{ password_hash: string }>(
+  const row = await queryOne<{ password_hash: string }>(
     "SELECT password_hash FROM users WHERE id = ?",
     [user.userId]
   );
   if (!row || !(await verifyPassword(password, row.password_hash))) {
-    const db = getDb();
-    const failed = (queryOne<{ f: number }>("SELECT failed_login + 1 AS f FROM users WHERE id = ?", [user.userId])?.f) ?? 1;
+    const failed = ((await queryOne<{ f: number }>("SELECT failed_login + 1 AS f FROM users WHERE id = ?", [user.userId]))?.f) ?? 1;
     if (failed >= LOCK_THRESHOLD) {
       // قفل مؤقت (وليس دائماً) حتى لا يُستغل لإيقاف حسابات الآخرين
-      db.prepare("UPDATE users SET failed_login = 0, locked_until = datetime('now', ?) WHERE id = ?").run(
-        `+${LOCK_MINUTES} minutes`,
-        user.userId
-      );
-      auditLog({ userId: user.userId, action: "LOGIN_TEMP_LOCK", entityType: "User", entityId: user.userId });
+      await exec("UPDATE users SET failed_login = 0, locked_until = datetime('now', ?) WHERE id = ?", [`+${LOCK_MINUTES} minutes`,
+        user.userId]);
+      await auditLog({ userId: user.userId, action: "LOGIN_TEMP_LOCK", entityType: "User", entityId: user.userId });
     } else {
-      db.prepare("UPDATE users SET failed_login = ? WHERE id = ?").run(failed, user.userId);
+      await exec("UPDATE users SET failed_login = ? WHERE id = ?", [failed, user.userId]);
     }
     return { ok: false, reason: "credentials" };
   }
 
-  getDb()
-    .prepare("UPDATE users SET failed_login = 0, locked_until = NULL, last_login_at = ? WHERE id = ?")
-    .run(nowISO(), user.userId);
+  await exec("UPDATE users SET failed_login = 0, locked_until = NULL, last_login_at = ? WHERE id = ?", [nowISO(), user.userId]);
   return { ok: true, user };
 }
 
@@ -290,7 +284,7 @@ export async function refreshSession(refreshToken: string): Promise<{
   const payload = verifyRefreshToken(refreshToken);
   if (!payload) return null;
 
-  const user = queryOne<{
+  const user = await queryOne<{
     id: string;
     name: string;
     email: string;
@@ -361,8 +355,8 @@ export async function getServerSession(): Promise<UserSession | null> {
   return null;
 }
 
-function sessionFromPayload(payload: AccessTokenPayload): UserSession | null {
-  const user = queryOne<{
+async function sessionFromPayload(payload: AccessTokenPayload): Promise<UserSession | null> {
+  const user = await queryOne<{
     id: string;
     is_active: number;
     is_locked: number;
@@ -393,7 +387,7 @@ function sessionFromPayload(payload: AccessTokenPayload): UserSession | null {
 /**
  * تسجيل تدقيق إجراء ما.
  */
-export function auditLog({
+export async function auditLog({
   userId,
   action,
   entityType,
@@ -411,14 +405,10 @@ export function auditLog({
   newValues?: unknown;
   ipAddress?: string | null;
   userAgent?: string | null;
-}): void {
+}): Promise<void> {
   try {
-    const db = getDb();
-    db.prepare(
-      `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, old_values, new_values, ip_address, user_agent, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-    ).run(
-      uuid(),
+    await exec(`INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, old_values, new_values, ip_address, user_agent, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [uuid(),
       userId ?? null,
       action,
       entityType,
@@ -427,8 +417,7 @@ export function auditLog({
       newValues ? toJson(newValues) : null,
       ipAddress ?? null,
       userAgent ?? null,
-      nowISO()
-    );
+      nowISO()]);
   } catch {
     // لا يُعطل التدفق الرئيسي بسبب خطأ في التدقيق
   }

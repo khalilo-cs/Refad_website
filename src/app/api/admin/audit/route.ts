@@ -67,12 +67,12 @@ export async function GET(request: NextRequest) {
 
     const whereSql = where.join(" AND ");
 
-    const total = queryOne<{ c: number }>(
+    const total = await queryOne<{ c: number }>(
       `SELECT COUNT(*) AS c FROM audit_logs a LEFT JOIN users u ON u.id = a.user_id WHERE ${whereSql}`,
       params
     );
 
-    const rows = query<any>(
+    const rows = await query<any>(
       `SELECT a.id, a.action, a.entity_type, a.entity_id,
               a.old_values, a.new_values, a.ip_address, a.created_at,
               u.name AS user_name, u.email AS user_email
@@ -84,10 +84,10 @@ export async function GET(request: NextRequest) {
       [...params, limit, offset]
     );
 
-    const actions = query<{ action: string; c: number }>(
+    const actions = await query<{ action: string; c: number }>(
       "SELECT action, COUNT(*) AS c FROM audit_logs GROUP BY action ORDER BY c DESC LIMIT 60"
     );
-    const entities = query<{ entity_type: string; c: number }>(
+    const entities = await query<{ entity_type: string; c: number }>(
       "SELECT entity_type, COUNT(*) AS c FROM audit_logs GROUP BY entity_type ORDER BY c DESC LIMIT 60"
     );
 

@@ -36,19 +36,19 @@ beforeAll(async () => {
   reportStatus = (await import("@/app/api/reports/[id]/status/route")) as any;
   improvement = (await import("@/app/api/improvement/route")) as any;
   evidenceRoute = (await import("@/app/api/evidence/route")) as any;
-  schoolA = q.queryOne<any>("SELECT id FROM schools WHERE code='RIFAD-DEMO-001'")!.id;
-  schoolB = q.queryOne<any>("SELECT id FROM schools WHERE code='RIFAD-DEMO-002'")!.id;
-  inProgressVisit = q.queryOne<any>("SELECT id FROM visits WHERE status='IN_PROGRESS' LIMIT 1")!.id;
-  completedVisit = q.queryOne<any>("SELECT id FROM visits WHERE status='COMPLETED' AND school_id = ? ORDER BY created_at DESC LIMIT 1", [schoolA])!.id;
+  schoolA = (await q.queryOne<any>("SELECT id FROM schools WHERE code='RIFAD-DEMO-001'"))!.id;
+  schoolB = (await q.queryOne<any>("SELECT id FROM schools WHERE code='RIFAD-DEMO-002'"))!.id;
+  inProgressVisit = (await q.queryOne<any>("SELECT id FROM visits WHERE status='IN_PROGRESS' LIMIT 1"))!.id;
+  completedVisit = (await q.queryOne<any>("SELECT id FROM visits WHERE status='COMPLETED' AND school_id = ? ORDER BY created_at DESC LIMIT 1", [schoolA]))!.id;
 });
 
 describe("التقييم الميداني: سجل التعديلات وكشف التعارض والقفل", () => {
   let indicatorId: string;
-  beforeAll(() => {
-    indicatorId = q.queryOne<any>(
+  beforeAll(async () => {
+    indicatorId = (await q.queryOne<any>(
       "SELECT id FROM indicators WHERE id NOT IN (SELECT indicator_id FROM evaluations WHERE visit_id = ?) ORDER BY order_index LIMIT 1",
       [inProgressVisit]
-    )!.id;
+    ))!.id;
   });
 
   it("المفتش يحفظ درجة جديدة فتُنشأ النسخة 1 ويُسجَّل التعديل", async () => {
@@ -56,7 +56,7 @@ describe("التقييم الميداني: سجل التعديلات وكشف ا
     const r = await json(await evalRoute.PATCH(req("/x", "PATCH", { indicatorId, status: "EVALUATED", score: 2, notes: "ملاحظة", methods: ["ملاحظة"] }), { params: Promise.resolve({ visitId: inProgressVisit }) }));
     expect(r.status).toBe(200);
     expect(r.body.version).toBe(1);
-    const hist = q.query<any>("SELECT field FROM evaluation_history WHERE visit_id = ? AND indicator_id = ?", [inProgressVisit, indicatorId]);
+    const hist = await q.query<any>("SELECT field FROM evaluation_history WHERE visit_id = ? AND indicator_id = ?", [inProgressVisit, indicatorId]);
     expect(hist.map((h) => h.field)).toEqual(expect.arrayContaining(["score", "status", "notes"]));
   });
 
@@ -68,7 +68,7 @@ describe("التقييم الميداني: سجل التعديلات وكشف ا
     const ok = await json(await evalRoute.PATCH(req("/x", "PATCH", { indicatorId, status: "EVALUATED", score: 3, reason: "ظهر دليل جديد", expectedVersion: 1 }), ctx));
     expect(ok.status).toBe(200);
     expect(ok.body.version).toBe(2);
-    const h = q.queryOne<any>("SELECT reason FROM evaluation_history WHERE indicator_id = ? AND field = 'score' ORDER BY rowid DESC", [indicatorId]);
+    const h = await q.queryOne<any>("SELECT reason FROM evaluation_history WHERE indicator_id = ? AND field = 'score' ORDER BY rowid DESC", [indicatorId]);
     expect(h.reason).toBe("ظهر دليل جديد");
   });
 
@@ -79,13 +79,13 @@ describe("التقييم الميداني: سجل التعديلات وكشف ا
     expect(r.status).toBe(409);
     expect(r.body.conflict).toBe(true);
     expect(r.body.server.score).toBe(3);
-    expect(q.queryOne<any>("SELECT score FROM evaluations WHERE visit_id = ? AND indicator_id = ?", [inProgressVisit, indicatorId])!.score).toBe(3);
+    expect((await q.queryOne<any>("SELECT score FROM evaluations WHERE visit_id = ? AND indicator_id = ?", [inProgressVisit, indicatorId]))!.score).toBe(3);
   });
 
   it("الدرجة خارج النطاق أو غير الصحيحة مرفوضة", async () => {
     await as(EMAILS.inspector);
     const ctx = { params: Promise.resolve({ visitId: inProgressVisit }) };
-    const other = q.queryOne<any>("SELECT id FROM indicators WHERE code = '2-2-2'")!.id;
+    const other = (await q.queryOne<any>("SELECT id FROM indicators WHERE code = '2-2-2'"))!.id;
     expect((await evalRoute.PATCH(req("/x", "PATCH", { indicatorId: other, status: "EVALUATED", score: 9 }), ctx)).status).toBe(400);
     expect((await evalRoute.PATCH(req("/x", "PATCH", { indicatorId: other, status: "EVALUATED", score: 1.5 }), ctx)).status).toBe(400);
   });
@@ -139,7 +139,7 @@ describe("التقارير: مسار الاعتماد وفصل المهام", ()
     expect((await reportStatus.PATCH(req("/x", "PATCH", { status: "REJECTED" }), ctx)).status).toBe(400);
     const ok = await json(await reportStatus.PATCH(req("/x", "PATCH", { status: "APPROVED" }), ctx));
     expect(ok.status).toBe(200);
-    const row = q.queryOne<any>("SELECT status, approved_by_id, approved_at FROM reports WHERE id = ?", [reportId])!;
+    const row = (await q.queryOne<any>("SELECT status, approved_by_id, approved_at FROM reports WHERE id = ?", [reportId]))!;
     expect(row.status).toBe("APPROVED");
     expect(row.approved_by_id).toBeTruthy();
     expect(row.approved_at).toBeTruthy();
@@ -159,8 +159,8 @@ describe("التقارير: مسار الاعتماد وفصل المهام", ()
     expect((await reportsRoute.POST(req("/api/reports", "POST", { type: "VISIT_DAILY", visitId: completedVisit }))).status).toBe(403);
   });
 
-  it("رمز التحقق عشوائي فريد بـ 10 خانات ويحتوي المحتوى المثبَّت", () => {
-    const r = q.queryOne<any>("SELECT verification_code, content FROM reports WHERE id = ?", [reportId])!;
+  it("رمز التحقق عشوائي فريد بـ 10 خانات ويحتوي المحتوى المثبَّت", async () => {
+    const r = (await q.queryOne<any>("SELECT verification_code, content FROM reports WHERE id = ?", [reportId]))!;
     expect(r.verification_code).toMatch(/^[A-HJ-NP-Z2-9]{10}$/);
     expect(JSON.parse(r.content).sections.length).toBeGreaterThan(3);
   });
@@ -184,21 +184,21 @@ describe("خطط التحسين: لا إغلاق دون دليل مقبول وت
 
   it("بعد رفع دليل: يكتمل، ولا يُغلق قبل قبول الدليل، ومدير المدرسة لا يتحقق", async () => {
     const principal = await sessionFor(EMAILS.principal);
-    q.exec(`INSERT INTO evidence (id, name, original_name, mime_type, size, storage_key, url, school_id, action_id, uploaded_by_id, review_status)
+    await q.exec(`INSERT INTO evidence (id, name, original_name, mime_type, size, storage_key, url, school_id, action_id, uploaded_by_id, review_status)
             VALUES ('ev-1','دليل','d.pdf','application/pdf',10,'k.pdf','/x',?,?,?, 'PENDING')`, [schoolA, actionId, principal.userId]);
     await as(EMAILS.principal);
     expect((await improvement.PATCH(req("/x", "PATCH", { actionId, status: "COMPLETED" }))).status).toBe(200);
     expect((await improvement.PATCH(req("/x", "PATCH", { actionId, status: "CLOSED_VERIFIED" }))).status).toBe(403);
     await as(EMAILS.inspector);
     expect((await improvement.PATCH(req("/x", "PATCH", { actionId, status: "CLOSED_VERIFIED" }))).status).toBe(422); // الدليل لم يُقبل
-    q.exec("UPDATE evidence SET review_status = 'ACCEPTED' WHERE id = 'ev-1'");
+    await q.exec("UPDATE evidence SET review_status = 'ACCEPTED' WHERE id = 'ev-1'");
     expect((await improvement.PATCH(req("/x", "PATCH", { actionId, status: "CLOSED_VERIFIED", notes: "تم التحقق" }))).status).toBe(200);
-    expect(q.queryOne<any>("SELECT status FROM corrective_actions WHERE id = ?", [actionId])!.status).toBe("CLOSED_VERIFIED");
+    expect((await q.queryOne<any>("SELECT status FROM corrective_actions WHERE id = ?", [actionId]))!.status).toBe("CLOSED_VERIFIED");
   });
 
   it("لا يرى مدير مدرسة (أ) خطط مدرسة (ب) ولا يعدلها", async () => {
-    const other = q.queryOne<any>("SELECT id FROM users WHERE email = ?", [EMAILS.director])!.id;
-    q.exec("INSERT INTO improvement_plans (id, school_id, title, status, created_by_id) VALUES ('p-b', ?, 'خطة مدرسة ب', 'ACTIVE', ?)", [schoolB, other]);
+    const other = (await q.queryOne<any>("SELECT id FROM users WHERE email = ?", [EMAILS.director]))!.id;
+    await q.exec("INSERT INTO improvement_plans (id, school_id, title, status, created_by_id) VALUES ('p-b', ?, 'خطة مدرسة ب', 'ACTIVE', ?)", [schoolB, other]);
     await as(EMAILS.principal);
     const list = await json(await improvement.GET(req("/api/improvement")));
     expect(list.body.plans.some((p: any) => p.id === "p-b")).toBe(false);
@@ -220,7 +220,7 @@ describe("الأدلة: رفع آمن ونطاق صلاحيات", () => {
   it("يقبل PDF حقيقياً ويحفظه خارج public بنسخة وبصمة", async () => {
     const r = await upload(EMAILS.principal, schoolA, "plan.pdf", pdf);
     expect(r.status).toBe(201);
-    const row = q.queryOne<any>("SELECT storage_key, sha256, version, url FROM evidence WHERE id = ?", [r.body.id])!;
+    const row = (await q.queryOne<any>("SELECT storage_key, sha256, version, url FROM evidence WHERE id = ?", [r.body.id]))!;
     expect(row.sha256).toHaveLength(64);
     expect(row.version).toBe(1);
     expect(row.url).toBe(`/api/evidence/${r.body.id}/file`);

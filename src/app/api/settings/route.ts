@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession, authorize, auditLog } from "@/lib/auth";
-import { query, queryOne, getDb, uuid, nowISO } from "@/lib/db/sqlite";
+import { query, queryOne, uuid, nowISO , exec } from "@/lib/db/sqlite";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -10,7 +10,7 @@ export async function GET() {
   try {
     const session = await getServerSession();
 
-    const ratingScale = query<{
+    const ratingScale = await query<{
       id: string;
       key: string;
       label_ar: string;
@@ -20,7 +20,7 @@ export async function GET() {
     }>("SELECT id, key, label_ar, score, order_index, is_active FROM rating_scale ORDER BY order_index");
 
     const isAdmin = !!session && authorize(session, { roles: ["SUPER_ADMIN"] }).allowed;
-    const settings = query<{ key: string; value: string; updated_at: string }>(
+    const settings = await query<{ key: string; value: string; updated_at: string }>(
       "SELECT key, value, updated_at FROM settings ORDER BY key"
     );
 
@@ -57,14 +57,13 @@ export async function PATCH(request: NextRequest) {
     }
 
     const body = await request.json();
-    const db = getDb();
     const now = nowISO();
 
     // تعديل مقياس التقدير
     if (body?.ratingId) {
       const { ratingId, label_ar, score, is_active } = body;
 
-      const existing = queryOne<{ id: string; score: number }>(
+      const existing = await queryOne<{ id: string; score: number }>(
         "SELECT id, score FROM rating_scale WHERE id = ?",
         [ratingId]
       );
@@ -83,7 +82,7 @@ export async function PATCH(request: NextRequest) {
           );
         }
         // منع تكرار الدرجة نفسها في مقياس واحد
-        const dup = queryOne<{ id: string }>(
+        const dup = await queryOne<{ id: string }>(
           "SELECT id FROM rating_scale WHERE score = ? AND id != ?",
           [score, ratingId]
         );
@@ -95,19 +94,15 @@ export async function PATCH(request: NextRequest) {
         }
       }
 
-      db.prepare(
-        `UPDATE rating_scale SET label_ar = COALESCE(?, label_ar),
+      await exec(`UPDATE rating_scale SET label_ar = COALESCE(?, label_ar),
                                  score = COALESCE(?, score),
                                  is_active = COALESCE(?, is_active)
-         WHERE id = ?`
-      ).run(
-        label_ar !== undefined ? label_ar.trim() : null,
+         WHERE id = ?`, [label_ar !== undefined ? label_ar.trim() : null,
         score !== undefined ? score : null,
         is_active !== undefined ? (is_active ? 1 : 0) : null,
-        ratingId
-      );
+        ratingId]);
 
-      auditLog({
+      await auditLog({
         userId: session.userId,
         action: "RATING_SCALE_UPDATED",
         entityType: "rating_scale",
@@ -130,14 +125,12 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ message: "مفتاح الإعداد غير صالح" }, { status: 400 });
     }
 
-    const old = queryOne<{ value: string }>("SELECT value FROM settings WHERE key = ?", [key]);
+    const old = await queryOne<{ value: string }>("SELECT value FROM settings WHERE key = ?", [key]);
 
-    db.prepare(
-      `INSERT INTO settings (key, value, updated_at) VALUES (?, ?, ?)
-       ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`
-    ).run(key, JSON.stringify(value), now);
+    await exec(`INSERT INTO settings (key, value, updated_at) VALUES (?, ?, ?)
+       ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`, [key, JSON.stringify(value), now]);
 
-    auditLog({
+    await auditLog({
       userId: session.userId,
       action: "SETTING_UPDATED",
       entityType: "settings",
@@ -192,7 +185,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const dup = queryOne<{ id: string }>("SELECT id FROM rating_scale WHERE score = ?", [score]);
+    const dup = await queryOne<{ id: string }>("SELECT id FROM rating_scale WHERE score = ?", [score]);
     if (dup) {
       return NextResponse.json(
         { message: "توجد درجة بالمقياس بالقيمة نفسها" },
@@ -200,19 +193,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const next = queryOne<{ n: number }>(
+    const next = await queryOne<{ n: number }>(
       "SELECT COALESCE(MAX(order_index), 0) + 1 AS n FROM rating_scale"
     );
     const id = uuid();
 
-    getDb()
-      .prepare(
-        `INSERT INTO rating_scale (id, key, label_ar, score, order_index, is_active)
-         VALUES (?, ?, ?, ?, ?, 1)`
-      )
-      .run(id, `LEVEL_${score}`, label_ar, score, next?.n ?? 1);
+    await exec(`INSERT INTO rating_scale (id, key, label_ar, score, order_index, is_active)
+         VALUES (?, ?, ?, ?, ?, 1)`, [id, `LEVEL_${score}`, label_ar, score, next?.n ?? 1]);
 
-    auditLog({
+    await auditLog({
       userId: session.userId,
       action: "RATING_SCALE_CREATED",
       entityType: "rating_scale",
@@ -247,10 +236,9 @@ export async function DELETE(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const ratingId = searchParams.get("ratingId");
     const key = searchParams.get("key");
-    const db = getDb();
 
     if (ratingId) {
-      const level = queryOne<{ id: string; score: number; label_ar: string }>(
+      const level = await queryOne<{ id: string; score: number; label_ar: string }>(
         "SELECT id, score, label_ar FROM rating_scale WHERE id = ?",
         [ratingId]
       );
@@ -258,7 +246,7 @@ export async function DELETE(request: NextRequest) {
         return NextResponse.json({ message: "المستوى غير موجود" }, { status: 404 });
       }
 
-      const count = queryOne<{ c: number }>("SELECT COUNT(*) AS c FROM rating_scale");
+      const count = await queryOne<{ c: number }>("SELECT COUNT(*) AS c FROM rating_scale");
       if ((count?.c ?? 0) <= 2) {
         return NextResponse.json(
           { message: "لا يمكن حذف المستوى — يجب أن يبقى مستويان على الأقل" },
@@ -266,9 +254,9 @@ export async function DELETE(request: NextRequest) {
         );
       }
 
-      db.prepare("DELETE FROM rating_scale WHERE id = ?").run(ratingId);
+      await exec("DELETE FROM rating_scale WHERE id = ?", [ratingId]);
 
-      auditLog({
+      await auditLog({
         userId: session.userId,
         action: "RATING_SCALE_DELETED",
         entityType: "rating_scale",
@@ -288,14 +276,14 @@ export async function DELETE(request: NextRequest) {
         );
       }
 
-      const old = queryOne<{ value: string }>("SELECT value FROM settings WHERE key = ?", [key]);
+      const old = await queryOne<{ value: string }>("SELECT value FROM settings WHERE key = ?", [key]);
       if (!old) {
         return NextResponse.json({ message: "الإعداد غير موجود" }, { status: 404 });
       }
 
-      db.prepare("DELETE FROM settings WHERE key = ?").run(key);
+      await exec("DELETE FROM settings WHERE key = ?", [key]);
 
-      auditLog({
+      await auditLog({
         userId: session.userId,
         action: "SETTING_DELETED",
         entityType: "settings",

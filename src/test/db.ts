@@ -15,6 +15,8 @@ export async function setupTestDb() {
   process.env.SQLITE_DIR = dir;
   process.env.DATABASE_FILE = "test.db";
   process.env.UPLOAD_DIR = path.join(dir, "uploads");
+  // TEST_LIBSQL=1 يشغّل الاختبارات نفسها عبر محرّك libSQL (مسار Turso) على ملف محلي.
+  if (process.env.TEST_LIBSQL === "1") process.env.TURSO_DATABASE_URL = "file:" + path.join(dir, "test-libsql.db");
   const db = await import("@/lib/db/sqlite");
   await db.initDatabase({ seed: true, demo: true, demoPassword: DEMO_PASSWORD });
   return { dir, db };
@@ -23,7 +25,7 @@ export async function setupTestDb() {
 /** جلسة جاهزة لمستخدم تجريبي بحسب بريده. */
 export async function sessionFor(email: string): Promise<UserSession> {
   const { queryOne } = await import("@/lib/db/sqlite");
-  const u = queryOne<any>(
+  const u = await queryOne<any>(
     `SELECT u.id, u.name, u.email, u.school_id, u.directorate_id, u.token_version, r.key AS role_key, r.name AS role_name, r.permissions
      FROM users u JOIN roles r ON r.id = u.role_id WHERE u.email = ?`, [email]);
   if (!u) throw new Error("مستخدم غير موجود: " + email);

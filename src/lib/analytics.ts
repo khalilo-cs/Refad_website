@@ -25,12 +25,12 @@ export type Tree = {
 let treeCache: { at: number; tree: Tree } | null = null;
 
 /** بنية المعايير (تُخزَّن مؤقتاً لثوانٍ لأنها نادرة التغيّر). */
-export function loadTree(force = false): Tree {
+export async function loadTree(force = false): Promise<Tree> {
   if (!force && treeCache && Date.now() - treeCache.at < 15_000) return treeCache.tree;
-  const criteria = query<CriterionRow>("SELECT id, code, title, weight FROM criteria ORDER BY order_index");
-  const subs = query<SubRow>("SELECT id, code, title, weight, criterion_id FROM sub_criteria ORDER BY order_index");
-  const indicators = query<IndRow>("SELECT id, code, title, sub_criterion_id, criterion_id FROM indicators ORDER BY order_index");
-  const m = queryOne<{ m: number }>("SELECT MAX(score) AS m FROM rating_scale WHERE is_active = 1");
+  const criteria = await query<CriterionRow>("SELECT id, code, title, weight FROM criteria ORDER BY order_index");
+  const subs = await query<SubRow>("SELECT id, code, title, weight, criterion_id FROM sub_criteria ORDER BY order_index");
+  const indicators = await query<IndRow>("SELECT id, code, title, sub_criterion_id, criterion_id FROM indicators ORDER BY order_index");
+  const m = await queryOne<{ m: number }>("SELECT MAX(score) AS m FROM rating_scale WHERE is_active = 1");
   const tree = { criteria, subs, indicators, maxScore: m?.m && m.m > 0 ? m.m : 3 };
   treeCache = { at: Date.now(), tree };
   return tree;
@@ -43,7 +43,8 @@ export function resetTreeCache(): void {
 export type SavedEval = { indicator_id: string; status: string; score: number };
 
 /** يحسب نتيجة زيارة من تقييماتها المحفوظة. */
-export function computeFromSaved(saved: SavedEval[], tree: Tree = loadTree()): EvaluationResult {
+export async function computeFromSaved(saved: SavedEval[], treeArg?: Tree): Promise<EvaluationResult> {
+  const tree = treeArg ?? (await loadTree());
   const map = new Map(saved.map((s) => [s.indicator_id, s]));
   const mk = (i: IndRow, fallbackSub: string): IndicatorInput => {
     const s = map.get(i.id);
@@ -78,17 +79,19 @@ export function computeFromSaved(saved: SavedEval[], tree: Tree = loadTree()): E
 }
 
 /** نتيجة زيارة واحدة. */
-export function computeVisitResult(visitId: string, tree: Tree = loadTree()): EvaluationResult {
-  const saved = query<SavedEval>("SELECT indicator_id, status, score FROM evaluations WHERE visit_id = ?", [visitId]);
+export async function computeVisitResult(visitId: string, treeArg?: Tree): Promise<EvaluationResult> {
+  const tree = treeArg ?? (await loadTree());
+  const saved = await query<SavedEval>("SELECT indicator_id, status, score FROM evaluations WHERE visit_id = ?", [visitId]);
   return computeFromSaved(saved, tree);
 }
 
 /** نتائج عدة زيارات بدفعة واحدة. */
-export function computeVisitResults(visitIds: string[], tree: Tree = loadTree()): Map<string, EvaluationResult> {
+export async function computeVisitResults(visitIds: string[], treeArg?: Tree): Promise<Map<string, EvaluationResult>> {
+  const tree = treeArg ?? (await loadTree());
   const out = new Map<string, EvaluationResult>();
   if (!visitIds.length) return out;
   const marks = visitIds.map(() => "?").join(",");
-  const rows = query<SavedEval & { visit_id: string }>(
+  const rows = await query<SavedEval & { visit_id: string }>(
     `SELECT visit_id, indicator_id, status, score FROM evaluations WHERE visit_id IN (${marks})`,
     visitIds
   );
@@ -98,7 +101,7 @@ export function computeVisitResults(visitIds: string[], tree: Tree = loadTree())
     a.push(r);
     by.set(r.visit_id, a);
   }
-  for (const id of visitIds) out.set(id, computeFromSaved(by.get(id) ?? [], tree));
+  for (const id of visitIds) out.set(id, await computeFromSaved(by.get(id) ?? [], tree));
   return out;
 }
 

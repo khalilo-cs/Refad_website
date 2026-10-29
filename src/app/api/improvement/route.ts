@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getServerSession, auditLog } from "@/lib/auth";
-import { query, queryOne, getDb, uuid } from "@/lib/db/sqlite";
+import { query, queryOne, uuid , exec } from "@/lib/db/sqlite";
 import { canAccessSchool, schoolScope } from "@/lib/scope";
 import { clientIp } from "@/lib/security";
 import { notify, schoolUsers } from "@/lib/notify";
@@ -23,14 +23,14 @@ export async function GET(request: Request) {
   if (!ROLES.includes(session.roleKey)) return bad("غير مصرح", 403);
 
   const sp = new URL(request.url).searchParams;
-  const sc = schoolScope(session, "s");
+  const sc = await schoolScope(session, "s");
   const where = [sc.sql];
   const params: unknown[] = [...sc.params];
   if (sp.get("schoolId")) { where.push("p.school_id = ?"); params.push(sp.get("schoolId")); }
   if (sp.get("planId")) { where.push("p.id = ?"); params.push(sp.get("planId")); }
   const W = where.join(" AND ");
 
-  const plans = query<any>(
+  const plans = await query<any>(
     `SELECT p.id, p.title, p.description, p.status, p.created_at, p.school_id, s.name AS school_name, u.name AS created_by_name,
             (SELECT COUNT(*) FROM corrective_actions a WHERE a.plan_id = p.id) AS actions_count,
             (SELECT COUNT(*) FROM corrective_actions a WHERE a.plan_id = p.id AND a.status IN ('CLOSED_VERIFIED')) AS actions_done,
@@ -40,7 +40,7 @@ export async function GET(request: Request) {
 
   const ids = plans.map((p) => p.id);
   const actions = ids.length
-    ? query<any>(
+    ? await query<any>(
         `SELECT a.id, a.plan_id, a.problem_description, a.root_cause, a.priority, a.proposed_action, a.due_date, a.resources, a.success_indicator,
                 a.status, a.verification_notes, a.verified_at, a.responsible_id, u.name AS responsible_name, vu.name AS verified_by_name,
                 i.code AS indicator_code, i.title AS indicator_title, a.indicator_id, p.school_id, s.name AS school_name, p.title AS plan_title,
@@ -53,7 +53,7 @@ export async function GET(request: Request) {
          ORDER BY CASE a.priority WHEN 'CRITICAL' THEN 1 WHEN 'HIGH' THEN 2 WHEN 'MEDIUM' THEN 3 ELSE 4 END, date(a.due_date)`, ids)
     : [];
 
-  const totals = queryOne<any>(
+  const totals = await queryOne<any>(
     `SELECT COUNT(*) AS total,
             SUM(CASE WHEN date(a.due_date) < date('now') AND a.status NOT IN ${OPEN} THEN 1 ELSE 0 END) AS overdue,
             SUM(CASE WHEN a.status = 'CLOSED_VERIFIED' THEN 1 ELSE 0 END) AS done,
@@ -61,7 +61,7 @@ export async function GET(request: Request) {
      FROM corrective_actions a JOIN improvement_plans p ON p.id = a.plan_id JOIN schools s ON s.id = p.school_id WHERE ${W}`, params);
 
   // مسؤولون محتملون لإسناد الإجراءات داخل نطاق المستخدم
-  const people = query<any>(
+  const people = await query<any>(
     `SELECT DISTINCT u.id, u.name, r.name AS role FROM users u JOIN roles r ON r.id = u.role_id
      WHERE u.is_active = 1 AND r.key IN ('SCHOOL_PRINCIPAL','QUALITY_COORDINATOR','TEACHER','INSPECTOR','EDUCATION_DIRECTOR')
        AND (u.school_id IN (SELECT s.id FROM schools s WHERE ${sc.sql}) OR r.key IN ('INSPECTOR','EDUCATION_DIRECTOR'))
@@ -83,27 +83,25 @@ export async function POST(request: Request) {
   if (!ROLES.includes(session.roleKey)) return bad("غير مصرح", 403);
   const body: any = await request.json().catch(() => null);
   if (!body) return bad("صيغة الطلب غير صحيحة");
-  const db = getDb();
   const kind = String(body.kind ?? "action");
 
   if (kind === "plan") {
     const title = String(body.title ?? "").trim();
     if (title.length < 3) return bad("عنوان الخطة قصير جداً");
     const schoolId = String(body.schoolId ?? session.schoolId ?? "");
-    if (!queryOne("SELECT id FROM schools WHERE id = ?", [schoolId])) return bad("المدرسة غير موجودة", 404);
-    if (!canAccessSchool(session, schoolId)) return bad("المدرسة خارج نطاق صلاحيتك", 403);
+    if (!await queryOne("SELECT id FROM schools WHERE id = ?", [schoolId])) return bad("المدرسة غير موجودة", 404);
+    if (!await canAccessSchool(session, schoolId)) return bad("المدرسة خارج نطاق صلاحيتك", 403);
     const id = uuid();
-    db.prepare(`INSERT INTO improvement_plans (id, school_id, title, description, status, created_by_id) VALUES (?,?,?,?, 'ACTIVE', ?)`)
-      .run(id, schoolId, title.slice(0, 200), String(body.description ?? "").slice(0, 2000) || null, session.userId);
-    auditLog({ userId: session.userId, action: "CREATE_IMPROVEMENT_PLAN", entityType: "improvement_plan", entityId: id, newValues: { title, schoolId }, ipAddress: clientIp(request) });
-    notify(schoolUsers(schoolId, ["SCHOOL_PRINCIPAL", "QUALITY_COORDINATOR"]).filter((u) => u !== session.userId), "خطة تحسين جديدة", title, { link: `/improvement?planId=${id}` });
+    await exec(`INSERT INTO improvement_plans (id, school_id, title, description, status, created_by_id) VALUES (?,?,?,?, 'ACTIVE', ?)`, [id, schoolId, title.slice(0, 200), String(body.description ?? "").slice(0, 2000) || null, session.userId]);
+    await auditLog({ userId: session.userId, action: "CREATE_IMPROVEMENT_PLAN", entityType: "improvement_plan", entityId: id, newValues: { title, schoolId }, ipAddress: clientIp(request) });
+    await notify((await schoolUsers(schoolId, ["SCHOOL_PRINCIPAL", "QUALITY_COORDINATOR"])).filter((u) => u !== session.userId), "خطة تحسين جديدة", title, { link: `/improvement?planId=${id}` });
     return NextResponse.json({ id, message: "تم إنشاء خطة التحسين" }, { status: 201 });
   }
 
   // إجراء تصحيحي
-  const plan = queryOne<any>("SELECT * FROM improvement_plans WHERE id = ?", [String(body.planId ?? "")]);
+  const plan = await queryOne<any>("SELECT * FROM improvement_plans WHERE id = ?", [String(body.planId ?? "")]);
   if (!plan) return bad("خطة التحسين غير موجودة", 404);
-  if (!canAccessSchool(session, plan.school_id)) return bad("الخطة خارج نطاق صلاحيتك", 403);
+  if (!await canAccessSchool(session, plan.school_id)) return bad("الخطة خارج نطاق صلاحيتك", 403);
   if (["COMPLETED", "CANCELLED"].includes(plan.status)) return bad("الخطة مغلقة أو ملغاة؛ أعد فتحها لإضافة إجراءات", 409);
 
   const problem = String(body.problemDescription ?? "").trim();
@@ -115,23 +113,21 @@ export async function POST(request: Request) {
   const priority = String(body.priority ?? "MEDIUM");
   if (!PRIORITIES.includes(priority)) return bad("أولوية غير معروفة");
   const responsibleId = String(body.responsibleId ?? session.userId);
-  const resp = queryOne<any>("SELECT u.id, u.school_id, r.key FROM users u JOIN roles r ON r.id = u.role_id WHERE u.id = ? AND u.is_active = 1", [responsibleId]);
+  const resp = await queryOne<any>("SELECT u.id, u.school_id, r.key FROM users u JOIN roles r ON r.id = u.role_id WHERE u.id = ? AND u.is_active = 1", [responsibleId]);
   if (!resp) return bad("المسؤول غير موجود");
   if (resp.school_id && resp.school_id !== plan.school_id) return bad("المسؤول من مدرسة أخرى");
   const indicatorId = String(body.indicatorId ?? "") || null;
-  if (indicatorId && !queryOne("SELECT id FROM indicators WHERE id = ?", [indicatorId])) return bad("المؤشر غير موجود", 404);
+  if (indicatorId && !await queryOne("SELECT id FROM indicators WHERE id = ?", [indicatorId])) return bad("المؤشر غير موجود", 404);
   const evaluationId = String(body.evaluationId ?? "") || null;
-  if (evaluationId && !queryOne("SELECT e.id FROM evaluations e JOIN visits v ON v.id = e.visit_id WHERE e.id = ? AND v.school_id = ?", [evaluationId, plan.school_id])) return bad("التقييم لا يخص هذه المدرسة");
+  if (evaluationId && !await queryOne("SELECT e.id FROM evaluations e JOIN visits v ON v.id = e.visit_id WHERE e.id = ? AND v.school_id = ?", [evaluationId, plan.school_id])) return bad("التقييم لا يخص هذه المدرسة");
 
   const id = uuid();
-  db.prepare(
-    `INSERT INTO corrective_actions (id, plan_id, evaluation_id, indicator_id, problem_description, root_cause, priority, proposed_action,
+  await exec(`INSERT INTO corrective_actions (id, plan_id, evaluation_id, indicator_id, problem_description, root_cause, priority, proposed_action,
        responsible_id, due_date, resources, success_indicator, status)
-     VALUES (?,?,?,?,?,?,?,?,?,?,?,?, 'NEW')`
-  ).run(id, plan.id, evaluationId, indicatorId, problem.slice(0, 1000), String(body.rootCause ?? "").slice(0, 1000) || null, priority, action.slice(0, 1000),
-    responsibleId, dueDate, String(body.resources ?? "").slice(0, 1000) || null, String(body.successIndicator ?? "").slice(0, 1000) || null);
-  auditLog({ userId: session.userId, action: "CREATE_CORRECTIVE_ACTION", entityType: "corrective_action", entityId: id, newValues: { planId: plan.id, priority, dueDate }, ipAddress: clientIp(request) });
-  notify([responsibleId].filter((x) => x !== session.userId), "إجراء تصحيحي مسند إليك", `${action.slice(0, 80)} — الموعد ${dueDate}`, { link: `/improvement?planId=${plan.id}`, type: "WARNING" });
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?, 'NEW')`, [id, plan.id, evaluationId, indicatorId, problem.slice(0, 1000), String(body.rootCause ?? "").slice(0, 1000) || null, priority, action.slice(0, 1000),
+    responsibleId, dueDate, String(body.resources ?? "").slice(0, 1000) || null, String(body.successIndicator ?? "").slice(0, 1000) || null]);
+  await auditLog({ userId: session.userId, action: "CREATE_CORRECTIVE_ACTION", entityType: "corrective_action", entityId: id, newValues: { planId: plan.id, priority, dueDate }, ipAddress: clientIp(request) });
+  await notify([responsibleId].filter((x) => x !== session.userId), "إجراء تصحيحي مسند إليك", `${action.slice(0, 80)} — الموعد ${dueDate}`, { link: `/improvement?planId=${plan.id}`, type: "WARNING" });
   return NextResponse.json({ id, message: "تمت إضافة الإجراء التصحيحي" }, { status: 201 });
 }
 
@@ -146,32 +142,31 @@ export async function PATCH(request: Request) {
   if (!ROLES.includes(session.roleKey)) return bad("غير مصرح", 403);
   const body: any = await request.json().catch(() => null);
   if (!body) return bad("صيغة الطلب غير صحيحة");
-  const db = getDb();
 
   if (body.planId) {
     const status = String(body.status ?? "");
     if (!PLAN_STATUS.includes(status)) return bad("حالة خطة غير معروفة");
-    const plan = queryOne<any>("SELECT * FROM improvement_plans WHERE id = ?", [body.planId]);
+    const plan = await queryOne<any>("SELECT * FROM improvement_plans WHERE id = ?", [body.planId]);
     if (!plan) return bad("الخطة غير موجودة", 404);
-    if (!canAccessSchool(session, plan.school_id)) return bad("الخطة خارج نطاق صلاحيتك", 403);
+    if (!await canAccessSchool(session, plan.school_id)) return bad("الخطة خارج نطاق صلاحيتك", 403);
     if (status === "COMPLETED") {
-      const open = queryOne<{ n: number }>(`SELECT COUNT(*) n FROM corrective_actions WHERE plan_id = ? AND status <> 'CLOSED_VERIFIED'`, [plan.id])?.n ?? 0;
+      const open = (await queryOne<{ n: number }>(`SELECT COUNT(*) n FROM corrective_actions WHERE plan_id = ? AND status <> 'CLOSED_VERIFIED'`, [plan.id]))?.n ?? 0;
       if (open > 0) return bad(`لا يمكن إكمال الخطة: ${open} إجراء لم يُغلق بعد التحقق`, 409);
     }
-    db.prepare("UPDATE improvement_plans SET status = ?, updated_at = datetime('now') WHERE id = ?").run(status, plan.id);
-    auditLog({ userId: session.userId, action: "UPDATE_IMPROVEMENT_PLAN", entityType: "improvement_plan", entityId: plan.id, oldValues: { status: plan.status }, newValues: { status }, ipAddress: clientIp(request) });
+    await exec("UPDATE improvement_plans SET status = ?, updated_at = datetime('now') WHERE id = ?", [status, plan.id]);
+    await auditLog({ userId: session.userId, action: "UPDATE_IMPROVEMENT_PLAN", entityType: "improvement_plan", entityId: plan.id, oldValues: { status: plan.status }, newValues: { status }, ipAddress: clientIp(request) });
     return NextResponse.json({ message: "تم تحديث حالة الخطة" });
   }
 
   const status = String(body.status ?? "");
-  const row = queryOne<any>(
+  const row = await queryOne<any>(
     `SELECT a.*, p.school_id, p.title AS plan_title FROM corrective_actions a JOIN improvement_plans p ON p.id = a.plan_id WHERE a.id = ?`, [String(body.actionId ?? "")]);
   if (!row) return bad("الإجراء غير موجود", 404);
-  if (!canAccessSchool(session, row.school_id)) return bad("الإجراء خارج نطاق صلاحيتك", 403);
+  if (!await canAccessSchool(session, row.school_id)) return bad("الإجراء خارج نطاق صلاحيتك", 403);
   const notes = String(body.notes ?? "").trim();
   const isVerifier = VERIFIERS.includes(session.roleKey);
 
-  const ev = queryOne<{ total: number; accepted: number }>(
+  const ev = await queryOne<{ total: number; accepted: number }>(
     `SELECT COUNT(*) AS total, COALESCE(SUM(CASE WHEN review_status='ACCEPTED' THEN 1 ELSE 0 END),0) AS accepted FROM evidence WHERE action_id = ?`, [row.id]);
 
   const allowed: Record<string, string[]> = {
@@ -195,16 +190,14 @@ export async function PATCH(request: Request) {
   if (row.status === "CLOSED_VERIFIED" && status === "IN_PROGRESS" && notes.length < 5) return bad("سبب إعادة فتح الإجراء مطلوب");
 
   const verifying = status === "CLOSED_VERIFIED" || status === "CLOSED_REJECTED";
-  db.prepare(
-    `UPDATE corrective_actions SET status = ?, verification_notes = COALESCE(?, verification_notes), verified_by_id = ?, verified_at = ?, updated_at = datetime('now') WHERE id = ?`
-  ).run(status, notes ? notes.slice(0, 1000) : null, verifying ? session.userId : status === "IN_PROGRESS" ? null : row.verified_by_id, verifying ? new Date().toISOString() : status === "IN_PROGRESS" ? null : row.verified_at, row.id);
-  auditLog({ userId: session.userId, action: "UPDATE_CORRECTIVE_ACTION", entityType: "corrective_action", entityId: row.id, oldValues: { status: row.status }, newValues: { status, notes }, ipAddress: clientIp(request) });
+  await exec(`UPDATE corrective_actions SET status = ?, verification_notes = COALESCE(?, verification_notes), verified_by_id = ?, verified_at = ?, updated_at = datetime('now') WHERE id = ?`, [status, notes ? notes.slice(0, 1000) : null, verifying ? session.userId : status === "IN_PROGRESS" ? null : row.verified_by_id, verifying ? new Date().toISOString() : status === "IN_PROGRESS" ? null : row.verified_at, row.id]);
+  await auditLog({ userId: session.userId, action: "UPDATE_CORRECTIVE_ACTION", entityType: "corrective_action", entityId: row.id, oldValues: { status: row.status }, newValues: { status, notes }, ipAddress: clientIp(request) });
 
   if (status === "COMPLETED") {
-    const verifiers = query<{ id: string }>(`SELECT DISTINCT u.id FROM users u JOIN roles r ON r.id = u.role_id JOIN schools s ON s.id = ? WHERE u.is_active = 1 AND (r.key = 'INSPECTOR' OR (r.key = 'EDUCATION_DIRECTOR' AND u.directorate_id = s.directorate_id))`, [row.school_id]);
-    notify(verifiers.map((v) => v.id), "إجراء بانتظار التحقق", row.proposed_action.slice(0, 90), { link: `/improvement?planId=${row.plan_id}`, type: "WARNING" });
+    const verifiers = await query<{ id: string }>(`SELECT DISTINCT u.id FROM users u JOIN roles r ON r.id = u.role_id JOIN schools s ON s.id = ? WHERE u.is_active = 1 AND (r.key = 'INSPECTOR' OR (r.key = 'EDUCATION_DIRECTOR' AND u.directorate_id = s.directorate_id))`, [row.school_id]);
+    await notify(verifiers.map((v) => v.id), "إجراء بانتظار التحقق", row.proposed_action.slice(0, 90), { link: `/improvement?planId=${row.plan_id}`, type: "WARNING" });
   } else if (verifying) {
-    notify([row.responsible_id, ...schoolUsers(row.school_id, ["SCHOOL_PRINCIPAL"])], status === "CLOSED_VERIFIED" ? "أُغلق الإجراء بعد التحقق" : "لم يُقبل إنجاز الإجراء", `${row.proposed_action.slice(0, 80)}${notes ? " — " + notes.slice(0, 80) : ""}`, { link: `/improvement?planId=${row.plan_id}`, type: status === "CLOSED_VERIFIED" ? "SUCCESS" : "DANGER" });
+    await notify([row.responsible_id, ...(await schoolUsers(row.school_id, ["SCHOOL_PRINCIPAL"]))], status === "CLOSED_VERIFIED" ? "أُغلق الإجراء بعد التحقق" : "لم يُقبل إنجاز الإجراء", `${row.proposed_action.slice(0, 80)}${notes ? " — " + notes.slice(0, 80) : ""}`, { link: `/improvement?planId=${row.plan_id}`, type: status === "CLOSED_VERIFIED" ? "SUCCESS" : "DANGER" });
   }
   return NextResponse.json({ message: "تم تحديث حالة الإجراء" });
 }
@@ -215,25 +208,24 @@ export async function DELETE(request: Request) {
   if (!session) return bad("غير مصدق", 401);
   if (!["SUPER_ADMIN", "EDUCATION_DIRECTOR", "SCHOOL_PRINCIPAL"].includes(session.roleKey)) return bad("غير مصرح", 403);
   const sp = new URL(request.url).searchParams;
-  const db = getDb();
 
   if (sp.get("planId")) {
-    const plan = queryOne<any>("SELECT * FROM improvement_plans WHERE id = ?", [sp.get("planId")]);
+    const plan = await queryOne<any>("SELECT * FROM improvement_plans WHERE id = ?", [sp.get("planId")]);
     if (!plan) return bad("الخطة غير موجودة", 404);
-    if (!canAccessSchool(session, plan.school_id)) return bad("خارج نطاق صلاحيتك", 403);
-    const verified = queryOne<{ n: number }>("SELECT COUNT(*) n FROM corrective_actions WHERE plan_id = ? AND status = 'CLOSED_VERIFIED'", [plan.id])?.n ?? 0;
+    if (!await canAccessSchool(session, plan.school_id)) return bad("خارج نطاق صلاحيتك", 403);
+    const verified = (await queryOne<{ n: number }>("SELECT COUNT(*) n FROM corrective_actions WHERE plan_id = ? AND status = 'CLOSED_VERIFIED'", [plan.id]))?.n ?? 0;
     if (verified > 0 && session.roleKey === "SCHOOL_PRINCIPAL") return bad("لا يمكن حذف خطة تضم إجراءات مغلقة بعد التحقق", 409);
-    db.prepare("DELETE FROM improvement_plans WHERE id = ?").run(plan.id);
-    auditLog({ userId: session.userId, action: "DELETE_IMPROVEMENT_PLAN", entityType: "improvement_plan", entityId: plan.id, oldValues: { title: plan.title }, ipAddress: clientIp(request) });
+    await exec("DELETE FROM improvement_plans WHERE id = ?", [plan.id]);
+    await auditLog({ userId: session.userId, action: "DELETE_IMPROVEMENT_PLAN", entityType: "improvement_plan", entityId: plan.id, oldValues: { title: plan.title }, ipAddress: clientIp(request) });
     return NextResponse.json({ message: "تم حذف خطة التحسين وإجراءاتها" });
   }
   if (sp.get("actionId")) {
-    const a = queryOne<any>("SELECT a.*, p.school_id FROM corrective_actions a JOIN improvement_plans p ON p.id = a.plan_id WHERE a.id = ?", [sp.get("actionId")]);
+    const a = await queryOne<any>("SELECT a.*, p.school_id FROM corrective_actions a JOIN improvement_plans p ON p.id = a.plan_id WHERE a.id = ?", [sp.get("actionId")]);
     if (!a) return bad("الإجراء غير موجود", 404);
-    if (!canAccessSchool(session, a.school_id)) return bad("خارج نطاق صلاحيتك", 403);
+    if (!await canAccessSchool(session, a.school_id)) return bad("خارج نطاق صلاحيتك", 403);
     if (a.status === "CLOSED_VERIFIED" && session.roleKey === "SCHOOL_PRINCIPAL") return bad("لا يمكن حذف إجراء مغلق بعد التحقق", 409);
-    db.prepare("DELETE FROM corrective_actions WHERE id = ?").run(a.id);
-    auditLog({ userId: session.userId, action: "DELETE_CORRECTIVE_ACTION", entityType: "corrective_action", entityId: a.id, ipAddress: clientIp(request) });
+    await exec("DELETE FROM corrective_actions WHERE id = ?", [a.id]);
+    await auditLog({ userId: session.userId, action: "DELETE_CORRECTIVE_ACTION", entityType: "corrective_action", entityId: a.id, ipAddress: clientIp(request) });
     return NextResponse.json({ message: "تم حذف الإجراء" });
   }
   return bad("يجب تحديد خطة أو إجراء");

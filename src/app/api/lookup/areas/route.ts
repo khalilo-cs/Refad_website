@@ -10,5 +10,5 @@ export async function GET(request: Request) {
   const params: unknown[] = [];
   if (directorateId) { sql += " WHERE directorate_id = ?"; params.push(directorateId); }
   sql += " ORDER BY name";
-  return NextResponse.json(query<any>(sql, params));
+  return NextResponse.json(await query<any>(sql, params));
 }

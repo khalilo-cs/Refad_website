@@ -586,3 +586,23 @@ h1, h2, h3, h4, h5, h6, .font-heading {
   height: 1px;
   background: linear-gradient(90deg, transparent, var(--gold), transparent);
 }
+
+/* ===== درج التنقل الجانبي =====
+   قاعدة صريحة خارج الطبقات: مغلق = خارج الشاشة ومخفي عن لوحة المفاتيح وقارئ الشاشة،
+   مفتوح = ظاهر. على الحاسوب يُفتح افتراضياً ويُطوى بالزر. */
+.sidebar-panel {
+  transform: translateX(100%);
+  visibility: hidden;
+  transition: transform 0.3s ease-out, visibility 0s linear 0.3s;
+}
+.sidebar-panel[data-open="true"] {
+  transform: translateX(0);
+  visibility: visible;
+  transition: transform 0.3s ease-out, visibility 0s linear 0s;
+}
+@media (prefers-reduced-motion: reduce) {
+  .sidebar-panel,
+  .sidebar-panel[data-open="true"] {
+    transition: none;
+  }
+}

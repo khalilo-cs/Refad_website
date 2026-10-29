@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession, auditLog } from "@/lib/auth";
-import { getDb, query, queryOne, uuid, nowISO } from "@/lib/db/sqlite";
+import { query, queryOne, uuid, nowISO, transaction , exec } from "@/lib/db/sqlite";
 import { clientIp, rateLimit } from "@/lib/security";
 import { notify } from "@/lib/notify";
 import { schoolScope } from "@/lib/scope";
@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
   if (!session) return bad("غير مصدق", 401);
   if (session.roleKey === "GUEST") return bad("غير مصرح", 403);
   const kind = request.nextUrl.searchParams.get("kind");
-  const rows = query<any>(
+  const rows = await query<any>(
     `SELECT c.id, c.title, c.kind, c.status, c.school_id, c.is_official, c.created_at, c.last_message_at, s.name AS school_name, cu.name AS created_by_name,
             (SELECT body FROM messages m WHERE m.conversation_id = c.id ORDER BY m.created_at DESC, m.rowid DESC LIMIT 1) AS last_body,
             (SELECT u.name FROM messages m JOIN users u ON u.id = m.sender_id WHERE m.conversation_id = c.id ORDER BY m.created_at DESC, m.rowid DESC LIMIT 1) AS last_sender,
@@ -47,9 +47,9 @@ export async function POST(request: NextRequest) {
   if (title.length < 3) return bad("عنوان المراسلة قصير جداً");
   if (body.length < 2) return bad("نص الرسالة مطلوب");
   const schoolId = String(b.schoolId ?? "");
-  if (!queryOne("SELECT id FROM schools WHERE id = ?", [schoolId])) return bad("المدرسة غير موجودة", 404);
+  if (!await queryOne("SELECT id FROM schools WHERE id = ?", [schoolId])) return bad("المدرسة غير موجودة", 404);
 
-  const allowed = allowedRecipients(session, schoolId);
+  const allowed = await allowedRecipients(session, schoolId);
   const allowedIds = new Set(allowed.map((u) => u.id));
   let recipients: string[] = Array.isArray(b.recipientIds) ? b.recipientIds.map(String).filter((id: string) => allowedIds.has(id)) : [];
   // الأدوار الإدارية: ما لم يُحدَّد مستلمون يُراسَل مدير المدرسة ومنسق الجودة
@@ -64,16 +64,14 @@ export async function POST(request: NextRequest) {
   let kind = String(b.kind ?? "");
   if (!KINDS[kind]) kind = session.roleKey === "PARENT" || hasParent ? "PARENT_CHANNEL" : ["SUPER_ADMIN", "EDUCATION_DIRECTOR", "INSPECTOR"].includes(session.roleKey) ? "OFFICIAL" : "INQUIRY";
   if (kind === "OFFICIAL" && !["SUPER_ADMIN", "EDUCATION_DIRECTOR", "INSPECTOR"].includes(session.roleKey)) kind = "INQUIRY";
-
-  const db = getDb();
   const id = uuid();
   const now = nowISO();
-  db.transaction(() => {
-    db.prepare("INSERT INTO conversations (id, school_id, title, is_official, kind, created_by_id, last_message_at) VALUES (?,?,?,?,?,?,?)").run(id, schoolId, title.slice(0, 200), kind === "OFFICIAL" ? 1 : 0, kind, session.userId, now);
-    for (const uid of new Set([session.userId, ...recipients])) db.prepare("INSERT INTO conversation_participants (id, conversation_id, user_id, last_read_at) VALUES (?,?,?,?)").run(uuid(), id, uid, uid === session.userId ? now : null);
-    db.prepare("INSERT INTO messages (id, conversation_id, sender_id, body, is_read, created_at) VALUES (?,?,?,?,0,?)").run(uuid(), id, session.userId, body.slice(0, 4000), now);
-  })();
-  notify(recipients, kind === "OFFICIAL" ? "مراسلة رسمية جديدة" : "رسالة جديدة", title, { link: `/communication?c=${id}`, type: "INFO" });
-  auditLog({ userId: session.userId, action: "CONVERSATION_CREATED", entityType: "conversation", entityId: id, newValues: { kind, schoolId, recipients: recipients.length }, ipAddress: clientIp(request) });
+  await transaction(async () => {
+    await exec("INSERT INTO conversations (id, school_id, title, is_official, kind, created_by_id, last_message_at) VALUES (?,?,?,?,?,?,?)", [id, schoolId, title.slice(0, 200), kind === "OFFICIAL" ? 1 : 0, kind, session.userId, now]);
+    for (const uid of new Set([session.userId, ...recipients])) await exec("INSERT INTO conversation_participants (id, conversation_id, user_id, last_read_at) VALUES (?,?,?,?)", [uuid(), id, uid, uid === session.userId ? now : null]);
+    await exec("INSERT INTO messages (id, conversation_id, sender_id, body, is_read, created_at) VALUES (?,?,?,?,0,?)", [uuid(), id, session.userId, body.slice(0, 4000), now]);
+  });
+  await notify(recipients, kind === "OFFICIAL" ? "مراسلة رسمية جديدة" : "رسالة جديدة", title, { link: `/communication?c=${id}`, type: "INFO" });
+  await auditLog({ userId: session.userId, action: "CONVERSATION_CREATED", entityType: "conversation", entityId: id, newValues: { kind, schoolId, recipients: recipients.length }, ipAddress: clientIp(request) });
   return NextResponse.json({ id, message: "أُرسلت الرسالة" }, { status: 201 });
 }

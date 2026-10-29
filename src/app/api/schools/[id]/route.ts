@@ -5,7 +5,7 @@ import {
   authorize,
   auditLog,
 } from "@/lib/auth";
-import { query, queryOne, exec, uuid, nowISO, getDb } from "@/lib/db/sqlite";
+import { query, queryOne, exec, uuid, nowISO } from "@/lib/db/sqlite";
 import { canAccessSchool } from "@/lib/scope";
 
 export const runtime = "nodejs";
@@ -31,11 +31,11 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   const session = await getServerSession();
   if (!session) return NextResponse.json({ message: "غير مصدق" }, { status: 401 });
   const { id } = await params;
-  if (!canAccessSchool(session, id)) {
+  if (!await canAccessSchool(session, id)) {
     return NextResponse.json({ message: "لا يمكنك الوصول إلى هذه المدرسة" }, { status: 403 });
   }
 
-  const school = queryOne<any>(
+  const school = await queryOne<any>(
     `SELECT s.*, g.name AS governorate_name, d.name AS directorate_name, a.name AS area_name,
             u.name AS principal_user_name
      FROM schools s
@@ -49,10 +49,10 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   if (!school) return NextResponse.json({ message: "المدرسة غير موجودة" }, { status: 404 });
 
   const stats = {
-    visits: queryOne<{ n: number }>("SELECT COUNT(*) n FROM visits WHERE school_id = ?", [id]),
-    evaluations: queryOne<{ n: number }>("SELECT COUNT(*) n FROM evaluations e JOIN visits v ON v.id = e.visit_id WHERE v.school_id = ?", [id]),
-    evidence: queryOne<{ n: number }>("SELECT COUNT(*) n FROM evidence WHERE school_id = ?", [id]),
-    plans: queryOne<{ n: number }>("SELECT COUNT(*) n FROM improvement_plans WHERE school_id = ?", [id]),
+    visits: await queryOne<{ n: number }>("SELECT COUNT(*) n FROM visits WHERE school_id = ?", [id]),
+    evaluations: await queryOne<{ n: number }>("SELECT COUNT(*) n FROM evaluations e JOIN visits v ON v.id = e.visit_id WHERE v.school_id = ?", [id]),
+    evidence: await queryOne<{ n: number }>("SELECT COUNT(*) n FROM evidence WHERE school_id = ?", [id]),
+    plans: await queryOne<{ n: number }>("SELECT COUNT(*) n FROM improvement_plans WHERE school_id = ?", [id]),
   };
 
   return NextResponse.json({ school, stats });
@@ -62,7 +62,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   const session = await getServerSession();
   if (!session) return NextResponse.json({ message: "غير مصدق" }, { status: 401 });
   const { id } = await params;
-  if (!canAccessSchool(session, id)) {
+  if (!await canAccessSchool(session, id)) {
     return NextResponse.json({ message: "لا يمكنك تعديل هذه المدرسة" }, { status: 403 });
   }
   const isManager = ["SUPER_ADMIN", "EDUCATION_DIRECTOR"].includes(session.roleKey);
@@ -72,7 +72,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     return NextResponse.json({ message: "لا تملك صلاحية تعديل بيانات المدرسة" }, { status: 403 });
   }
 
-  const old = queryOne("SELECT * FROM schools WHERE id = ?", [id]);
+  const old = await queryOne("SELECT * FROM schools WHERE id = ?", [id]);
   if (!old) return NextResponse.json({ message: "المدرسة غير موجودة" }, { status: 404 });
 
   let body: unknown;
@@ -112,10 +112,9 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   values.push(nowISO());
   values.push(id);
 
-  const db = getDb();
-  db.prepare(`UPDATE schools SET ${fields.join(", ")} WHERE id = ?`).run(...values);
+  await exec(`UPDATE schools SET ${fields.join(", ")} WHERE id = ?`, [...values]);
 
-  auditLog({
+  await auditLog({
     userId: session.userId,
     action: "UPDATE",
     entityType: "School",
@@ -149,11 +148,11 @@ export async function DELETE(
     if (!isAdmin && !isDirector) {
       return NextResponse.json({ message: "حذف المدارس مقصور على المدير" }, { status: 403 });
     }
-    if (!canAccessSchool(session, id) && !isAdmin) {
+    if (!await canAccessSchool(session, id) && !isAdmin) {
       return NextResponse.json({ message: "المدرسة خارج نطاق صلاحيتك" }, { status: 403 });
     }
 
-    const school = queryOne<{ id: string; name: string; status: string }>(
+    const school = await queryOne<{ id: string; name: string; status: string }>(
       "SELECT id, name, status FROM schools WHERE id = ?",
       [id]
     );
@@ -171,7 +170,7 @@ export async function DELETE(
           { status: 403 }
         );
       }
-      const visits = queryOne<{ n: number }>(
+      const visits = await queryOne<{ n: number }>(
         "SELECT COUNT(*) AS n FROM visits WHERE school_id = ?",
         [id]
       );
@@ -183,8 +182,8 @@ export async function DELETE(
           { status: 409 }
         );
       }
-      getDb().prepare("DELETE FROM schools WHERE id = ?").run(id);
-      auditLog({
+      await exec("DELETE FROM schools WHERE id = ?", [id]);
+      await auditLog({
         userId: session.userId,
         action: "SCHOOL_DELETED_PERMANENTLY",
         entityType: "School",
@@ -196,11 +195,9 @@ export async function DELETE(
       return NextResponse.json({ message: "تم حذف المدرسة نهائياً" });
     }
 
-    getDb()
-      .prepare("UPDATE schools SET status = 'ARCHIVED', last_updated_at = ? WHERE id = ?")
-      .run(nowISO(), id);
+    await exec("UPDATE schools SET status = 'ARCHIVED', last_updated_at = ? WHERE id = ?", [nowISO(), id]);
 
-    auditLog({
+    await auditLog({
       userId: session.userId,
       action: "SCHOOL_ARCHIVED",
       entityType: "School",

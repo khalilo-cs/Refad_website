@@ -1,7 +1,7 @@
 "use client";
 
-import { Suspense, useState } from "react";
-import { useToast } from "@/components/providers";
+import { Suspense, useEffect, useState } from "react";
+import { useSession } from "@/components/providers";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Mail, Lock, AlertCircle, Eye, EyeOff, ArrowLeft, ShieldCheck } from "lucide-react";
@@ -9,7 +9,7 @@ import RifadLogo from "@/components/brand/rifad-logo";
 import InstitutionLogos from "@/components/brand/institution-logos";
 
 function LoginForm() {
-  const { add } = useToast();
+  const { reload } = useSession();
   const router = useRouter();
   const params = useSearchParams();
   const callbackUrl = params.get("callbackUrl") || "/dashboard";
@@ -21,6 +21,18 @@ function LoginForm() {
   const [totp, setTotp] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [needsSetup, setNeedsSetup] = useState(false);
+  const [serviceMessage, setServiceMessage] = useState("");
+
+  useEffect(() => {
+    fetch("/api/setup", { credentials: "include" })
+      .then(async (r) => {
+        const d = await r.json().catch(() => ({}));
+        if (r.status === 503) setServiceMessage(d.message ?? "");
+        else setNeedsSetup(d.initialized === false);
+      })
+      .catch(() => {});
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -31,7 +43,7 @@ function LoginForm() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ email: email.trim(), password, totp: needTotp ? totp.trim() : undefined }),
+        body: JSON.stringify({ email: email.trim().toLowerCase(), password, totp: needTotp ? totp.trim() : undefined }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -39,7 +51,8 @@ function LoginForm() {
         setError(data.message || "تعذّر تسجيل الدخول");
         return;
       }
-      add({ type: "success", message: `مرحباً ${data.user?.name ?? ""}` });
+      // تحديث حالة الجلسة قبل الانتقال حتى تظهر القائمة وبيانات المستخدم فوراً
+      await reload();
       router.replace(callbackUrl);
       router.refresh();
     } catch {
@@ -141,6 +154,10 @@ function LoginForm() {
                   type="email"
                   required
                   autoComplete="email"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  inputMode="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="name@example.com"
@@ -201,15 +218,23 @@ function LoginForm() {
             </button>
           </form>
 
-          <div className="mt-7 space-y-3">
-            <div className="ornament text-[10px] text-gray-300">أو</div>
-            <Link
-              href="/setup"
-              className="block rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-center text-[12.5px] font-semibold text-navy transition hover:border-turquoise/40 hover:bg-turquoise-soft/40"
-            >
-              تهيئة حساب المسؤول الأول
-            </Link>
-          </div>
+          {serviceMessage && (
+            <p role="alert" className="mt-5 rounded-xl border border-warning/30 bg-warning/10 px-4 py-3 text-[12.5px] leading-relaxed text-navy">
+              {serviceMessage}
+            </p>
+          )}
+
+          {needsSetup && (
+            <div className="mt-7 space-y-3">
+              <div className="ornament text-[10px] text-gray-300">أو</div>
+              <Link
+                href="/setup"
+                className="block rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-center text-[12.5px] font-semibold text-navy transition hover:border-turquoise/40 hover:bg-turquoise-soft/40"
+              >
+                تهيئة حساب المسؤول الأول
+              </Link>
+            </div>
+          )}
 
           <p className="mt-8 text-center text-[10.5px] leading-relaxed text-gray-400">
             بتسجيل الدخول فإنك توافق على أن استخدام المنصة محصور في الأغراض الإدارية

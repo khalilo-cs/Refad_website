@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession, authorize, auditLog } from "@/lib/auth";
-import { query, queryOne, uuid, nowISO, getDb } from "@/lib/db/sqlite";
+import { query, queryOne, uuid, nowISO, transaction , exec } from "@/lib/db/sqlite";
 import * as ExcelJS from "exceljs";
 
 export const runtime = "nodejs";
@@ -51,9 +51,9 @@ export async function POST(request: NextRequest) {
   if (!sheet) return NextResponse.json({ message: "الملف فارغ" }, { status: 400 });
 
   // قواميس الأسماء للمحافظات والمديريات
-  const governorates = query<{ id: string; name: string }>("SELECT id, name FROM governorates");
-  const directorates = query<{ id: string; name: string; governorate_id: string }>("SELECT id, name, governorate_id FROM directorates");
-  const existingCodes = query<{ code: string }>("SELECT code FROM schools");
+  const governorates = await query<{ id: string; name: string }>("SELECT id, name FROM governorates");
+  const directorates = await query<{ id: string; name: string; governorate_id: string }>("SELECT id, name, governorate_id FROM directorates");
+  const existingCodes = await query<{ code: string }>("SELECT code FROM schools");
   const codeSet = new Set(existingCodes.map((x) => x.code));
 
   const valid: ParsedRow[] = [];
@@ -125,19 +125,15 @@ export async function POST(request: NextRequest) {
   if (valid.length === 0) {
     return NextResponse.json({ message: "لا توجد صفوف صالحة للحفظ", errors }, { status: 400 });
   }
-
-  const db = getDb();
-  const tx = db.transaction(() => {
+  await transaction(async () => {
     for (const row of valid) {
       const g = governorates.find((x: { id: string; name: string }) => x.name === row.governorate)!;
       const d = directorates.find((x: { id: string; name: string; governorate_id: string }) => x.name === row.directorate && x.governorate_id === g.id)!;
       const id = uuid();
       const now = nowISO();
-      db.prepare(
-        `INSERT INTO schools (id, code, name, governorate_id, directorate_id, address, type, stage, contact_phone, contact_email, principal_name, latitude, longitude, data_source, status, last_updated_at, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'EXCEL_IMPORT', 'ACTIVE', ?, ?)`
-      ).run(id, row.code, row.name, g.id, d.id, row.address || null, row.type, row.stage, row.contact_phone || null, row.contact_email || null, row.principal_name || null, row.latitude ?? null, row.longitude ?? null, now, now);
-      auditLog({
+      await exec(`INSERT INTO schools (id, code, name, governorate_id, directorate_id, address, type, stage, contact_phone, contact_email, principal_name, latitude, longitude, data_source, status, last_updated_at, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'EXCEL_IMPORT', 'ACTIVE', ?, ?)`, [id, row.code, row.name, g.id, d.id, row.address || null, row.type, row.stage, row.contact_phone || null, row.contact_email || null, row.principal_name || null, row.latitude ?? null, row.longitude ?? null, now, now]);
+      await auditLog({
         userId: session.userId,
         action: "CREATE",
         entityType: "School",
@@ -146,7 +142,6 @@ export async function POST(request: NextRequest) {
       });
     }
   });
-  tx();
 
   return NextResponse.json({ message: `تمت إضافة ${valid.length} مدرسة بنجاح`, imported: valid.length, errors: errors.slice(0, 500) });
 }

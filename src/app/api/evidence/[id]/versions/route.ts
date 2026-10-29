@@ -10,10 +10,10 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   const session = await getServerSession();
   if (!session) return NextResponse.json({ message: "غير مصدق" }, { status: 401 });
   const { id } = await params;
-  const row = queryOne<any>("SELECT school_id, version, original_name, size, sha256, created_at, updated_at FROM evidence WHERE id = ?", [id]);
+  const row = await queryOne<any>("SELECT school_id, version, original_name, size, sha256, created_at, updated_at FROM evidence WHERE id = ?", [id]);
   if (!row) return NextResponse.json({ message: "الدليل غير موجود" }, { status: 404 });
-  if (!canAccessSchool(session, row.school_id) || session.roleKey === "PARENT") return NextResponse.json({ message: "لا تملك صلاحية" }, { status: 403 });
-  const old = query(
+  if (!await canAccessSchool(session, row.school_id) || session.roleKey === "PARENT") return NextResponse.json({ message: "لا تملك صلاحية" }, { status: 403 });
+  const old = await query(
     `SELECT v.version, v.original_name, v.size, v.sha256, v.created_at, u.name AS uploaded_by
      FROM evidence_versions v LEFT JOIN users u ON u.id = v.uploaded_by_id
      WHERE v.evidence_id = ? ORDER BY v.version DESC`,

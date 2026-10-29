@@ -8,5 +8,5 @@ export const runtime = "nodejs";
 export async function GET() {
   const session = await getServerSession();
   if (!session) return NextResponse.json({ message: "غير مصدق" }, { status: 401 });
-  return NextResponse.json(query("SELECT i.id, i.code, i.title FROM indicators i ORDER BY i.order_index"));
+  return NextResponse.json(await query("SELECT i.id, i.code, i.title FROM indicators i ORDER BY i.order_index"));
 }

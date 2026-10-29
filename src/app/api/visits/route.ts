@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession, auditLog, authorize } from "@/lib/auth";
-import { query, queryOne, getDb, uuid, nowISO } from "@/lib/db/sqlite";
+import { query, queryOne, uuid, nowISO , exec } from "@/lib/db/sqlite";
 import { schoolScope, canAccessSchool } from "@/lib/scope";
 import { notify, schoolUsers } from "@/lib/notify";
 import { clientIp } from "@/lib/security";
@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
     const page = Math.max(Number(sp.get("page") ?? 1) || 1, 1);
     const offset = (page - 1) * limit;
 
-    const scope = schoolScope(session, "s");
+    const scope = await schoolScope(session, "s");
     const where: string[] = [scope.sql];
     const params: unknown[] = [...scope.params];
     // المفتش يرى زياراته هو فقط داخل مدارسه
@@ -55,12 +55,12 @@ export async function GET(request: NextRequest) {
     if (to) { where.push("date(COALESCE(v.started_at, v.scheduled_at, v.created_at)) <= date(?)"); params.push(to); }
     const whereSql = where.join(" AND ");
 
-    const total = queryOne<{ n: number }>(
+    const total = await queryOne<{ n: number }>(
       `SELECT COUNT(*) AS n FROM visits v JOIN schools s ON v.school_id = s.id WHERE ${whereSql}`,
       params
     );
 
-    const visits = query(
+    const visits = await query(
       `SELECT v.id, v.school_id, v.inspector_id, v.type, v.purpose, v.status, v.completion,
               v.scheduled_at, v.started_at, v.ended_at, v.submitted_at,
               COALESCE(v.started_at, v.scheduled_at, v.created_at) AS visit_date,
@@ -118,14 +118,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ message: "موعد الزيارة غير صالح" }, { status: 400 });
     }
 
-    const school = queryOne<{ id: string; name: string }>("SELECT id, name FROM schools WHERE id = ?", [schoolId]);
+    const school = await queryOne<{ id: string; name: string }>("SELECT id, name FROM schools WHERE id = ?", [schoolId]);
     if (!school) return NextResponse.json({ message: "المدرسة غير موجودة" }, { status: 404 });
-    if (!canAccessSchool(session, schoolId)) {
+    if (!await canAccessSchool(session, schoolId)) {
       return NextResponse.json({ message: "المدرسة خارج نطاق صلاحيتك" }, { status: 403 });
     }
 
     const inspectorId = session.roleKey === "INSPECTOR" ? session.userId : (body?.inspectorId ?? session.userId);
-    const inspector = queryOne<{ id: string; role_key: string }>(
+    const inspector = await queryOne<{ id: string; role_key: string }>(
       `SELECT u.id, r.key AS role_key FROM users u JOIN roles r ON u.role_id = r.id WHERE u.id = ? AND u.is_active = 1`,
       [inspectorId]
     );
@@ -135,23 +135,17 @@ export async function POST(request: NextRequest) {
 
     const id = uuid();
     const now = nowISO();
-    getDb()
-      .prepare(
-        `INSERT INTO visits (id, school_id, inspector_id, type, purpose, scheduled_at, status, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, 'SCHEDULED', ?, ?)`
-      )
-      .run(
-        id, schoolId, inspector.id, type ?? "PERIODIC",
+    await exec(`INSERT INTO visits (id, school_id, inspector_id, type, purpose, scheduled_at, status, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, 'SCHEDULED', ?, ?)`, [id, schoolId, inspector.id, type ?? "PERIODIC",
         typeof purpose === "string" && purpose.trim() ? purpose.trim().slice(0, 500) : null,
         typeof scheduledAt === "string" && scheduledAt ? scheduledAt : null,
-        now, now
-      );
+        now, now]);
 
-    notify([inspector.id], "زيارة ميدانية جديدة", `جُدولت زيارة إلى ${school.name}`, { link: `/visits`, type: "INFO" });
-    notify(schoolUsers(schoolId, ["SCHOOL_PRINCIPAL", "QUALITY_COORDINATOR"]), "زيارة مجدولة لمدرستكم",
+    await notify([inspector.id], "زيارة ميدانية جديدة", `جُدولت زيارة إلى ${school.name}`, { link: `/visits`, type: "INFO" });
+    await notify(await schoolUsers(schoolId, ["SCHOOL_PRINCIPAL", "QUALITY_COORDINATOR"]), "زيارة مجدولة لمدرستكم",
       `ستُجرى زيارة ميدانية${scheduledAt ? " بتاريخ " + String(scheduledAt).slice(0, 10) : ""}`, { link: `/visits`, type: "INFO" });
 
-    auditLog({
+    await auditLog({
       userId: session.userId, action: "VISIT_CREATED", entityType: "visit", entityId: id,
       newValues: { schoolId, inspectorId: inspector.id, type }, ipAddress: clientIp(request),
       userAgent: request.headers.get("user-agent") ?? null,

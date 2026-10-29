@@ -28,6 +28,8 @@ type SessionContextType = {
   login: (email: string, password: string) => Promise<{ ok: boolean; message?: string }>;
   logout: () => Promise<void>;
   refresh: () => Promise<void>;
+  /** إعادة قراءة الجلسة من الخادم (بعد الدخول مثلاً). */
+  reload: () => Promise<void>;
 };
 
 const SessionCtx = createContext<SessionContextType | null>(null);
@@ -103,13 +105,17 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     setUser(null);
   }, []);
 
+  const reload = useCallback(async () => {
+    await fetchSession();
+  }, []);
+
   const refresh = useCallback(async () => {
     await fetch("/api/auth/refresh", { method: "POST", credentials: "include" });
     await fetchSession();
   }, []);
 
   return (
-    <SessionCtx.Provider value={{ user, loading, login, logout, refresh }}>
+    <SessionCtx.Provider value={{ user, loading, login, logout, refresh, reload }}>
       {children}
     </SessionCtx.Provider>
   );

@@ -1,8 +1,19 @@
 import type { NextConfig } from "next";
 
+const isVercel = Boolean(process.env.VERCEL);
+
 const nextConfig: NextConfig = {
-  // بناء مستقل يحتوي كل ما يلزم للتشغيل دون node_modules كاملة — مطلوب للنشر.
-  output: "standalone",
+  // بناء مستقل للخوادم وDocker؛ على Vercel تتولى المنصة التجميع.
+  ...(isVercel ? {} : { output: "standalone" as const }),
+
+  // وحدات أصلية/خادمية لا تُجمَّع داخل الحزمة.
+  serverExternalPackages: ["better-sqlite3", "@libsql/client"],
+
+  // خطوط التقرير العربي والشعارات تُقرأ من القرص عند توليد PDF؛
+  // يجب تضمينها في دوال الخادم على الاستضافات بلا خادم.
+  outputFileTracingIncludes: {
+    "/api/reports/**": ["./public/fonts/Amiri-Regular.ttf", "./public/fonts/Amiri-Bold.ttf", "./public/brand/*.png"],
+  },
 
   // إخفاء ترويسة الإصدار.
   poweredByHeader: false,

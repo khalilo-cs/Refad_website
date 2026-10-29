@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { hashPassword, auditLog } from "@/lib/auth";
-import { queryOne, exec, getDb, uuid, nowISO } from "@/lib/db/sqlite";
+import { queryOne, exec, uuid, nowISO } from "@/lib/db/sqlite";
 import { getServerSession } from "@/lib/auth";
+import { dbReadyOr503 } from "@/lib/db/ready";
 
 const schema = z.object({
   name: z.string().min(2, "الاسم الكامل مطلوب"),
@@ -11,9 +12,13 @@ const schema = z.object({
 });
 
 export const runtime = "nodejs";
+// أول طلب على استضافة بلا خادم قد يُنشئ المخطط ويبذر البيانات المرجعية.
+export const maxDuration = 60;
 
 export async function GET() {
-  const exists = queryOne("SELECT COUNT(*) n FROM users");
+  const notReady = await dbReadyOr503();
+  if (notReady) return notReady;
+  const exists = await queryOne("SELECT COUNT(*) n FROM users");
   const session = await getServerSession();
   return NextResponse.json({
     initialized: (exists as { n: number }).n > 0,
@@ -22,7 +27,9 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const exists = queryOne("SELECT COUNT(*) n FROM users");
+  const notReady = await dbReadyOr503();
+  if (notReady) return notReady;
+  const exists = await queryOne("SELECT COUNT(*) n FROM users");
   if ((exists as { n: number }).n > 0) {
     const session = await getServerSession();
     if (!session?.permissions.all) {
@@ -42,25 +49,22 @@ export async function POST(request: Request) {
   }
 
   const { name, email, password } = parsed.data;
-  const existsEmail = queryOne("SELECT id FROM users WHERE email = ?", [email]);
+  const existsEmail = await queryOne("SELECT id FROM users WHERE email = ?", [email]);
   if (existsEmail) {
     return NextResponse.json({ message: "البريد الإلكتروني مستخدم مسبقًا" }, { status: 409 });
   }
 
-  const role = queryOne<{ id: string }>("SELECT id FROM roles WHERE key = ?", ["SUPER_ADMIN"]);
+  const role = await queryOne<{ id: string }>("SELECT id FROM roles WHERE key = ?", ["SUPER_ADMIN"]);
   if (!role) {
     return NextResponse.json({ message: "الأدوار النظامية غير موجودة، يُرجى تشغيل بذر البيانات أولاً" }, { status: 500 });
   }
 
   const passwordHash = await hashPassword(password);
   const userId = uuid();
-  const db = getDb();
-  db.prepare(
-    `INSERT INTO users (id, name, email, password_hash, role_id, is_active, token_version, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, 1, 1, ?, ?)`
-  ).run(userId, name, email, passwordHash, role.id, nowISO(), nowISO());
+  await exec(`INSERT INTO users (id, name, email, password_hash, role_id, is_active, token_version, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, 1, 1, ?, ?)`, [userId, name, email, passwordHash, role.id, nowISO(), nowISO()]);
 
-  auditLog({
+  await auditLog({
     userId,
     action: "CREATE",
     entityType: "User",

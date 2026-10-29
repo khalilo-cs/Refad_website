@@ -1,19 +1,26 @@
 import { NextResponse } from "next/server";
-import { queryOne } from "@/lib/db/sqlite";
+import { isRemoteDb, queryOne } from "@/lib/db/sqlite";
+import { dbReadyOr503 } from "@/lib/db/ready";
 
 export const runtime = "nodejs";
 
 export async function GET() {
-  let dbOk = false;
-  try {
-    const r = queryOne("SELECT COUNT(*) n FROM criteria");
-    dbOk = !!r;
-  } catch {
-    dbOk = false;
+  const notReady = await dbReadyOr503();
+  let dbOk = !notReady;
+  if (dbOk) {
+    try {
+      dbOk = !!(await queryOne("SELECT COUNT(*) n FROM criteria"));
+    } catch {
+      dbOk = false;
+    }
   }
-  return NextResponse.json({
-    status: dbOk ? "ok" : "db_error",
-    service: "itqan-platform",
-    database: dbOk ? "connected" : "disconnected",
-  });
+  return NextResponse.json(
+    {
+      status: dbOk ? "ok" : "db_error",
+      service: "itqan-platform",
+      database: dbOk ? "connected" : "disconnected",
+      engine: isRemoteDb() ? "libsql" : "sqlite",
+    },
+    { status: dbOk ? 200 : 503 }
+  );
 }

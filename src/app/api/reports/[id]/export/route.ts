@@ -20,7 +20,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
   const { id } = await params;
   const format = (request.nextUrl.searchParams.get("format") ?? "pdf").toLowerCase();
-  const row = getReportRow(session, id);
+  const row = await getReportRow(session, id);
   if (!row) return NextResponse.json({ message: "التقرير غير موجود" }, { status: 404 });
   const content = parseContent(row);
   if (!content) return NextResponse.json({ message: "هذا التقرير قديم ولا يحمل محتوى مثبَّتاً. ولّد تقريراً جديداً." }, { status: 409 });
@@ -30,8 +30,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   if (row.approved_by_name) extra.push(["اعتُمد بواسطة", row.approved_by_name]);
   const safeName = row.number.replace(/[^A-Za-z0-9-]/g, "");
 
-  exec("INSERT INTO export_logs (id, type, filters, created_by_id) VALUES (?,?,?,?)", [uuid(), `REPORT_${format.toUpperCase()}`, JSON.stringify({ id, number: row.number }), session.userId]);
-  auditLog({ userId: session.userId, action: "REPORT_EXPORT", entityType: "report", entityId: id, newValues: { format }, ipAddress: clientIp(request) });
+  await exec("INSERT INTO export_logs (id, type, filters, created_by_id) VALUES (?,?,?,?)", [uuid(), `REPORT_${format.toUpperCase()}`, JSON.stringify({ id, number: row.number }), session.userId]);
+  await auditLog({ userId: session.userId, action: "REPORT_EXPORT", entityType: "report", entityId: id, newValues: { format }, ipAddress: clientIp(request) });
   const headers = { "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" };
 
   if (format === "csv") {

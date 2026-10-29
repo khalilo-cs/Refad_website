@@ -17,7 +17,7 @@ export type Clause = { sql: string; params: unknown[] };
 const NONE: Clause = { sql: "1 = 0", params: [] };
 
 /** شرط SQL على جدول المدارس (بالاسم المستعار alias). */
-export function schoolScope(user: ScopeUser, alias = "s"): Clause {
+export async function schoolScope(user: ScopeUser, alias = "s"): Promise<Clause> {
   switch (user.roleKey) {
     case "SUPER_ADMIN":
       return { sql: "1 = 1", params: [] };
@@ -25,10 +25,10 @@ export function schoolScope(user: ScopeUser, alias = "s"): Clause {
       if (!user.directorateId) return NONE;
       return { sql: `${alias}.directorate_id = ?`, params: [user.directorateId] };
     case "INSPECTOR": {
-      const assigned = queryOne<{ n: number }>(
+      const assigned = (await queryOne<{ n: number }>(
         "SELECT COUNT(*) n FROM school_assignments WHERE user_id = ?",
         [user.userId]
-      )?.n ?? 0;
+      ))?.n ?? 0;
       const parts = [
         `${alias}.id IN (SELECT school_id FROM school_assignments WHERE user_id = ?)`,
         `${alias}.id IN (SELECT school_id FROM visits WHERE inspector_id = ?)`,
@@ -61,10 +61,10 @@ export function schoolScope(user: ScopeUser, alias = "s"): Clause {
 }
 
 /** هل يستطيع المستخدم الوصول إلى مدرسة معينة؟ */
-export function canAccessSchool(user: ScopeUser, schoolId: string): boolean {
+export async function canAccessSchool(user: ScopeUser, schoolId: string): Promise<boolean> {
   if (!schoolId) return false;
-  const c = schoolScope(user, "s");
-  const row = queryOne<{ n: number }>(
+  const c = await schoolScope(user, "s");
+  const row = await queryOne<{ n: number }>(
     `SELECT COUNT(*) n FROM schools s WHERE s.id = ? AND ${c.sql}`,
     [schoolId, ...c.params]
   );
@@ -72,8 +72,8 @@ export function canAccessSchool(user: ScopeUser, schoolId: string): boolean {
 }
 
 /** هل يستطيع المستخدم الوصول إلى زيارة؟ (عبر مدرسة الزيارة، ومفتش الزيارة دائماً). */
-export function canAccessVisit(user: ScopeUser, visitId: string): boolean {
-  const v = queryOne<{ school_id: string; inspector_id: string }>(
+export async function canAccessVisit(user: ScopeUser, visitId: string): Promise<boolean> {
+  const v = await queryOne<{ school_id: string; inspector_id: string }>(
     "SELECT school_id, inspector_id FROM visits WHERE id = ?",
     [visitId]
   );

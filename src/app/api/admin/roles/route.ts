@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession, authorize, auditLog } from "@/lib/auth";
-import { query, queryOne, getDb, uuid, nowISO } from "@/lib/db/sqlite";
+import { query, queryOne, uuid, nowISO , exec } from "@/lib/db/sqlite";
 import { normalizePermissions, PERMISSION_GROUPS } from "@/lib/permissions";
 
 export const runtime = "nodejs";
@@ -44,7 +44,7 @@ export async function GET() {
       );
     }
 
-    const rows = query<Omit<RoleRow, "permissions"> & { permissions: unknown }>(
+    const rows = await query<Omit<RoleRow, "permissions"> & { permissions: unknown }>(
       `SELECT r.id, r.key, r.name, r.description, r.scope, r.permissions,
               r.is_system, r.created_at,
               (SELECT COUNT(*) FROM users u WHERE u.role_id = r.id) AS users_count
@@ -101,7 +101,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ message: e.message }, { status: 400 });
     }
 
-    const exists = queryOne<{ id: string }>("SELECT id FROM roles WHERE key = ?", [key]);
+    const exists = await queryOne<{ id: string }>("SELECT id FROM roles WHERE key = ?", [key]);
     if (exists) {
       return NextResponse.json({ message: "يوجد دور بالمفتاح نفسه" }, { status: 409 });
     }
@@ -109,14 +109,10 @@ export async function POST(request: NextRequest) {
     const id = uuid();
     const now = nowISO();
 
-    getDb()
-      .prepare(
-        `INSERT INTO roles (id, key, name, description, scope, permissions, is_system, created_at)
-         VALUES (?, ?, ?, ?, 'system', ?, 0, ?)`
-      )
-      .run(id, key, name, description, JSON.stringify(permissions), now);
+    await exec(`INSERT INTO roles (id, key, name, description, scope, permissions, is_system, created_at)
+         VALUES (?, ?, ?, ?, 'system', ?, 0, ?)`, [id, key, name, description, JSON.stringify(permissions), now]);
 
-    auditLog({
+    await auditLog({
       userId: session.userId,
       action: "ROLE_CREATED",
       entityType: "Role",

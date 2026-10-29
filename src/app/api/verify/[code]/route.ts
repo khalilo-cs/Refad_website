@@ -19,7 +19,7 @@ export async function GET(_request: Request, ctx: { params: Promise<{ code: stri
     return NextResponse.json({ valid: false, message: "الرمز مطلوب" }, { status: 400 });
   }
 
-  const row = queryOne<any>(
+  const row = await queryOne<any>(
     `SELECT r.number, r.title, r.type, r.status, r.approved_at,
             r.verification_code, r.created_at,
             s.name AS school_name,

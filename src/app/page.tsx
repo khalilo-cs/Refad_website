@@ -27,7 +27,7 @@ async function getSession() {
   if (!token) return null;
   const payload = verifyAccessToken(token);
   if (!payload) return null;
-  const user = queryOne<{
+  const user = await queryOne<{
     id: string;
     is_active: number;
     is_locked: number;
@@ -36,7 +36,7 @@ async function getSession() {
   }>(
     "SELECT u.id, u.is_active, u.is_locked, u.token_version, r.key AS role_key FROM users u JOIN roles r ON u.role_id = r.id WHERE u.id = ?",
     [payload.userId]
-  );
+  ).catch(() => null); // الصفحة التعريفية تُعرض حتى لو تعذّر الوصول إلى القاعدة
   if (!user || user.is_locked === 1 || user.is_active === 0 || user.token_version !== payload.tokenVersion)
     return null;
   return { roleKey: user.role_key };

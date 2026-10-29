@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
     const sp = request.nextUrl.searchParams;
     const limit = Math.min(Number(sp.get("limit") ?? 20) || 20, 100);
     const page = Math.max(Number(sp.get("page") ?? 1) || 1, 1);
-    const sc = reportScope(session);
+    const sc = await reportScope(session);
     const where = [sc.sql];
     const params: unknown[] = [...sc.params];
     const status = sp.get("status");
@@ -34,8 +34,8 @@ export async function GET(request: NextRequest) {
     if (q) { where.push("(r.title LIKE ? OR r.number LIKE ?)"); const like = `%${q.replace(/[%_]/g, "")}%`; params.push(like, like); }
     const W = where.join(" AND ");
 
-    const total = queryOne<{ n: number }>(`SELECT COUNT(*) AS n FROM reports r WHERE ${W}`, params)?.n ?? 0;
-    const reports = query(
+    const total = (await queryOne<{ n: number }>(`SELECT COUNT(*) AS n FROM reports r WHERE ${W}`, params))?.n ?? 0;
+    const reports = await query(
       `SELECT r.id, r.number, r.title, r.type, r.status, r.period_start, r.period_end, r.verification_code, r.approved_at,
               r.rejection_reason, r.created_at, r.submitted_at, r.summary,
               s.name AS school_name, d.name AS directorate_name, u.name AS generated_by_name, a.name AS approved_by_name
@@ -44,7 +44,7 @@ export async function GET(request: NextRequest) {
        WHERE ${W} ORDER BY r.created_at DESC LIMIT ? OFFSET ?`,
       [...params, limit, (page - 1) * limit]
     );
-    const counts = query<{ status: string; n: number }>(`SELECT r.status, COUNT(*) n FROM reports r WHERE ${sc.sql} GROUP BY r.status`, sc.params);
+    const counts = await query<{ status: string; n: number }>(`SELECT r.status, COUNT(*) n FROM reports r WHERE ${sc.sql} GROUP BY r.status`, sc.params);
     return NextResponse.json({
       reports, total, page, limit, totalPages: Math.ceil(total / limit),
       counts: Object.fromEntries(counts.map((c) => [c.status, c.n])),
@@ -67,8 +67,8 @@ export async function POST(request: NextRequest) {
     const body = (await request.json().catch(() => null)) as CreateParams | null;
     if (!body?.type) return NextResponse.json({ message: "نوع التقرير مطلوب" }, { status: 400 });
     const actor: Actor = { ...session, name: session.name };
-    const r = createReport(actor, body);
-    auditLog({ userId: session.userId, action: "REPORT_GENERATED", entityType: "report", entityId: r.id, newValues: { type: body.type, number: r.number }, ipAddress: clientIp(request), userAgent: request.headers.get("user-agent") });
+    const r = await createReport(actor, body);
+    await auditLog({ userId: session.userId, action: "REPORT_GENERATED", entityType: "report", entityId: r.id, newValues: { type: body.type, number: r.number }, ipAddress: clientIp(request), userAgent: request.headers.get("user-agent") });
     return NextResponse.json({ id: r.id, number: r.number, state: r.content.state, message: "تم توليد التقرير كمسودة" }, { status: 201 });
   } catch (e: any) {
     if (e instanceof ReportError) return NextResponse.json({ message: e.message }, { status: e.status });

@@ -1,12 +1,11 @@
 /**
- * بذر البيانات الأولية لقاعدة بيانات SQLite.
+ * بذر البيانات الأولية لقاعدة البيانات.
  * يُستدعى من src/lib/db/sqlite.ts عند تشغيل المنصة لأول مرة.
  * جميع النصوص المستخرجة من استمارة التقييم الذاتي (المرفق)، والبيانات التجريبية
  مُعلمة بوضوح بأنها للعرض التوضيحي فقط.
  */
 
-import type Database from "better-sqlite3";
-import { uuid, nowISO, toJson } from "./sqlite";
+import { uuid, nowISO, toJson, query, queryOne, exec, batch } from "./sqlite";
 import {
   SEED_CRITERIA,
   RATING_SCALE,
@@ -25,16 +24,13 @@ export type SeedOptions = {
   demoPassword?: string;
 };
 
-export async function seedDatabase(db: Database.Database, opts: SeedOptions = {}): Promise<{ demoPassword?: string }> {
+export async function seedDatabase(opts: SeedOptions = {}): Promise<{ demoPassword?: string }> {
   const DEMO_PASSWORD =
     opts.demoPassword ??
     // 16 حرفاً عشوائياً: أحرف كبيرة وصغيرة وأرقام ورمز
     randomBytes(12).toString("base64url") + "!9a";
-  const insert = (rows: Row[]) => {
-    const tx = db.transaction((rs: Row[]) => {
-      for (const r of rs) db.prepare(r.sql).run(...r.params);
-    });
-    tx(rows);
+  const insert = async (rs: Row[]) => {
+    await batch(rs.map((r) => ({ sql: r.sql, params: [...r.params] })));
   };
 
   const rows: Row[] = [];
@@ -158,7 +154,7 @@ export async function seedDatabase(db: Database.Database, opts: SeedOptions = {}
       ],
     });
   }
-  insert(rows);
+  await insert(rows);
   rows.length = 0;
 
   // ----------------------------------------------------------
@@ -277,7 +273,7 @@ export async function seedDatabase(db: Database.Database, opts: SeedOptions = {}
     }
   }
 
-  insert(rows);
+  await insert(rows);
   rows.length = 0;
 
   // ----------------------------------------------------------
@@ -304,7 +300,7 @@ export async function seedDatabase(db: Database.Database, opts: SeedOptions = {}
   });
 
   if (!opts.demo) {
-    insert(rows);
+    await insert(rows);
     rows.length = 0;
     console.log("تم بذر المعايير والمؤشرات والأدوار والإعدادات. أنشئ حساب المسؤول الأول من صفحة /setup.");
     return {};
@@ -387,11 +383,9 @@ export async function seedDatabase(db: Database.Database, opts: SeedOptions = {}
 
   const createdUserIds: Record<string, string> = {};
   for (const u of demoUsers) {
-    const roleRow = db
-      .prepare("SELECT id FROM roles WHERE key = ?")
-      .get(u.key) as { id: string } | undefined;
+    const roleRow = await queryOne("SELECT id FROM roles WHERE key = ?", [u.key]) as { id: string } | undefined;
     if (!roleRow) continue;
-    const passwordHash = bcrypt.hashSync(DEMO_PASSWORD, 12);
+    const passwordHash = await bcrypt.hash(DEMO_PASSWORD, 12);
     const userId = uuid();
     createdUserIds[u.key] = userId;
     rows.push({
@@ -411,7 +405,7 @@ export async function seedDatabase(db: Database.Database, opts: SeedOptions = {}
       ],
     });
   }
-  insert(rows);
+  await insert(rows);
   rows.length = 0;
 
   // ----------------------------------------------------------
@@ -427,73 +421,55 @@ export async function seedDatabase(db: Database.Database, opts: SeedOptions = {}
   if (inspectorId) {
     // إسناد المدارس للمفتش وإنشاء ملف تعريفي أولي لكل مدرسة (غير موثّق)
     for (const sc of demoSchools) {
-      db.prepare("INSERT OR IGNORE INTO school_assignments (id, user_id, school_id, assigned_by_id) VALUES (?,?,?,?)").run(uuid(), inspectorId, sc.id, directorId ?? null);
-      db.prepare(
-        `INSERT OR IGNORE INTO school_profiles (school_id, students_count, teachers_count, admin_staff_count, service_staff_count, classes_count,
+      await exec("INSERT OR IGNORE INTO school_assignments (id, user_id, school_id, assigned_by_id) VALUES (?,?,?,?)", [uuid(), inspectorId, sc.id, directorId ?? null]);
+      await exec(`INSERT OR IGNORE INTO school_profiles (school_id, students_count, teachers_count, admin_staff_count, service_staff_count, classes_count,
            has_science_lab, has_computer_lab, has_library, has_canteen, has_playground, info_source, verified)
-         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,0)`
-      ).run(sc.id, null, null, null, null, null, null, null, null, null, null, "بيانات توضيحية — لم تُدخل بعد");
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,0)`, [sc.id, null, null, null, null, null, null, null, null, null, null, "بيانات توضيحية — لم تُدخل بعد"]);
     }
 
-    const indicators = db.prepare("SELECT id, code FROM indicators ORDER BY order_index").all() as { id: string; code: string }[];
+    const indicators = await query("SELECT id, code FROM indicators ORDER BY order_index") as { id: string; code: string }[];
     // درجات حتمية (بلا عشوائية) حتى تتكرر نتائج العرض نفسها في كل تثبيت
     const scoreFor = (schoolIdx: number, i: number) => {
       const base = [3, 2, 3, 1, 3, 2, 3, 0, 2, 3][(i * 7 + schoolIdx * 3) % 10];
       return schoolIdx === 1 ? Math.max(0, base - 1) : base;
     };
-    const makeVisit = (schoolIdx: number, status: string, coverage: number, daysAgo: number) => {
+    const makeVisit = async (schoolIdx: number, status: string, coverage: number, daysAgo: number) => {
       const visitId = uuid();
       const when = iso(-daysAgo);
-      db.prepare(
-        `INSERT INTO visits (id, school_id, inspector_id, type, purpose, status, scheduled_at, started_at, ended_at, submitted_at, submitted_by_id, completion, created_at, updated_at)
-         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
-      ).run(
-        visitId, demoSchools[schoolIdx].id, inspectorId, "PERIODIC", "زيارة تعريفية للمنصة (توضيحية)", status,
+      await exec(`INSERT INTO visits (id, school_id, inspector_id, type, purpose, status, scheduled_at, started_at, ended_at, submitted_at, submitted_by_id, completion, created_at, updated_at)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, [visitId, demoSchools[schoolIdx].id, inspectorId, "PERIODIC", "زيارة تعريفية للمنصة (توضيحية)", status,
         when, when, ["SUBMITTED", "COMPLETED"].includes(status) ? when : null,
         ["SUBMITTED", "COMPLETED"].includes(status) ? when : null,
         ["SUBMITTED", "COMPLETED"].includes(status) ? inspectorId : null,
-        Math.round(coverage * 100), when, when
-      );
+        Math.round(coverage * 100), when, when]);
       const n = Math.round(indicators.length * coverage);
-      indicators.slice(0, n).forEach((ind, i) => {
-        db.prepare(
-          `INSERT INTO evaluations (id, visit_id, indicator_id, status, score, notes, verification_methods, rated_by_id, rated_at, created_by_id, created_at, updated_at, version)
-           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,1)`
-        ).run(uuid(), visitId, ind.id, "EVALUATED", scoreFor(schoolIdx, i), i % 9 === 0 ? DEMO_FLAG : null,
-          JSON.stringify(["فحص وثائق"]), inspectorId, when, inspectorId, when, when);
-      });
+      await batch(indicators.slice(0, n).map((ind, i) => ({
+        sql: `INSERT INTO evaluations (id, visit_id, indicator_id, status, score, notes, verification_methods, rated_by_id, rated_at, created_by_id, created_at, updated_at, version)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,1)`, params: [uuid(), visitId, ind.id, "EVALUATED", scoreFor(schoolIdx, i), i % 9 === 0 ? DEMO_FLAG : null,
+          JSON.stringify(["فحص وثائق"]), inspectorId, when, inspectorId, when, when] })));
       return visitId;
     };
 
-    const v1 = makeVisit(0, "COMPLETED", 1, 40);
-    makeVisit(0, "COMPLETED", 1, 130); // زيارة أقدم لإظهار اتجاه التحسن
-    makeVisit(1, "SUBMITTED", 0.7, 6);
-    makeVisit(2, "IN_PROGRESS", 0.2, 1);
+    const v1 = await makeVisit(0, "COMPLETED", 1, 40);
+    await makeVisit(0, "COMPLETED", 1, 130); // زيارة أقدم لإظهار اتجاه التحسن
+    await makeVisit(1, "SUBMITTED", 0.7, 6);
+    await makeVisit(2, "IN_PROGRESS", 0.2, 1);
     // زيارة قادمة وأخرى متأخرة (للتنبيهات)
     for (const [idx, off, st] of [[0, 3, "SCHEDULED"], [2, -9, "SCHEDULED"]] as [number, number, string][]) {
-      db.prepare(
-        `INSERT INTO visits (id, school_id, inspector_id, type, purpose, status, scheduled_at, created_at, updated_at)
-         VALUES (?,?,?,?,?,?,?,?,?)`
-      ).run(uuid(), demoSchools[idx].id, inspectorId, "FOLLOW_UP", "زيارة متابعة (توضيحية)", st, iso(off), nowISO(), nowISO());
+      await exec(`INSERT INTO visits (id, school_id, inspector_id, type, purpose, status, scheduled_at, created_at, updated_at)
+         VALUES (?,?,?,?,?,?,?,?,?)`, [uuid(), demoSchools[idx].id, inspectorId, "FOLLOW_UP", "زيارة متابعة (توضيحية)", st, iso(off), nowISO(), nowISO()]);
     }
 
     // خطة تحسين توضيحية بإجراءين: أحدهما متأخر
     if (principalId) {
       const planId = uuid();
-      db.prepare(
-        `INSERT INTO improvement_plans (id, school_id, title, description, status, created_by_id) VALUES (?,?,?,?,?,?)`
-      ).run(planId, demoSchools[0].id, "خطة تحسين توضيحية", DEMO_FLAG, "ACTIVE", principalId);
-      const weakInd = db.prepare(
-        `SELECT i.id, e.id AS eid FROM evaluations e JOIN indicators i ON i.id = e.indicator_id
-         WHERE e.visit_id = ? AND e.score <= 1 ORDER BY i.order_index LIMIT 2`
-      ).all(v1) as { id: string; eid: string }[];
-      weakInd.forEach((w, i) => {
-        db.prepare(
-          `INSERT INTO corrective_actions (id, plan_id, evaluation_id, indicator_id, problem_description, priority, proposed_action,
-             responsible_id, due_date, success_indicator, status) VALUES (?,?,?,?,?,?,?,?,?,?,?)`
-        ).run(uuid(), planId, w.eid, w.id, "قصور مكتشف في الزيارة التوضيحية", i === 0 ? "HIGH" : "MEDIUM",
-          "إجراء تصحيحي توضيحي", principalId, iso(i === 0 ? -5 : 14).slice(0, 10), "رفع دليل جديد يثبت المعالجة", "IN_PROGRESS");
-      });
+      await exec(`INSERT INTO improvement_plans (id, school_id, title, description, status, created_by_id) VALUES (?,?,?,?,?,?)`, [planId, demoSchools[0].id, "خطة تحسين توضيحية", DEMO_FLAG, "ACTIVE", principalId]);
+      const weakInd = await query(`SELECT i.id, e.id AS eid FROM evaluations e JOIN indicators i ON i.id = e.indicator_id
+         WHERE e.visit_id = ? AND e.score <= 1 ORDER BY i.order_index LIMIT 2`, [v1]) as { id: string; eid: string }[];
+      await batch(weakInd.map((w, i) => ({
+        sql: `INSERT INTO corrective_actions (id, plan_id, evaluation_id, indicator_id, problem_description, priority, proposed_action,
+             responsible_id, due_date, success_indicator, status) VALUES (?,?,?,?,?,?,?,?,?,?,?)`, params: [uuid(), planId, w.eid, w.id, "قصور مكتشف في الزيارة التوضيحية", i === 0 ? "HIGH" : "MEDIUM",
+          "إجراء تصحيحي توضيحي", principalId, iso(i === 0 ? -5 : 14).slice(0, 10), "رفع دليل جديد يثبت المعالجة", "IN_PROGRESS"] })));
     }
   }
 
@@ -502,9 +478,9 @@ export async function seedDatabase(db: Database.Database, opts: SeedOptions = {}
   if (parentUserId) {
     const studentId = uuid();
     const parentId = uuid();
-    db.prepare("INSERT INTO students (id, school_id, name, grade, section) VALUES (?,?,?,?,?)").run(studentId, schoolId, "طالب توضيحي", "الصف الخامس", "أ");
-    db.prepare("INSERT INTO parents (id, name, user_id) VALUES (?,?,?)").run(parentId, "ولي أمر تجريبي", parentUserId);
-    db.prepare("INSERT INTO parent_student (id, parent_id, student_id) VALUES (?,?,?)").run(uuid(), parentId, studentId);
+    await exec("INSERT INTO students (id, school_id, name, grade, section) VALUES (?,?,?,?,?)", [studentId, schoolId, "طالب توضيحي", "الصف الخامس", "أ"]);
+    await exec("INSERT INTO parents (id, name, user_id) VALUES (?,?,?)", [parentId, "ولي أمر تجريبي", parentUserId]);
+    await exec("INSERT INTO parent_student (id, parent_id, student_id) VALUES (?,?,?)", [uuid(), parentId, studentId]);
   }
 
   console.log("تم بذر البيانات الأولية والبيانات التوضيحية لقاعدة بيانات SQLite.");
