@@ -121,7 +121,7 @@ export default function RankingsPage() {
                           className="flex flex-col items-center text-center"
                         >
                           <Medal className={`h-7 w-7 ${MEDAL[idx]} drop-shadow`} />
-                          <Link href={`/schools/${r.schoolId}`} className="mt-1 line-clamp-2 min-h-[2.5rem] text-[12px] font-semibold leading-tight hover:underline sm:text-[13.5px]">
+                          <Link href={`/schools/${r.schoolId}`} className="mt-1 block min-h-[2.5rem] w-full overflow-hidden text-[12px] font-semibold leading-tight line-clamp-2 hover:underline sm:text-[13.5px]">
                             {r.name}
                           </Link>
                           <p className="mt-1 font-mono text-lg font-bold text-gold-bright sm:text-2xl">{r.percent}%</p>

@@ -607,6 +607,14 @@ h1, h2, h3, h4, h5, h6, .font-heading {
   }
 }
 
+/* ===== الجداول على الشاشات الصغيرة =====
+   الجدول داخل حاوية تمرير أفقي يحتفظ بعرض أدنى فيُمرَّر بدل أن تنضغط أعمدته. */
+@media (max-width: 1023px) {
+  .overflow-x-auto > table {
+    min-width: 760px;
+  }
+}
+
 /* ===== طباعة شهادة التقدير وحدها ===== */
 @media print {
   body:has(.certificate) * {
@@ -621,7 +629,7 @@ h1, h2, h3, h4, h5, h6, .font-heading {
     inset: 0;
     background: #fff;
   }
-}
-@page {
-  margin: 10mm;
+  @page {
+    margin: 10mm;
+  }
 }
