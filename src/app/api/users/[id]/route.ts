@@ -105,9 +105,11 @@ export async function PATCH(
           );
         }
       }
-      sets.push("role_id = ?");
-      args.push(role.id);
-      bumpTokenVersion = true;
+      if (roleKey !== target.role_key) {
+        sets.push("role_id = ?");
+        args.push(role.id);
+        bumpTokenVersion = true;
+      }
     }
 
     if (schoolId !== undefined) {

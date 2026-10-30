@@ -19,6 +19,8 @@ export function generatePassword(length = 12): string {
       const j = randomInt(i + 1);
       [chars[i], chars[j]] = [chars[j], chars[i]];
     }
+    // لا تبدأ برمز (حتى لا تُفسَّر كصيغة عند فتحها في جداول البيانات)
+    if (SYMBOLS.includes(chars[0])) chars.push(chars.shift()!);
     const pw = chars.join("");
     if (validatePassword(pw).ok) return pw;
   }
@@ -36,3 +38,9 @@ export function normalizeUsername(raw: unknown): string | null {
 
 export const placeholderEmail = (username: string) => `${username}@no-email.invalid`;
 export const isPlaceholderEmail = (email: string | null | undefined) => !!email && email.endsWith("@no-email.invalid");
+
+/** يحوّل رمز المدرسة إلى اسم مستخدم صالح (حروف صغيرة وأرقام و . _ -). */
+export function usernameFromCode(code: string): string | null {
+  const u = code.trim().toLowerCase().replace(/[^a-z0-9._-]+/g, "-").replace(/^[^a-z0-9]+|[^a-z0-9]+$/g, "");
+  return USERNAME_RE.test(u) ? u : null;
+}
