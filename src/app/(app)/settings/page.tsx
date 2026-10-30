@@ -13,9 +13,16 @@ type Rating = { id: string; key: string; label_ar: string; score: number; order_
 
 export default function SettingsPage() {
   const { user } = useSession();
-  const [tab, setTab] = useState<Tab>("account");
+  const [tab, setTab] = useState<Tab>(user?.mustChangePassword ? "security" : "account");
+  useEffect(() => { if (user?.mustChangePassword) setTab("security"); }, [user?.mustChangePassword]);
   return (
     <div className="space-y-5">
+      {user?.mustChangePassword && (
+        <div role="alert" className="flex items-start gap-2 rounded-xl border border-warning/30 bg-warning/10 px-4 py-3 text-[13px] text-warning">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+          <span>حسابك يتطلب تغيير كلمة المرور المؤقتة قبل متابعة استخدام المنصة. اختر كلمة مرور جديدة من قسم «تغيير كلمة المرور» أدناه.</span>
+        </div>
+      )}
       <PageHeader icon={Settings} title="الإعدادات" subtitle="بياناتي وأمان حسابي، ومقياس التقدير وصيغة الحساب المطبَّقة" />
       <Tabs<Tab> value={tab} onChange={setTab} tabs={[{ key: "account", label: "حسابي" }, { key: "security", label: "الأمان" }, { key: "system", label: "النظام" }]} />
       {tab === "account" && <AccountTab roleName={user?.role ?? ""} />}
@@ -72,6 +79,7 @@ function AccountTab({ roleName }: { roleName: string }) {
 
 function SecurityTab() {
   const { add } = useToast();
+  const { refresh } = useSession();
   const [p, setP] = useState<any>(null);
   const [pw, setPw] = useState<any>({});
   const [busy, setBusy] = useState(false);
@@ -97,7 +105,7 @@ function SecurityTab() {
     setBusy(true);
     const { ok } = await post("/api/account", { currentPassword: pw.cur, newPassword: pw.next });
     setBusy(false);
-    if (ok) setPw({});
+    if (ok) { setPw({}); await refresh(); }
   };
   const startSetup = async () => {
     const { ok, d } = await post("/api/account/twofa", { action: "setup" });

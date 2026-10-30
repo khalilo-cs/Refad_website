@@ -17,6 +17,7 @@ export type UserSession = {
   roleKey: string;
   schoolId: string | null;
   directorateId: string | null;
+  mustChangePassword?: boolean;
   isActive: boolean;
   isLocked: boolean;
   permissions: Record<string, unknown>;

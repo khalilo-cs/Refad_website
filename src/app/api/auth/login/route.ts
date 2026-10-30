@@ -13,7 +13,7 @@ import { decryptSecret, verifyTotp } from "@/lib/totp";
 import { dbReadyOr503 } from "@/lib/db/ready";
 
 const schema = z.object({
-  email: z.string().email("أدخل بريدًا إلكترونيًا صالحًا"),
+  email: z.string().trim().min(3, "أدخل البريد الإلكتروني أو اسم المستخدم").max(120),
   password: z.string().min(1, "أدخل كلمة المرور"),
   totp: z.string().optional(),
 });
@@ -69,7 +69,7 @@ export async function POST(request: NextRequest) {
         );
       }
       const reasonMap: Record<string, string> = {
-        credentials: "البريد الإلكتروني أو كلمة المرور غير صحيحة",
+        credentials: "البريد الإلكتروني (أو اسم المستخدم) أو كلمة المرور غير صحيحة",
         locked: "الحساب موقوف من قِبل المسؤول. راجع إدارة المنصة",
         inactive: "الحساب غير فعال. راجع المسؤول",
       };
@@ -114,6 +114,7 @@ export async function POST(request: NextRequest) {
         roleKey: user.roleKey,
         schoolId: user.schoolId,
         directorateId: user.directorateId,
+        mustChangePassword: !!user.mustChangePassword,
       },
     });
   } catch (e: any) {

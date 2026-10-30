@@ -53,7 +53,7 @@ function LoginForm() {
       }
       // تحديث حالة الجلسة قبل الانتقال حتى تظهر القائمة وبيانات المستخدم فوراً
       await reload();
-      router.replace(callbackUrl);
+      router.replace(data.user?.mustChangePassword ? "/settings?force=1" : callbackUrl);
       router.refresh();
     } catch {
       setError("تعذّر الاتصال بالخادم. تحقق من الشبكة وأعد المحاولة.");
@@ -145,22 +145,22 @@ function LoginForm() {
           <form onSubmit={handleSubmit} className="mt-6 space-y-4">
             <div>
               <label htmlFor="email" className="label">
-                البريد الإلكتروني
+                البريد الإلكتروني أو اسم المستخدم
               </label>
               <div className="relative">
                 <Mail className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
                 <input
                   id="email"
-                  type="email"
+                  type="text"
                   required
-                  autoComplete="email"
+                  autoComplete="username"
                   autoCapitalize="none"
                   autoCorrect="off"
                   spellCheck={false}
                   inputMode="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="name@example.com"
+                  placeholder="name@example.com أو اسم المستخدم"
                   className="input pr-10"
                   dir="ltr"
                 />

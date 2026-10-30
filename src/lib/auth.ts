@@ -74,6 +74,8 @@ export type TokenUser = {
   schoolId: string | null;
   directorateId: string | null;
   tokenVersion: number;
+  /** يجب تغيير كلمة المرور قبل أي استخدام آخر (حساب أنشأه المدير أو أعاد ضبطه). */
+  mustChangePassword?: boolean;
 };
 
 type AccessTokenPayload = TokenUser & { type: "access" };
@@ -207,13 +209,14 @@ async function findUserByEmail(email: string): Promise<UserSession | null> {
     role_key: string;
     role_name: string;
     permissions: unknown;
+    must_change_password: number;
   }>(
     `SELECT u.id, u.name, u.email, u.password_hash, u.role_id, u.school_id, u.directorate_id,
-            u.is_active, u.is_locked, u.token_version,
+            u.is_active, u.is_locked, u.token_version, u.must_change_password,
             r.key AS role_key, r.permissions, r.name AS role_name
      FROM users u JOIN roles r ON u.role_id = r.id
-     WHERE lower(u.email) = ?`,
-    [email.trim().toLowerCase()]
+     WHERE lower(u.email) = ? OR lower(u.username) = ?`,
+    [email.trim().toLowerCase(), email.trim().toLowerCase()]
   );
   if (!row) return null;
   return {
@@ -225,6 +228,7 @@ async function findUserByEmail(email: string): Promise<UserSession | null> {
     schoolId: row.school_id,
     directorateId: row.directorate_id,
     tokenVersion: row.token_version,
+    mustChangePassword: row.must_change_password === 1,
     isActive: row.is_active === 1,
     isLocked: row.is_locked === 1,
     permissions: typeof row.permissions === "string" ? JSON.parse(row.permissions || "{}") : (row.permissions ?? {}),
@@ -310,9 +314,10 @@ export async function refreshSession(refreshToken: string): Promise<{
     role_key: string;
     role_name: string;
     permissions: unknown;
+    must_change_password: number;
   } & UserSession>(
     `SELECT u.id, u.name, u.email, u.password_hash, u.role_id, u.school_id, u.directorate_id,
-            u.is_active, u.is_locked, u.token_version,
+            u.is_active, u.is_locked, u.token_version, u.must_change_password,
             r.key AS role_key, r.name AS role_name, r.permissions
      FROM users u JOIN roles r ON u.role_id = r.id
      WHERE u.id = ?`,
@@ -331,6 +336,7 @@ export async function refreshSession(refreshToken: string): Promise<{
     schoolId: user.school_id,
     directorateId: user.directorate_id,
     tokenVersion: user.token_version,
+    mustChangePassword: user.must_change_password === 1,
     isActive: user.is_active === 1,
     isLocked: user.is_locked === 1,
     permissions:
@@ -373,9 +379,10 @@ async function sessionFromPayload(payload: AccessTokenPayload): Promise<UserSess
     is_active: number;
     is_locked: number;
     token_version: number;
+    must_change_password: number;
     permissions: unknown;
   }>(
-    "SELECT u.id, u.is_active, u.is_locked, u.token_version, r.permissions FROM users u JOIN roles r ON u.role_id = r.id WHERE u.id = ?",
+    "SELECT u.id, u.is_active, u.is_locked, u.token_version, u.must_change_password, r.permissions FROM users u JOIN roles r ON u.role_id = r.id WHERE u.id = ?",
     [payload.userId]
   );
   if (!user || user.is_locked === 1 || !user.is_active || user.token_version !== payload.tokenVersion) {
@@ -390,6 +397,7 @@ async function sessionFromPayload(payload: AccessTokenPayload): Promise<UserSess
     schoolId: payload.schoolId,
     directorateId: payload.directorateId,
     tokenVersion: payload.tokenVersion,
+    mustChangePassword: user.must_change_password === 1,
     isActive: user.is_active === 1,
     isLocked: user.is_locked === 1,
     permissions: typeof user.permissions === "string" ? JSON.parse(user.permissions as string) : (user.permissions ?? {}),
@@ -453,6 +461,9 @@ export function authorize(user: UserSession | null, options: {
 }): { allowed: boolean; reason?: string } {
   if (!user || !user.isActive || user.isLocked) {
     return { allowed: false, reason: "غير مصرح لك بالدخول" };
+  }
+  if (user.mustChangePassword) {
+    return { allowed: false, reason: "يجب تغيير كلمة المرور أولاً من الإعدادات" };
   }
 
   const hasAll = user.permissions?.all === true;

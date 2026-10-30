@@ -18,6 +18,7 @@ export async function GET() {
       roleKey: session.roleKey,
       schoolId: session.schoolId,
       directorateId: session.directorateId,
+      mustChangePassword: !!session.mustChangePassword,
       isActive: session.isActive,
       isLocked: session.isLocked,
       permissions: session.permissions,

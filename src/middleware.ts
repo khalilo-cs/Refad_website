@@ -28,6 +28,9 @@ const PUBLIC_PATHS = [
   "/logo.svg",
 ];
 
+/** ما يُسمح به لحساب يلزمه تغيير كلمة المرور. */
+const MCP_ALLOWED = ["/settings", "/api/account", "/api/auth", "/api/health"];
+
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 
 /** رابط الدليل المؤقت الموقَّع: يُقبل بلا جلسة (التحقق من التوقيع والانتهاء يتم في المسار نفسه). */
@@ -66,13 +69,13 @@ export function middleware(request: NextRequest) {
   }
 
   const token = request.cookies.get("access_token")?.value;
-  let payload: { userId?: string } | null = null;
+  let payload: { userId?: string; mustChangePassword?: boolean } | null = null;
   if (token) {
     try {
       payload = jwt.verify(token, ACCESS_SECRET, {
         issuer: "rifad",
         audience: "rifad-app",
-      }) as { userId?: string };
+      }) as { userId?: string; mustChangePassword?: boolean };
     } catch {
       payload = null;
     }
@@ -86,6 +89,12 @@ export function middleware(request: NextRequest) {
     const url = new URL("/login", request.url);
     url.searchParams.set("callbackUrl", pathname);
     return NextResponse.redirect(url);
+  }
+
+  // حساب يلزمه تغيير كلمة المرور: لا يصل إلا إلى صفحة الإعدادات وواجهات الحساب والخروج.
+  if (authenticated && payload?.mustChangePassword && !MCP_ALLOWED.some((p) => pathname === p || pathname.startsWith(p + "/")) && !isPublic(pathname)) {
+    if (isApi) return NextResponse.json({ message: "يجب تغيير كلمة المرور أولاً", mustChangePassword: true }, { status: 403 });
+    return NextResponse.redirect(new URL("/settings?force=1", request.url));
   }
 
   if (authenticated && (pathname === "/login" || pathname === "/setup")) {

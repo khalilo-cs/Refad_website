@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { getServerSession, authorize, auditLog } from "@/lib/auth";
 import { queryOne, nowISO , exec } from "@/lib/db/sqlite";
+import { generatePassword, normalizeUsername } from "@/lib/credentials";
+import { normalizePhoneField, wa } from "@/lib/school-input";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -17,12 +19,13 @@ type UserRow = {
   is_locked: number;
   token_version: number;
   role_key: string;
+  username: string | null;
 };
 
 async function loadUser(id: string) {
   return await queryOne<UserRow>(
     `SELECT u.id, u.name, u.email, u.role_id, u.school_id, u.directorate_id,
-            u.is_active, u.is_locked, u.token_version, r.key AS role_key
+            u.is_active, u.is_locked, u.token_version, u.username, r.key AS role_key
      FROM users u JOIN roles r ON u.role_id = r.id WHERE u.id = ?`,
     [id]
   );
@@ -51,8 +54,11 @@ export async function PATCH(
     }
 
     const body = await request.json();
-    const { name, email, roleKey, schoolId, directorateId, isActive, isLocked, password } =
-      body ?? {};
+    const { name, email, roleKey, schoolId, directorateId, isActive, isLocked } = body ?? {};
+    let password: string | undefined = body?.password;
+    // إعادة تعيين بكلمة مؤقتة تُولَّد وتُعاد مرة واحدة، وتُلزم المستخدم بتغييرها.
+    const reset = body?.resetPassword === true;
+    if (reset) password = generatePassword();
 
     const sets: string[] = [];
     const args: (string | number | null)[] = [];
@@ -143,7 +149,41 @@ export async function PATCH(
       sets.push("is_locked = ?");
       args.push(isLocked ? 1 : 0);
       if (isLocked) bumpTokenVersion = true;
+      else sets.push("failed_login = 0", "locked_until = NULL");
     }
+
+    if (body?.phone !== undefined) {
+      const ph = normalizePhoneField(body.phone, body?.allowInvalidPhone === true);
+      if (ph.error) return NextResponse.json({ message: ph.error, invalidPhone: true }, { status: 400 });
+      sets.push("phone = ?");
+      args.push(ph.value ?? null);
+    }
+    if (body?.hasWhatsapp !== undefined) {
+      sets.push("has_whatsapp = ?");
+      args.push(wa(body.hasWhatsapp));
+    }
+    if (body?.jobTitle !== undefined) {
+      sets.push("job_title = ?");
+      args.push(typeof body.jobTitle === "string" && body.jobTitle.trim() ? body.jobTitle.trim().slice(0, 80) : null);
+    }
+    if (body?.username !== undefined) {
+      const un = body.username ? normalizeUsername(body.username) : null;
+      if (body.username && !un) {
+        return NextResponse.json({ message: "اسم المستخدم: 3–40 خانة من الحروف اللاتينية الصغيرة والأرقام و . _ - فقط" }, { status: 400 });
+      }
+      if (un) {
+        const dupU = await queryOne<{ id: string }>("SELECT id FROM users WHERE lower(username) = ? AND id != ?", [un, id]);
+        if (dupU) return NextResponse.json({ message: "اسم المستخدم مستخدم لمستخدم آخر" }, { status: 409 });
+      }
+      sets.push("username = ?");
+      args.push(un);
+    }
+    if (body?.mustChangePassword !== undefined) {
+      sets.push("must_change_password = ?");
+      args.push(body.mustChangePassword ? 1 : 0);
+      if (body.mustChangePassword) bumpTokenVersion = true;
+    }
+    if (body?.revokeSessions === true) bumpTokenVersion = true;
 
     if (password !== undefined) {
       if (typeof password !== "string" || password.length < 10) {
@@ -161,7 +201,24 @@ export async function PATCH(
       const hash = await bcrypt.hash(password, 12);
       sets.push("password_hash = ?");
       args.push(hash);
+      sets.push("password_changed_at = datetime('now')");
+      // كلمة يعيّنها المدير تُعدّ مؤقتة دائماً ما لم يُصرَّح بخلافه.
+      if (body?.mustChangePassword === undefined) {
+        sets.push("must_change_password = 1");
+      }
       bumpTokenVersion = true;
+    }
+
+    {
+      const finalRole = roleKey ?? target.role_key;
+      const finalDir = directorateId !== undefined ? directorateId : target.directorate_id;
+      if (["INSPECTOR", "EDUCATION_DIRECTOR"].includes(finalRole) && !finalDir) {
+        return NextResponse.json({ message: "المديرية مطلوبة لهذا الدور" }, { status: 400 });
+      }
+      const finalSchool = schoolId !== undefined ? schoolId : target.school_id;
+      if (["SCHOOL_PRINCIPAL", "QUALITY_COORDINATOR"].includes(finalRole) && !finalSchool) {
+        return NextResponse.json({ message: "المدرسة مطلوبة لهذا الدور" }, { status: 400 });
+      }
     }
 
     if (sets.length === 0) {
@@ -205,6 +262,8 @@ export async function PATCH(
     return NextResponse.json({
       message: password !== undefined ? "تم تحديث المستخدم وإعادة تعيين كلمة المرور" : "تم تحديث المستخدم",
       sessionsRevoked: bumpTokenVersion,
+      // تُعرض مرة واحدة فقط عند التوليد التلقائي
+      ...(reset ? { credentials: { login: target.username ?? target.email, password, mustChange: true, generated: true } } : {}),
     });
   } catch (e: any) {
     return NextResponse.json(

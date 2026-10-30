@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
   const hash = await hashPassword(next);
   await exec("UPDATE users SET password_hash = ?, token_version = token_version + 1, password_changed_at = datetime('now'), must_change_password = 0 WHERE id = ?", [hash, session.userId]);
   // نُصدر رمزاً جديداً لهذه الجلسة بعد إبطال القديم
-  const fresh = { ...session, tokenVersion: row.token_version + 1 };
+  const fresh = { ...session, tokenVersion: row.token_version + 1, mustChangePassword: false };
   await setAuthCookies(signAccessToken(fresh), signRefreshToken(session.userId, fresh.tokenVersion));
   await auditLog({ userId: session.userId, action: "PASSWORD_CHANGED", entityType: "User", entityId: session.userId, ipAddress: clientIp(request) });
   return NextResponse.json({ message: "تم تغيير كلمة المرور وإنهاء الجلسات الأخرى" });
