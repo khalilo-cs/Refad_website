@@ -15,10 +15,12 @@ import StructureManager from "@/components/admin/structure-manager";
 import RolesManager from "@/components/admin/roles-manager";
 import AuditLog from "@/components/admin/audit-log";
 import SecurityPanel from "@/components/admin/security-panel";
+import ControlCenter from "@/components/admin/control-center";
 
-type Tab = "schools" | "geo" | "users" | "structure" | "scale" | "roles" | "audit" | "security";
+type Tab = "control" | "schools" | "geo" | "users" | "structure" | "scale" | "roles" | "audit" | "security";
 
 const TABS: { key: Tab; label: string; icon: any }[] = [
+  { key: "control", label: "مركز التحكم", icon: SlidersHorizontal },
   { key: "schools", label: "المدارس", icon: Building2 },
   { key: "geo", label: "المحافظات والمديريات", icon: MapPin },
   { key: "users", label: "المستخدمون", icon: Users },
@@ -39,7 +41,7 @@ function listOf<T = any>(data: any, key: string): T[] {
 export default function AdminPage() {
   const { user, loading: sessionLoading } = useSession();
   const { add } = useToast();
-  const [tab, setTab] = useState<Tab>("schools");
+  const [tab, setTab] = useState<Tab>("control");
 
   // حالة كل قسم
   const [schools, setSchools] = useState<any[]>([]);
@@ -232,6 +234,8 @@ export default function AdminPage() {
       </div>
 
       {/* ============ المدارس ============ */}
+      {tab === "control" && <ControlCenter />}
+
       {tab === "schools" && (
         <div className="space-y-4">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
