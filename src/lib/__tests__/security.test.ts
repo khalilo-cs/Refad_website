@@ -86,3 +86,19 @@ describe("تحديد المعدل وحماية CSRF", () => {
     expect(isSameOrigin(mk("https://evil.example", "GET"))).toBe(true);
   });
 });
+
+describe("أسرار JWT تُقرأ وقت الاستخدام لا وقت التحميل", () => {
+  it("تحميل وحدة المصادقة بلا JWT_SECRET لا يرمي (حتى لا يفشل البناء)، والتوقيع يرفض بوضوح", async () => {
+    const saved = process.env.JWT_SECRET;
+    const { vi } = await import("vitest");
+    vi.resetModules();
+    delete process.env.JWT_SECRET;
+    try {
+      const auth = await import("@/lib/auth");
+      expect(() => auth.signAccessToken({ userId: "u", email: "a@b.c", name: "n", role: "r", roleKey: "SUPER_ADMIN", schoolId: null, directorateId: null, tokenVersion: 1 } as any)).toThrow(/JWT_SECRET/);
+    } finally {
+      process.env.JWT_SECRET = saved;
+      vi.resetModules();
+    }
+  });
+});

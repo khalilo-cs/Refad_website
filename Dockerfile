@@ -22,9 +22,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY package.json package-lock.json ./
 RUN npm ci --ignore-scripts && npm rebuild better-sqlite3
 COPY . .
-# متغيرات وقت البناء: قيم مؤقتة فقط — الأسرار الحقيقية تُمرَّر وقت التشغيل.
+# لا أسرار وقت البناء: تُقرأ الأسرار عند أول طلب، وتُمرَّر وقت التشغيل فقط.
 ENV NEXT_TELEMETRY_DISABLED=1
-ENV JWT_SECRET=build-time-placeholder-not-used-at-runtime-000000
 RUN npx next build \
     && npx esbuild scripts/init-db.ts --bundle --platform=node --format=cjs \
          --outfile=scripts/init-db.bundle.js --external:better-sqlite3

@@ -48,10 +48,20 @@ export function readSecret(name: string): string {
   return trimmed;
 }
 
-const ACCESS_SECRET = readSecret("JWT_SECRET");
-const REFRESH_SECRET = process.env.JWT_REFRESH_SECRET?.trim()
-  ? readSecret("JWT_REFRESH_SECRET")
-  : ACCESS_SECRET;
+/**
+ * الأسرار تُقرأ عند أول استخدام لا عند تحميل الوحدة: بناء المشروع (Vercel/Docker)
+ * يحمّل المسارات لجمع بياناتها دون متغيرات التشغيل. التحقق يبقى صارماً وقت الطلب:
+ * سرّ مفقود أو ضعيف يُوقف التوقيع والتحقق بخطأ واضح بدل الاستمرار بسرّ فارغ.
+ */
+let secretsCache: { access: string; refresh: string } | null = null;
+function secrets(): { access: string; refresh: string } {
+  if (!secretsCache) {
+    const access = readSecret("JWT_SECRET");
+    const refresh = process.env.JWT_REFRESH_SECRET?.trim() ? readSecret("JWT_REFRESH_SECRET") : access;
+    secretsCache = { access, refresh };
+  }
+  return secretsCache;
+}
 const ACCESS_TTL_MINUTES = Number(process.env.JWT_ACCESS_TTL_MINUTES ?? 60);
 const REFRESH_TTL_DAYS = Number(process.env.JWT_REFRESH_TTL_DAYS ?? 7);
 
@@ -119,7 +129,7 @@ export async function verifyPassword(
 export function signAccessToken(user: TokenUser): string {
   return jwt.sign(
     { ...user, type: "access" },
-    ACCESS_SECRET,
+    secrets().access,
     { expiresIn: `${ACCESS_TTL_MINUTES}m`, issuer: "rifad", audience: "rifad-app" }
   );
 }
@@ -127,7 +137,7 @@ export function signAccessToken(user: TokenUser): string {
 export function signRefreshToken(userId: string, tokenVersion: number): string {
   return jwt.sign(
     { userId, tokenVersion, type: "refresh" },
-    REFRESH_SECRET,
+    secrets().refresh,
     { expiresIn: `${REFRESH_TTL_DAYS}d`, issuer: "rifad", audience: "rifad-app" }
   );
 }
@@ -157,8 +167,9 @@ export async function clearAuthCookies(): Promise<void> {
 }
 
 export function verifyAccessToken(token: string): AccessTokenPayload | null {
+  const secret = secrets().access;
   try {
-    const payload = jwt.verify(token, ACCESS_SECRET, {
+    const payload = jwt.verify(token, secret, {
       issuer: "rifad",
       audience: "rifad-app",
     }) as AccessTokenPayload & JwtPayload;
@@ -169,8 +180,9 @@ export function verifyAccessToken(token: string): AccessTokenPayload | null {
 }
 
 export function verifyRefreshToken(token: string): RefreshTokenPayload | null {
+  const secret = secrets().refresh;
   try {
-    const payload = jwt.verify(token, REFRESH_SECRET, {
+    const payload = jwt.verify(token, secret, {
       issuer: "rifad",
       audience: "rifad-app",
     }) as RefreshTokenPayload & JwtPayload;
