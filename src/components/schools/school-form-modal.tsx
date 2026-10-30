@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { Modal } from "@/components/ui";
 import { useToast } from "@/components/providers";
+import { LocationPicker, type PickedLocation } from "@/components/maps/location-picker";
 
 /* ------------------------------------------------------------------ */
 /* نموذج إضافة/تعديل مدرسة                                              */
@@ -16,15 +17,21 @@ export function SchoolFormModal({ open, onClose, onSaved, school }: { open: bool
   const [f, setF] = useState<any>({});
   const [busy, setBusy] = useState(false);
   const [errors, setErrors] = useState<Record<string, string[]>>({});
+  const [loc, setLoc] = useState<PickedLocation | null>(null);
+  const [phoneBad, setPhoneBad] = useState(false);
+  const [allowBad, setAllowBad] = useState(false);
 
   useEffect(() => {
     if (!open) return;
     setErrors({});
+    setPhoneBad(false);
+    setAllowBad(false);
+    setLoc(school?.latitude != null && school?.longitude != null ? { lat: school.latitude, lng: school.longitude, source: (school.location_source ?? "MANUAL") as PickedLocation["source"] } : null);
     setF(school ? {
       code: school.code, name: school.name, governorateId: school.governorate_id, directorateId: school.directorate_id, areaId: school.area_id ?? "",
       address: school.address ?? "", type: school.type, stage: school.stage, contactPhone: school.contact_phone ?? "", contactEmail: school.contact_email ?? "",
-      principalName: school.principal_name ?? "", latitude: school.latitude ?? "", longitude: school.longitude ?? "", status: school.status,
-    } : { type: "مختلط", stage: "أساسي", dataSource: "MANUAL" });
+      principalName: school.principal_name ?? "", hasWhatsapp: school.has_whatsapp !== 0, status: school.status,
+    } : { type: "مختلط", stage: "أساسي", dataSource: "MANUAL", hasWhatsapp: true });
     fetch("/api/lookup/governorates", { credentials: "include" }).then((r) => r.json()).then((d) => setGovs(Array.isArray(d) ? d : [])).catch(() => {});
   }, [open, school]);
   useEffect(() => {
@@ -43,12 +50,16 @@ export function SchoolFormModal({ open, onClose, onSaved, school }: { open: bool
     setBusy(true);
     setErrors({});
     try {
-      const body: any = { ...f };
-      for (const k of ["areaId", "address", "contactPhone", "contactEmail", "principalName", "latitude", "longitude"]) if (body[k] === "") body[k] = null;
+      const body: any = { ...f, allowInvalidPhone: allowBad };
+      for (const k of ["areaId", "address", "contactPhone", "contactEmail", "principalName"]) if (body[k] === "") body[k] = null;
+      body.latitude = loc ? loc.lat : null;
+      body.longitude = loc ? loc.lng : null;
+      body.locationSource = loc ? loc.source : null;
       const res = await fetch(school ? `/api/schools/${school.id}` : "/api/schools", { method: school ? "PATCH" : "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
       const data = await res.json();
-      if (!res.ok) { setErrors(data.errors ?? {}); throw new Error(data.message || "تعذّر الحفظ"); }
+      if (!res.ok) { setErrors(data.errors ?? {}); setPhoneBad(!!data.invalidPhone); throw new Error(data.message || "تعذّر الحفظ"); }
       add({ type: "success", message: data.message });
+      for (const w of data.warnings ?? []) add({ type: "info", message: w });
       onSaved();
     } catch (e: any) {
       add({ type: "error", message: e.message });
@@ -105,7 +116,13 @@ export function SchoolFormModal({ open, onClose, onSaved, school }: { open: bool
             </select>
           </div>
           {fld({ k: "principalName", label: "اسم مدير المدرسة" })}
-          {fld({ k: "contactPhone", label: "هاتف رسمي", dirLtr: true })}
+          <div>
+            <label className="label">هاتف المدرسة / المدير</label>
+            <input className="input" dir="ltr" inputMode="tel" placeholder="77X XXX XXX" value={f.contactPhone ?? ""} onChange={(e) => { set("contactPhone", e.target.value); setPhoneBad(false); setAllowBad(false); }} />
+            {err("contactPhone") && <p className="mt-1 text-[11.5px] text-danger">{err("contactPhone")}</p>}
+            {phoneBad && <label className="mt-1 flex items-center gap-1.5 text-[12px] text-gray-700"><input type="checkbox" checked={allowBad} onChange={(e) => setAllowBad(e.target.checked)} /> احفظ الرقم كما هو رغم ذلك</label>}
+            <label className="mt-1.5 flex items-center gap-2 text-[12.5px] text-gray-700"><input type="checkbox" checked={f.hasWhatsapp !== false} onChange={(e) => set("hasWhatsapp", e.target.checked)} /> هذا الرقم عليه واتساب</label>
+          </div>
           {fld({ k: "contactEmail", label: "بريد رسمي", type: "email", dirLtr: true })}
           {school && (
             <div>
@@ -117,11 +134,8 @@ export function SchoolFormModal({ open, onClose, onSaved, school }: { open: bool
           )}
         </div>
         <fieldset className="rounded-xl border border-gray-200 p-3">
-          <legend className="px-2 text-[12px] font-semibold text-gray-600">الإحداثيات (من مصدر معتمد — اختياري)</legend>
-          <div className="grid gap-3 sm:grid-cols-2">
-            {fld({ k: "latitude", label: "خط العرض", type: "number", ph: "مثال: 14.80", dirLtr: true })}
-            {fld({ k: "longitude", label: "خط الطول", type: "number", ph: "مثال: 43.00", dirLtr: true })}
-          </div>
+          <legend className="px-2 text-[12px] font-semibold text-gray-600">موقع المدرسة على الخريطة (اختياري)</legend>
+          <LocationPicker value={loc} onChange={setLoc} />
         </fieldset>
         <div className="flex justify-end gap-2 border-t border-gray-100 pt-4">
           <button type="button" className="btn btn-ghost btn-sm" onClick={onClose}>إلغاء</button>

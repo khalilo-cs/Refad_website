@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import dynamic from "next/dynamic";
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import {
@@ -12,11 +12,14 @@ import { Alert, EmptyState } from "@/components/ui";
 import { ConfirmDialog, Rise, ScoreBar, ScoreRing, Stagger, StatusBadge, Tabs } from "@/components/ui/extra";
 import { useSession, useToast } from "@/components/providers";
 import { SchoolFormModal } from "@/components/schools/school-form-modal";
+import { SchoolContactsCard } from "@/components/schools/contacts-card";
+import { LocationActions, PhoneActions } from "@/components/ui/contact";
+import { LOCATION_SOURCE_LABEL, type LocationSource } from "@/lib/geo";
 import { REPORT_STATUS, SCORE_COLOR, VISIT_STATUS, VISIT_TYPE, fmtDate, fmtPercent, scoreTone } from "@/lib/labels";
 
 const SchoolsMap = dynamic(() => import("@/components/maps/schools-map"), { ssr: false, loading: () => <div className="skeleton h-[220px] rounded-2xl" /> });
 
-type Tab = "overview" | "visits" | "profile" | "evidence" | "plans";
+type Tab = "overview" | "visits" | "profile" | "contacts" | "evidence" | "plans";
 
 const FACILITIES: [string, string][] = [
   ["has_science_lab", "معمل علوم"], ["has_computer_lab", "معمل حاسوب"], ["has_library", "مكتبة"], ["has_resource_room", "غرفة مصادر تعلم"],
@@ -36,11 +39,14 @@ export default function SchoolDetailPage() {
   const { add } = useToast();
   const [data, setData] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
-  const [tab, setTab] = useState<Tab>("overview");
+  const sp = useSearchParams();
+  const initialTab = (["overview", "visits", "profile", "contacts", "evidence", "plans"] as Tab[]).find((t) => t === sp.get("tab")) ?? "overview";
+  const [tab, setTab] = useState<Tab>(initialTab);
   const [editOpen, setEditOpen] = useState(false);
   const [editSchool, setEditSchool] = useState<any>(null);
   const [archiveOpen, setArchiveOpen] = useState(false);
   const [openCrit, setOpenCrit] = useState<string | null>(null);
+  const [contactsKey, setContactsKey] = useState(0);
 
   const load = useCallback(async () => {
     try {
@@ -109,6 +115,12 @@ export default function SchoolDetailPage() {
                 {s.principal_name && <span className="flex items-center gap-1"><Users className="h-3.5 w-3.5" />{s.principal_name}</span>}
               </p>
               {res?.warnings?.length > 0 && <p className="text-[12px] text-gold-bright">{res.warnings[res.warnings.length - 1]}</p>}
+              {(s.contact_phone || (s.latitude != null && s.longitude != null)) && (
+                <div className="flex flex-wrap items-center gap-2 pt-1">
+                  {s.contact_phone && <span className="inline-flex items-center rounded-xl bg-white/95 px-3 py-1"><PhoneActions phone={s.contact_phone} hasWhatsapp={s.has_whatsapp !== 0} name={s.principal_name ?? s.name} /></span>}
+                  {s.latitude != null && s.longitude != null && <span className="inline-flex items-center rounded-xl bg-white/95 px-2 py-1"><LocationActions lat={s.latitude} lng={s.longitude} label /></span>}
+                </div>
+              )}
             </div>
             <div className="flex flex-wrap gap-2 md:flex-col">
               {canVisit && <Link href={`/visits?new=1&schoolId=${id}`} className="btn btn-gold btn-sm justify-center"><CalendarPlus className="h-3.5 w-3.5" /> زيارة جديدة</Link>}
@@ -126,6 +138,7 @@ export default function SchoolDetailPage() {
           { key: "overview", label: "نظرة عامة" },
           { key: "visits", label: "الزيارات", count: data.visits.length },
           { key: "profile", label: "الملف والمرافق" },
+          { key: "contacts", label: "جهات الاتصال والموقع" },
           { key: "evidence", label: "الأدلة", count: data.evidence?.total ?? 0 },
           { key: "plans", label: "التحسين والتقارير", count: data.plans.length },
         ]}
@@ -240,6 +253,28 @@ export default function SchoolDetailPage() {
 
       {tab === "profile" && <ProfileTab id={id} data={data} onSaved={load} canEdit={canManage || user?.roleKey === "INSPECTOR" || (user?.roleKey === "SCHOOL_PRINCIPAL" && (user as any)?.permissions?.manageSchoolProfile === true)} canVerify={["SUPER_ADMIN", "EDUCATION_DIRECTOR", "INSPECTOR"].includes(user?.roleKey ?? "")} />}
 
+      {tab === "contacts" && (
+        <div className="grid gap-4 lg:grid-cols-5">
+          <div className="card p-5 lg:col-span-3"><SchoolContactsCard schoolId={id} onEditPrimary={openEdit} refreshKey={contactsKey} /></div>
+          <div className="card p-5 lg:col-span-2">
+            <div className="mb-3 flex items-center justify-between gap-2">
+              <h3 className="font-heading text-[15px] font-bold text-navy">موقع المدرسة</h3>
+              <LocationActions lat={s.latitude} lng={s.longitude} label />
+            </div>
+            {mapPoint.length ? (
+              <>
+                <SchoolsMap schools={mapPoint} height={220} />
+                <p className="mt-2 text-[11.5px] text-gray-500">
+                  <bdi dir="ltr" className="font-mono">{Number(s.latitude).toFixed(6)}, {Number(s.longitude).toFixed(6)}</bdi>
+                  {s.location_source && <> · {LOCATION_SOURCE_LABEL[s.location_source as LocationSource] ?? s.location_source}</>}
+                  {s.location_updated_at && <> · {fmtDate(s.location_updated_at)}</>}
+                </p>
+              </>
+            ) : <EmptyState icon={MapPin} title="لم يُحدَّد موقع المدرسة" description={canManage ? "حدّده من زر «تعديل» لتظهر على الخريطة ويتوفر زر التوجيه." : "لم تُدخل الإدارة الموقع بعد."} />}
+          </div>
+        </div>
+      )}
+
       {tab === "evidence" && (
         <div className="card p-5">
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -275,7 +310,7 @@ export default function SchoolDetailPage() {
         </div>
       )}
 
-      <SchoolFormModal open={editOpen} school={editSchool} onClose={() => setEditOpen(false)} onSaved={() => { setEditOpen(false); void load(); }} />
+      <SchoolFormModal open={editOpen} school={editSchool} onClose={() => setEditOpen(false)} onSaved={() => { setEditOpen(false); void load(); setContactsKey((k) => k + 1); }} />
       <ConfirmDialog open={archiveOpen} title="أرشفة المدرسة" message="ستُخفى المدرسة من القوائم النشطة مع الاحتفاظ بكل زياراتها وتقييماتها وأدلتها. يمكن استعادتها لاحقاً من التعديل." confirmLabel="أرشفة" onConfirm={archive} onClose={() => setArchiveOpen(false)} />
     </div>
   );

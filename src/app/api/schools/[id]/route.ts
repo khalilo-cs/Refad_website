@@ -7,6 +7,7 @@ import {
 } from "@/lib/auth";
 import { query, queryOne, exec, uuid, nowISO } from "@/lib/db/sqlite";
 import { canAccessSchool } from "@/lib/scope";
+import { checkLocation, findNearbySchools, normalizePhoneField } from "@/lib/school-input";
 
 export const runtime = "nodejs";
 
@@ -17,13 +18,17 @@ const schoolSchema = z.object({
   directorateId: z.string().uuid().optional(),
   areaId: z.string().uuid().optional().nullable(),
   address: z.string().optional().nullable(),
-  latitude: z.preprocess((v) => (v === "" || v == null ? undefined : Number(v)), z.number().optional().nullable()),
-  longitude: z.preprocess((v) => (v === "" || v == null ? undefined : Number(v)), z.number().optional().nullable()),
+  // null أو "" = مسح الموقع، وغياب الحقل = لا تغيير
+  latitude: z.preprocess((v) => (v === undefined ? undefined : v === "" || v === null ? null : Number(v)), z.number().optional().nullable()),
+  longitude: z.preprocess((v) => (v === undefined ? undefined : v === "" || v === null ? null : Number(v)), z.number().optional().nullable()),
   type: z.string().optional(),
   stage: z.string().optional(),
   contactPhone: z.string().optional().nullable(),
   contactEmail: z.string().email().optional().nullable(),
   principalName: z.string().optional().nullable(),
+  hasWhatsapp: z.boolean().optional(),
+  allowInvalidPhone: z.boolean().optional(),
+  locationSource: z.string().optional().nullable(),
   status: z.enum(["ACTIVE", "INACTIVE", "SUSPENDED"]).optional(),
 });
 
@@ -82,10 +87,16 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     return NextResponse.json({ message: "بيانات غير صحيحة", errors: parsed.error.flatten().fieldErrors }, { status: 400 });
   }
 
+  const phone = normalizePhoneField(parsed.data.contactPhone, parsed.data.allowInvalidPhone === true);
+  if (phone.error) return NextResponse.json({ message: phone.error, errors: { contactPhone: [phone.error] }, invalidPhone: true }, { status: 400 });
+  const loc = checkLocation(parsed.data.latitude, parsed.data.longitude, parsed.data.locationSource);
+  if (!loc.ok) return NextResponse.json({ message: loc.message, errors: { latitude: [loc.message] } }, { status: 400 });
+  if (loc.lat !== undefined && !isManager) return NextResponse.json({ message: "تحديد موقع المدرسة من صلاحيات الإدارة" }, { status: 403 });
+
   const fields: string[] = [];
   const values: unknown[] = [];
   // مدير المدرسة يعدّل بيانات الاتصال والعنوان فقط؛ الرمز والحالة والتبعية الإدارية للإدارة.
-  const PRINCIPAL_COLS = new Set(["address", "contact_phone", "contact_email", "principal_name"]);
+  const PRINCIPAL_COLS = new Set(["address", "contact_phone", "contact_email", "principal_name", "has_whatsapp"]);
   const setField = (col: string, val: unknown) => {
     if (val === undefined) return;
     if (!isManager && !PRINCIPAL_COLS.has(col)) return;
@@ -98,11 +109,16 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   setField("directorate_id", parsed.data.directorateId);
   setField("area_id", parsed.data.areaId);
   setField("address", parsed.data.address);
-  setField("latitude", parsed.data.latitude);
-  setField("longitude", parsed.data.longitude);
+  setField("latitude", loc.lat);
+  setField("longitude", loc.lng);
+  if (loc.lat !== undefined) {
+    setField("location_source", loc.source ?? null);
+    setField("location_updated_at", loc.lat == null ? null : nowISO());
+  }
+  setField("has_whatsapp", parsed.data.hasWhatsapp === undefined ? undefined : parsed.data.hasWhatsapp ? 1 : 0);
   setField("type", parsed.data.type);
   setField("stage", parsed.data.stage);
-  setField("contact_phone", parsed.data.contactPhone);
+  setField("contact_phone", phone.value);
   setField("contact_email", parsed.data.contactEmail);
   setField("principal_name", parsed.data.principalName);
   setField("status", parsed.data.status);
@@ -125,7 +141,12 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     userAgent: request.headers.get("user-agent") ?? null,
   });
 
-  return NextResponse.json({ message: "تم تحديث بيانات المدرسة" });
+  const warnings: string[] = [];
+  if (typeof loc.lat === "number" && typeof loc.lng === "number") {
+    const near = await findNearbySchools(loc.lat, loc.lng, id);
+    for (const n of near) warnings.push(`الموقع قريب جداً (${n.meters} م) من «${n.name}» (${n.code}) — تأكد أنه ليس تكراراً`);
+  }
+  return NextResponse.json({ message: "تم تحديث بيانات المدرسة", warnings });
 }
 
 /**

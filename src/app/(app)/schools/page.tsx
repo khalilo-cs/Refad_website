@@ -8,11 +8,13 @@ import { EmptyState, Modal, PageHeader, LoadingRows } from "@/components/ui";
 import { Pagination, useDebounced } from "@/components/ui/extra";
 import { useSession, useToast } from "@/components/providers";
 import { fmtDate } from "@/lib/labels";
+import { LocationActions, PhoneActions } from "@/components/ui/contact";
 import { SchoolFormModal } from "@/components/schools/school-form-modal";
 
 type School = {
   id: string; code: string; name: string; type: string; stage: string; status: string; data_source: string;
   directorate: string; governorate: string; visitsCount: number; last_updated_at: string; latitude: number | null; longitude: number | null;
+  contact_phone: string | null; has_whatsapp: number | null; principal_name: string | null;
 };
 
 const SORTS: { key: string; label: string; cls?: string }[] = [
@@ -124,10 +126,11 @@ export default function SchoolsPage() {
                 ))}
                 <th className="px-4 py-3 text-right font-medium">النوع / المرحلة</th>
                 <th className="px-4 py-3 text-right font-medium">الحالة</th>
+                <th className="px-4 py-3 text-right font-medium">اتصال وتوجيه</th>
               </tr>
             </thead>
             <tbody>
-              {loading ? <LoadingRows cols={7} rows={6} /> : rows.map((s, i) => (
+              {loading ? <LoadingRows cols={8} rows={6} /> : rows.map((s, i) => (
                 <motion.tr key={s.id} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: Math.min(i * 0.03, 0.3) }} className="group border-b border-gray-50 transition hover:bg-turquoise-soft/30">
                   <td className="px-4 py-3">
                     <Link href={`/schools/${s.id}`} className="font-semibold text-navy hover:text-turquoise hover:underline">{s.name}</Link>
@@ -139,10 +142,17 @@ export default function SchoolsPage() {
                   <td className="hidden px-4 py-3 text-gray-500 lg:table-cell">{fmtDate(s.last_updated_at)}</td>
                   <td className="px-4 py-3 text-gray-600">{s.type} / {s.stage}</td>
                   <td className="px-4 py-3"><span className={`badge ${s.status === "ACTIVE" ? "badge-success" : "badge-neutral"}`}>{STATUS_AR[s.status] ?? s.status}</span></td>
+                  <td className="px-4 py-3">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <PhoneActions phone={s.contact_phone} hasWhatsapp={s.has_whatsapp !== 0} name={s.principal_name ?? s.name} showNumber={false} />
+                      <LocationActions lat={s.latitude} lng={s.longitude} />
+                      {s.latitude == null && canManage && <Link href={`/schools/${s.id}?tab=contacts`} className="text-[11px] text-warning hover:underline" title="لم يُحدَّد موقع المدرسة">بلا موقع</Link>}
+                    </div>
+                  </td>
                 </motion.tr>
               ))}
               {!loading && rows.length === 0 && (
-                <tr><td colSpan={7}>
+                <tr><td colSpan={8}>
                   <EmptyState icon={Building2} title="لا توجد مدارس مطابقة" description={canManage ? "أضف مدرسة يدوياً أو استورد السجل من ملف Excel/CSV." : "لا مدارس ضمن نطاق صلاحيتك بهذه المرشحات."}
                     action={canManage ? <button className="btn btn-primary btn-sm" onClick={() => setCreateOpen(true)}><Plus className="h-3.5 w-3.5" /> إضافة مدرسة</button> : undefined} />
                 </td></tr>

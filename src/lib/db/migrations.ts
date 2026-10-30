@@ -248,6 +248,38 @@ export const MIGRATIONS: Migration[] = [
       UPDATE schools SET name = replace(name, 'مدرسة رِفاد التجريبية', 'مدرسة إتقان التجريبية') WHERE code LIKE 'RIFAD-DEMO-%';
     `,
   },
+  {
+    id: 8,
+    name: "contacts-locations-people",
+    sql: `
+      -- جهات اتصال إضافية للمدرسة (وكيل، منسق جودة، حارس...). الجهة الرئيسية (المدير) في جدول المدارس نفسه.
+      CREATE TABLE IF NOT EXISTS school_contacts (
+        id TEXT PRIMARY KEY,
+        school_id TEXT NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+        role TEXT NOT NULL,
+        name TEXT NOT NULL,
+        phone TEXT,
+        has_whatsapp INTEGER NOT NULL DEFAULT 1,
+        email TEXT,
+        notes TEXT,
+        created_by_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+      CREATE INDEX IF NOT EXISTS idx_school_contacts_school ON school_contacts(school_id);
+
+      -- الأشخاص: المسمى الوظيفي، هل رقمه على واتساب، واسم مستخدم بديل عن البريد (لمن لا بريد لهم)
+      ALTER TABLE users ADD COLUMN job_title TEXT;
+      ALTER TABLE users ADD COLUMN has_whatsapp INTEGER NOT NULL DEFAULT 1;
+      ALTER TABLE users ADD COLUMN username TEXT;
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_users_username ON users(lower(username)) WHERE username IS NOT NULL;
+
+      -- المدارس: هل الهاتف الرسمي على واتساب، ومصدر الموقع وتاريخ تحديده
+      ALTER TABLE schools ADD COLUMN has_whatsapp INTEGER NOT NULL DEFAULT 1;
+      ALTER TABLE schools ADD COLUMN location_source TEXT;
+      ALTER TABLE schools ADD COLUMN location_updated_at TEXT;
+    `,
+  },
 ];
 
 /** واجهة تنفيذ مستقلة عن المحرّك (SQLite محلي أو libSQL). */

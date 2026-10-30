@@ -3,6 +3,7 @@ import { getServerSession, authorize, auditLog } from "@/lib/auth";
 import { query, queryOne, uuid, nowISO, transaction , exec } from "@/lib/db/sqlite";
 import * as ExcelJS from "exceljs";
 import { parseSchoolRows, TEMP_CODE_PREFIX, type SheetRow } from "@/lib/school-import";
+import { inYemen } from "@/lib/geo";
 
 export const runtime = "nodejs";
 
@@ -109,6 +110,8 @@ export async function POST(request: NextRequest) {
     if ((lat != null && (Number.isNaN(lat) || lat < -90 || lat > 90)) || (lng != null && (Number.isNaN(lng) || lng < -180 || lng > 180)))
       errors.push({ row: r, field: "coordinates", message: "إحداثيات غير صالحة (خط العرض -90..90، خط الطول -180..180)" });
     if ((lat == null) !== (lng == null)) errors.push({ row: r, field: "coordinates", message: "يجب إدخال خطي العرض والطول معاً" });
+    else if (lat != null && lng != null && !Number.isNaN(lat) && !Number.isNaN(lng) && !inYemen(lat, lng))
+      errors.push({ row: r, field: "coordinates", message: "الإحداثيات خارج اليمن — تحقق من عدم قلب خطّي العرض والطول" });
     if (session.roleKey === "EDUCATION_DIRECTOR" && directorateName) {
       const own = session.directorateId && directorates.find((x) => x.id === session.directorateId)?.name;
       if (own !== directorateName) errors.push({ row: r, field: "directorate", message: "لا يمكنك إضافة مدارس خارج مديريتك" });
@@ -140,8 +143,9 @@ export async function POST(request: NextRequest) {
       const d = directorates.find((x: { id: string; name: string; governorate_id: string }) => x.name === row.directorate && x.governorate_id === g.id)!;
       const id = uuid();
       const now = nowISO();
-      await exec(`INSERT INTO schools (id, code, name, governorate_id, directorate_id, address, type, stage, contact_phone, contact_email, principal_name, latitude, longitude, data_source, status, last_updated_at, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'EXCEL_IMPORT', 'ACTIVE', ?, ?)`, [id, row.code, row.name, g.id, d.id, row.address || null, row.type, row.stage, row.contact_phone || null, row.contact_email || null, row.principal_name || null, row.latitude ?? null, row.longitude ?? null, now, now]);
+      const hasLoc = row.latitude != null && row.longitude != null;
+      await exec(`INSERT INTO schools (id, code, name, governorate_id, directorate_id, address, type, stage, contact_phone, contact_email, principal_name, latitude, longitude, data_source, status, last_updated_at, created_at, location_source, location_updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'EXCEL_IMPORT', 'ACTIVE', ?, ?, ?, ?)`, [id, row.code, row.name, g.id, d.id, row.address || null, row.type, row.stage, row.contact_phone || null, row.contact_email || null, row.principal_name || null, row.latitude ?? null, row.longitude ?? null, now, now, hasLoc ? "IMPORT" : null, hasLoc ? now : null]);
       await auditLog({
         userId: session.userId,
         action: "CREATE",

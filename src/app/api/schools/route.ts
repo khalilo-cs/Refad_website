@@ -7,6 +7,7 @@ import {
 } from "@/lib/auth";
 import { query, queryOne, exec, uuid, nowISO, toJson } from "@/lib/db/sqlite";
 import { schoolScope } from "@/lib/scope";
+import { checkLocation, findNearbySchools, normalizePhoneField } from "@/lib/school-input";
 
 export const runtime = "nodejs";
 
@@ -25,6 +26,9 @@ const schoolSchema = z.object({
   contactEmail: z.string().email().optional().nullable(),
   principalName: z.string().optional().nullable(),
   dataSource: z.enum(["MANUAL", "EXCEL_IMPORT", "OFFICIAL"]).default("MANUAL"),
+  hasWhatsapp: z.boolean().optional(),
+  allowInvalidPhone: z.boolean().optional(),
+  locationSource: z.string().optional().nullable(),
 });
 
 export async function GET(request: NextRequest) {
@@ -74,7 +78,7 @@ export async function GET(request: NextRequest) {
 
   const schools = await query<any>(
     `SELECT s.id, s.code, s.name, s.type, s.stage, s.contact_phone, s.status, s.data_source, s.last_updated_at,
-            s.latitude, s.longitude, s.principal_name,
+            s.latitude, s.longitude, s.principal_name, s.has_whatsapp, s.location_source,
             d.name AS directorate, g.name AS governorate,
             (SELECT COUNT(*) FROM visits v WHERE v.school_id = s.id) AS visitsCount
      FROM schools s
@@ -112,14 +116,25 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ message: "بيانات غير صحيحة", errors: parsed.error.flatten().fieldErrors }, { status: 400 });
   }
 
-  const { code, name, governorateId, directorateId, areaId, address, latitude, longitude, type, stage, contactPhone, contactEmail, principalName, dataSource } = parsed.data;
+  const { code, name, governorateId, directorateId, areaId, address, type, stage, contactEmail, principalName, dataSource } = parsed.data;
+  const phone = normalizePhoneField(parsed.data.contactPhone, parsed.data.allowInvalidPhone === true);
+  if (phone.error) return NextResponse.json({ message: phone.error, errors: { contactPhone: [phone.error] }, invalidPhone: true }, { status: 400 });
+  const loc = checkLocation(parsed.data.latitude, parsed.data.longitude, parsed.data.locationSource);
+  if (!loc.ok) return NextResponse.json({ message: loc.message, errors: { latitude: [loc.message] } }, { status: 400 });
+  const latitude = loc.lat ?? null, longitude = loc.lng ?? null;
   const exists = await queryOne("SELECT id FROM schools WHERE code = ?", [code]);
   if (exists) return NextResponse.json({ message: "الكود المدرسي مستخدم مسبقاً" }, { status: 409 });
+  const dup = await queryOne<{ code: string }>("SELECT code FROM schools WHERE directorate_id = ? AND name = ?", [directorateId, name.trim()]);
+  if (dup) return NextResponse.json({ message: `توجد مدرسة بالاسم نفسه في هذه المديرية (الرمز ${dup.code})` }, { status: 409 });
+  if (session.roleKey === "EDUCATION_DIRECTOR" && session.directorateId !== directorateId) {
+    return NextResponse.json({ message: "لا يمكنك إضافة مدارس خارج مديريتك" }, { status: 403 });
+  }
 
   const id = uuid();
   const now = nowISO();
-  await exec(`INSERT INTO schools (id, code, name, governorate_id, directorate_id, area_id, address, latitude, longitude, type, stage, contact_phone, contact_email, principal_name, data_source, status, last_updated_at, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [id, code, name, governorateId, directorateId, areaId ?? null, address ?? null, latitude ?? null, longitude ?? null, type, stage, contactPhone ?? null, contactEmail ?? null, principalName ?? null, dataSource, "ACTIVE", now, now]);
+  await exec(`INSERT INTO schools (id, code, name, governorate_id, directorate_id, area_id, address, latitude, longitude, type, stage, contact_phone, contact_email, principal_name, data_source, status, last_updated_at, created_at, has_whatsapp, location_source, location_updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [id, code, name.trim(), governorateId, directorateId, areaId ?? null, address ?? null, latitude, longitude, type, stage, phone.value ?? null, contactEmail ?? null, principalName ?? null, dataSource, "ACTIVE", now, now,
+    parsed.data.hasWhatsapp === false ? 0 : 1, latitude == null ? null : (loc.ok ? loc.source ?? "MANUAL" : "MANUAL"), latitude == null ? null : now]);
 
   await auditLog({
     userId: session.userId,
@@ -131,5 +146,9 @@ export async function POST(request: NextRequest) {
     userAgent: request.headers.get("user-agent") ?? null,
   });
 
-  return NextResponse.json({ message: "تم إضافة المدرسة بنجاح", school: { id, code, name } }, { status: 201 });
+  const warnings: string[] = [];
+  if (latitude != null && longitude != null) {
+    for (const n of await findNearbySchools(latitude, longitude, id)) warnings.push(`الموقع قريب جداً (${n.meters} م) من «${n.name}» (${n.code}) — تأكد أنه ليس تكراراً`);
+  }
+  return NextResponse.json({ message: "تم إضافة المدرسة بنجاح", school: { id, code, name }, warnings }, { status: 201 });
 }

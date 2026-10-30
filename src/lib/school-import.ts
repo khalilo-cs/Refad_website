@@ -7,6 +7,8 @@
  *  - المدرسة بلا رقم تُعطى رمزاً مؤقتاً واضحاً مع تنبيه، بدل إسقاطها.
  */
 
+import { canonicalPhone, parsePhone, splitPhones } from "./phone";
+
 export type Field =
   | "code" | "name" | "governorate" | "directorate" | "type" | "stage"
   | "address" | "phone" | "email" | "principal" | "lat" | "lng";
@@ -122,6 +124,15 @@ export function parseSchoolRows(rows: SheetRow[]): ParseResult {
     }
     const latRaw = get("lat");
     const lngRaw = get("lng");
+    // هاتف: يؤخذ أول رقم إن كُتب أكثر من رقم، وتُنبَّه الصيغ الخاطئة دون إسقاط الصف
+    const phones = splitPhones(get("phone"));
+    let phone: string | undefined;
+    if (phones.length) {
+      phone = canonicalPhone(phones[0]) ?? undefined;
+      const parsed = parsePhone(phones[0]);
+      if (!parsed.valid) warnings.push({ row: r.rowNumber, field: "phone", message: `هاتف «${name || code}» غير صالح (${parsed.reason}) — سيُحفظ كما هو ولن يظهر له زر اتصال حتى يُصحَّح` });
+      if (phones.length > 1) warnings.push({ row: r.rowNumber, field: "phone", message: `«${name || code}» فيها أكثر من رقم؛ حُفظ الأول فقط ويمكن إضافة الباقي من «جهات الاتصال»` });
+    }
     out.push({
       row: r.rowNumber,
       code,
@@ -132,7 +143,7 @@ export function parseSchoolRows(rows: SheetRow[]): ParseResult {
       type: get("type"),
       stage: normalizeStage(get("stage")),
       address: get("address") || undefined,
-      phone: get("phone") || undefined,
+      phone,
       email: get("email") || undefined,
       principal: get("principal") || undefined,
       lat: latRaw ? Number(latRaw) : undefined,
