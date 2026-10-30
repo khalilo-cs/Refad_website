@@ -34,6 +34,35 @@ export async function GET(_request: Request, ctx: { params: Promise<{ code: stri
   );
 
   if (!row) {
+    // شهادات التكريم الصادرة من بيانات التقييم الذاتي
+    const cert = await queryOne<any>(
+      `SELECT c.code, c.title, c.body, c.academic_year, c.issued_at, c.revoked_at, s.name AS school_name, d.name AS directorate_name, u.name AS issued_by
+       FROM certificates c JOIN schools s ON s.id = c.school_id LEFT JOIN directorates d ON d.id = s.directorate_id
+       LEFT JOIN users u ON u.id = c.issued_by_id WHERE c.code = ?`,
+      [clean]
+    );
+    if (cert) {
+      return NextResponse.json({
+        valid: true,
+        report: {
+          kind: "certificate",
+          number: cert.code,
+          title: cert.title,
+          body: cert.body,
+          year: cert.academic_year,
+          status: cert.revoked_at ? "REJECTED" : "APPROVED",
+          statusLabel: cert.revoked_at ? "ملغاة" : "شهادة سارية",
+          approved: !cert.revoked_at,
+          approvedBy: cert.issued_by ?? null,
+          approvedAt: cert.issued_at,
+          school: cert.school_name,
+          directorate: cert.directorate_name ?? null,
+          issuedAt: cert.issued_at,
+          verificationCode: cert.code,
+        },
+        note: "هذه الشهادة صادرة من منصة إتقان بناءً على بيانات التقييم الذاتي والتحسين المعتمدة من الإدارة.",
+      });
+    }
     return NextResponse.json(
       {
         valid: false,

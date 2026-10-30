@@ -280,6 +280,83 @@ export const MIGRATIONS: Migration[] = [
       ALTER TABLE schools ADD COLUMN location_updated_at TEXT;
     `,
   },
+  {
+    id: 9,
+    name: "self-assessment-improvement-cycle",
+    sql: `
+      -- استمارة التقييم الذاتي لكل مدرسة في كل عام دراسي
+      CREATE TABLE IF NOT EXISTS self_assessments (
+        id TEXT PRIMARY KEY,
+        school_id TEXT NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+        academic_year TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'DRAFT',
+        submitted_at TEXT,
+        submitted_by_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+        UNIQUE (school_id, academic_year)
+      );
+      CREATE INDEX IF NOT EXISTS idx_self_assessments_year ON self_assessments(academic_year);
+
+      -- تقييم كل مؤشر ودورة معالجة الضعف: ضعيف ← خطة ← تنفيذ ← تحسّن ← اعتماد
+      CREATE TABLE IF NOT EXISTS self_assessment_items (
+        id TEXT PRIMARY KEY,
+        assessment_id TEXT NOT NULL REFERENCES self_assessments(id) ON DELETE CASCADE,
+        indicator_id TEXT NOT NULL REFERENCES indicators(id) ON DELETE CASCADE,
+        baseline_score INTEGER,
+        score INTEGER,
+        is_weak INTEGER NOT NULL DEFAULT 0,
+        weak_marked_at TEXT,
+        improvement_status TEXT NOT NULL DEFAULT 'NONE',
+        plan_action TEXT,
+        plan_responsible TEXT,
+        plan_due_date TEXT,
+        plan_success_measure TEXT,
+        plan_set_at TEXT,
+        progress_note TEXT,
+        improved_at TEXT,
+        review_note TEXT,
+        verified_by_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+        verified_at TEXT,
+        notes TEXT,
+        updated_by_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+        UNIQUE (assessment_id, indicator_id)
+      );
+      CREATE INDEX IF NOT EXISTS idx_sa_items_assessment ON self_assessment_items(assessment_id);
+      CREATE INDEX IF NOT EXISTS idx_sa_items_status ON self_assessment_items(improvement_status);
+
+      -- تاريخ كل مؤشر (لا يُعدَّل): كان ضعيفاً ثم عُمل عليه ثم تحسّن
+      CREATE TABLE IF NOT EXISTS self_assessment_history (
+        id TEXT PRIMARY KEY,
+        item_id TEXT NOT NULL REFERENCES self_assessment_items(id) ON DELETE CASCADE,
+        event TEXT NOT NULL,
+        from_value TEXT,
+        to_value TEXT,
+        note TEXT,
+        user_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+        created_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+      CREATE INDEX IF NOT EXISTS idx_sa_history_item ON self_assessment_history(item_id);
+
+      -- شهادات التكريم الصادرة من بيانات المنصة، قابلة للتحقق برمز
+      CREATE TABLE IF NOT EXISTS certificates (
+        id TEXT PRIMARY KEY,
+        code TEXT NOT NULL UNIQUE,
+        school_id TEXT NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+        academic_year TEXT NOT NULL,
+        kind TEXT NOT NULL,
+        title TEXT NOT NULL,
+        body TEXT NOT NULL,
+        details TEXT NOT NULL DEFAULT '{}',
+        issued_by_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+        issued_at TEXT NOT NULL DEFAULT (datetime('now')),
+        revoked_at TEXT
+      );
+      CREATE INDEX IF NOT EXISTS idx_certificates_school ON certificates(school_id, academic_year);
+    `,
+  },
 ];
 
 /** واجهة تنفيذ مستقلة عن المحرّك (SQLite محلي أو libSQL). */

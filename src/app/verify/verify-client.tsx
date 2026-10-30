@@ -72,10 +72,10 @@ export default function VerifyClient() {
             <RifadLogo size={46} withText tone="light" />
           </div>
           <h1 className="font-heading text-[26px] font-bold text-white sm:text-[32px]">
-            التحقق من صحة تقرير
+            التحقق من صحة تقرير أو شهادة
           </h1>
           <p className="mx-auto mt-2 max-w-lg text-[13px] leading-relaxed text-white/60">
-            أدخل رمز التحقق المطبوع على التقرير للتأكد من صدوره عن المنصة ومعرفة حالته
+            أدخل رمز التحقق المطبوع على التقرير أو الشهادة للتأكد من صدوره عن المنصة ومعرفة حالته
             الحالية.
           </p>
         </div>
@@ -133,7 +133,7 @@ export default function VerifyClient() {
                   </span>
                   <div>
                     <p className="font-heading text-[16px] font-bold text-success">
-                      التقرير مسجّل في المنصة
+                      {rep.kind === "certificate" ? "الشهادة مسجّلة في المنصة" : "التقرير مسجّل في المنصة"}
                     </p>
                     <p className="text-[11.5px] text-gray-500">
                       تم العثور على تطابق لرمز التحقق
@@ -142,12 +142,14 @@ export default function VerifyClient() {
                 </div>
 
                 <dl className="divide-y divide-gray-100">
-                  <Row icon={ShieldCheck} label="رقم التقرير">
+                  <Row icon={ShieldCheck} label={rep.kind === "certificate" ? "رمز الشهادة" : "رقم التقرير"}>
                     <span className="font-mono text-[13px] font-semibold text-navy" dir="ltr">
                       {rep.number}
                     </span>
                   </Row>
                   <Row icon={Info} label="العنوان">{rep.title}</Row>
+                  {rep.body && <Row icon={Info} label="نص الشهادة"><span className="leading-relaxed">{rep.body}</span></Row>}
+                  {rep.year && <Row icon={CalendarDays} label="العام الدراسي"><span dir="ltr">{rep.year}</span></Row>}
                   <Row icon={StatusIcon} label="الحالة">
                     <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[11.5px] font-bold ${style?.cls}`}>
                       {StatusIcon && <StatusIcon className="h-3 w-3" />}

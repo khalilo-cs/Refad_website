@@ -20,6 +20,8 @@ import {
   Map,
   Trophy,
   Phone,
+  ClipboardCheck,
+  Award,
 } from "lucide-react";
 import RifadLogo from "@/components/brand/rifad-logo";
 import InstitutionLogos from "@/components/brand/institution-logos";
@@ -41,6 +43,8 @@ const ICONS: Record<string, React.ComponentType<any>> = {
   Map,
   Trophy,
   Phone,
+  ClipboardCheck,
+  Award,
 };
 
 type Props = {

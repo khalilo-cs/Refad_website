@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { SelfAssessmentNudge } from "@/components/self-assessment/nudge";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import {
@@ -100,6 +101,7 @@ export default function DashboardPage() {
           </>
         }
       />
+      {user && ["SCHOOL_PRINCIPAL", "QUALITY_COORDINATOR"].includes(user.roleKey) && <SelfAssessmentNudge />}
 
       {showFilters && (
         <div className="card animate-fade-up p-4">
