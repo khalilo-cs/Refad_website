@@ -4,7 +4,7 @@ import { query, queryOne, uuid, transaction , exec } from "@/lib/db/sqlite";
 import { schoolScope, canAccessSchool } from "@/lib/scope";
 import { clientIp, rateLimit, sanitizeFilename, sha256Hex, sniffFile } from "@/lib/security";
 import { notify, schoolUsers } from "@/lib/notify";
-import { putObject } from "@/lib/storage";
+import { putObject, StorageNotConfiguredError } from "@/lib/storage";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -202,6 +202,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ id, version, url: `/api/evidence/${id}/file`, message: replacing ? "تم رفع نسخة جديدة من الدليل" : "تم رفع الدليل" }, { status: 201 });
   } catch (e: any) {
+    if (e instanceof StorageNotConfiguredError) return bad(e.message, 503);
     return bad("تعذّر حفظ الملف", 500);
   }
 }

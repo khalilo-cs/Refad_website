@@ -13,6 +13,21 @@ export function usesBlobStorage(): boolean {
   return Boolean(process.env.BLOB_READ_WRITE_TOKEN?.trim());
 }
 
+export const STORAGE_NOT_CONFIGURED_MESSAGE =
+  "تخزين الملفات غير مهيّأ على هذه الاستضافة: اربط متجر Vercel Blob بالمشروع (Storage) ثم أعد النشر.";
+
+export class StorageNotConfiguredError extends Error {
+  constructor() {
+    super(STORAGE_NOT_CONFIGURED_MESSAGE);
+    this.name = "StorageNotConfiguredError";
+  }
+}
+
+/** على الاستضافات بلا قرص دائم لا يصح الحفظ محلياً: الملف يضيع بعد إعادة التشغيل. */
+function assertLocalStorageAllowed(): void {
+  if (process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.NETLIFY) throw new StorageNotConfiguredError();
+}
+
 const BLOB_PREFIX = "evidence/";
 
 export async function putObject(key: string, data: Buffer, contentType: string): Promise<void> {
@@ -26,6 +41,7 @@ export async function putObject(key: string, data: Buffer, contentType: string):
     });
     return;
   }
+  assertLocalStorageAllowed();
   const full = safeStoragePath(key);
   if (!full) throw new Error("مسار تخزين غير صالح");
   await mkdir(path.dirname(full), { recursive: true });

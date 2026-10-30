@@ -100,3 +100,31 @@ describe("حماية الاستضافة بلا قرص", () => {
     expect(SCHEMA_SQL).toBe(fs.readFileSync("prisma/schema.sql", "utf8"));
   });
 });
+
+describe("رسائل الإعداد الناقص على الاستضافة", () => {
+  it("غياب JWT_SECRET يعيد رسالة عربية واضحة بدل خطأ عام", async () => {
+    const saved = process.env.JWT_SECRET;
+    delete process.env.JWT_SECRET;
+    try {
+      const { dbReadyOr503, SECRET_NOT_CONFIGURED_MESSAGE } = await import("@/lib/db/ready");
+      const res = await dbReadyOr503();
+      expect(res?.status).toBe(503);
+      expect((await res!.json()).message).toBe(SECRET_NOT_CONFIGURED_MESSAGE);
+    } finally {
+      process.env.JWT_SECRET = saved;
+    }
+  });
+
+  it("رفع ملف على Vercel دون ربط Blob يرفض برسالة واضحة ولا يكتب على القرص", async () => {
+    const saved = { VERCEL: process.env.VERCEL, BLOB: process.env.BLOB_READ_WRITE_TOKEN };
+    process.env.VERCEL = "1";
+    delete process.env.BLOB_READ_WRITE_TOKEN;
+    try {
+      const { putObject, StorageNotConfiguredError } = await import("@/lib/storage");
+      await expect(putObject("x.pdf", Buffer.from("%PDF"), "application/pdf")).rejects.toBeInstanceOf(StorageNotConfiguredError);
+    } finally {
+      if (saved.VERCEL === undefined) delete process.env.VERCEL; else process.env.VERCEL = saved.VERCEL;
+      if (saved.BLOB !== undefined) process.env.BLOB_READ_WRITE_TOKEN = saved.BLOB;
+    }
+  });
+});

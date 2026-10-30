@@ -4,7 +4,7 @@ import { exec, query, queryOne, uuid, transaction } from "@/lib/db/sqlite";
 import { canAccessSchool, schoolScope } from "@/lib/scope";
 import { clientIp, rateLimit, sanitizeFilename, sha256Hex, sniffFile } from "@/lib/security";
 import { notify } from "@/lib/notify";
-import { putObject } from "@/lib/storage";
+import { putObject, StorageNotConfiguredError } from "@/lib/storage";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -48,7 +48,12 @@ export async function POST(request: NextRequest) {
   if (!kind) return bad("نوع الملف غير مسموح أو محتواه لا يطابق امتداده");
 
   const key = `${uuid()}.${kind.ext}`;
-  await putObject(key, buf, kind.mime);
+  try {
+    await putObject(key, buf, kind.mime);
+  } catch (e) {
+    if (e instanceof StorageNotConfiguredError) return bad(e.message, 503);
+    throw e;
+  }
   const evId = uuid();
   const matId = uuid();
   await transaction(async () => {
