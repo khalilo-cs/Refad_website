@@ -257,6 +257,23 @@ export type MigrationRunner = {
   inTransaction(fn: () => Promise<void>): Promise<void>;
 };
 
+/**
+ * يحذف من نص الترحيل أوامر ADD COLUMN لأعمدة موجودة أصلاً. يجعل الترحيل آمناً لإعادة
+ * التشغيل بعد انقطاع جزئي (libSQL لا يلفّ ALTER بمعاملة)، وعلى قواعد أنشأتها نسخة
+ * سابقة من المنصة أضافت بعض الأعمدة بنفسها.
+ */
+export async function skipExistingColumns(db: MigrationRunner, sql: string): Promise<string> {
+  const known = new Map<string, Set<string>>();
+  let out = sql;
+  for (const [stmt, table, column] of sql.matchAll(/ALTER\s+TABLE\s+(\w+)\s+ADD\s+COLUMN\s+(\w+)[^;]*;/gi)) {
+    if (!known.has(table)) {
+      known.set(table, new Set((await db.all<{ name: string }>(`PRAGMA table_info(${table})`)).map((c) => c.name)));
+    }
+    if (known.get(table)!.has(column)) out = out.replace(stmt, "");
+  }
+  return out;
+}
+
 /** يطبّق الترحيلات المعلّقة. لا يفعل شيئاً إن لم تُهيَّأ قاعدة البيانات بعد. */
 export async function runMigrations(db: MigrationRunner): Promise<number> {
   const hasUsers = await db.all("SELECT 1 FROM sqlite_master WHERE type='table' AND name='users'");
@@ -269,8 +286,9 @@ export async function runMigrations(db: MigrationRunner): Promise<number> {
   let count = 0;
   for (const m of MIGRATIONS) {
     if (applied.has(m.id)) continue;
+    const sql = await skipExistingColumns(db, m.sql);
     await db.inTransaction(async () => {
-      await db.script(m.sql);
+      await db.script(sql);
       await db.script(`INSERT INTO schema_migrations (id, name) VALUES (${m.id}, '${m.name.replace(/'/g, "''")}')`);
     });
     count++;
