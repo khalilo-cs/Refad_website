@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession, authorize, auditLog } from "@/lib/auth";
 import { query, queryOne, uuid, nowISO, transaction , exec } from "@/lib/db/sqlite";
 import * as ExcelJS from "exceljs";
+import { parseSchoolRows, TEMP_CODE_PREFIX, type SheetRow } from "@/lib/school-import";
 
 export const runtime = "nodejs";
 
@@ -60,63 +61,71 @@ export async function POST(request: NextRequest) {
   const errors: Array<{ row: number; field: string; message: string }> = [];
   const seenCodes = new Set<string>();
 
-  let rowNo = 1;
-  sheet.eachRow((row: any, r: number) => {
-    if (r === 1) { rowNo = r; return; } // ترويسة
-    const get = (col: string) => (row.getCell(col)?.value ?? "").toString().trim();
-    const code = get("A");
-    const name = get("B");
-    const governorateName = get("C");
-    const directorateName = get("D");
-    const type = get("E");
-    const stage = get("F");
-    const address = get("G") || undefined;
-    const phone = get("H") || undefined;
-    const email = get("I") || undefined;
-    const principal = get("J") || undefined;
-    const latRaw = get("K");
-    const lngRaw = get("L");
-    const lat = latRaw ? Number(latRaw) : undefined;
-    const lng = lngRaw ? Number(lngRaw) : undefined;
+  // قراءة مرنة: صف العناوين يُكتشف تلقائياً والأعمدة تُطابق بأسمائها
+  const sheetRows: SheetRow[] = [];
+  sheet.eachRow({ includeEmpty: false }, (row: any, r: number) => {
+    sheetRows.push({ rowNumber: r, cells: (row.values as unknown[]) ?? [] });
+  });
+  const parsed = parseSchoolRows(sheetRows);
+  const warnings = [...parsed.warnings];
+  const existingNames = await query<{ name: string; directorate_id: string }>("SELECT name, directorate_id FROM schools");
+  let tempSeq = 0;
+  const nextTemp = () => {
+    let c: string;
+    do { tempSeq++; c = `${TEMP_CODE_PREFIX}${String(tempSeq).padStart(3, "0")}`; } while (codeSet.has(c) || seenCodes.has(c));
+    return c;
+  };
 
-    rowNo = r;
-    if (!code && !name && !governorateName) return; // صف فارغ
+  for (const p of parsed.rows) {
+    const r = p.row;
+    const governorateName = p.governorate;
+    const directorateName = p.directorate;
+    const gov = governorates.find((g) => g.name === governorateName);
+    const dir = directorates.find((x) => x.name === directorateName && (!gov || x.governorate_id === gov.id));
+    let code = p.code;
 
-    if (!code) errors.push({ row: r, field: "code", message: "الكود المدرسي مطلوب" });
-    else if (codeSet.has(code) || seenCodes.has(code)) errors.push({ row: r, field: "code", message: "الكود مكرر" });
-    else seenCodes.add(code);
-
-    if (!name) errors.push({ row: r, field: "name", message: "اسم المدرسة مطلوب" });
-    if (!governorateName) errors.push({ row: r, field: "governorate", message: "المحافظة مطلوبة" });
-    else if (!governorates.find((g) => g.name === governorateName)) errors.push({ row: r, field: "governorate", message: "المحافظة غير موجودة" });
-
-    if (!directorateName) errors.push({ row: r, field: "directorate", message: "المديرية مطلوبة" });
-    else {
-      const dir = directorates.find((x) => x.name === directorateName && (!governorateName || x.governorate_id === governorates.find((g) => g.name === governorateName)?.id));
-      if (!dir) errors.push({ row: r, field: "directorate", message: "المديرية غير مطابقة للمحافظة المختارة" });
+    if (p.tempCode) {
+      if (dir && existingNames.some((e) => e.name === p.name && e.directorate_id === dir.id)) {
+        errors.push({ row: r, field: "name", message: `«${p.name}» موجودة مسبقاً في هذه المديرية` });
+        continue;
+      }
+      code = nextTemp();
+      const w = warnings.find((x) => x.row === r && x.field === "code");
+      if (w) w.message = `«${p.name}» بلا رقم مدرسة؛ ستُحفظ بالرمز المؤقت ${code} ويمكن تعديله لاحقاً`;
+    } else if (codeSet.has(code) || seenCodes.has(code)) {
+      errors.push({ row: r, field: "code", message: `الكود ${code} مكرر` });
     }
-    if (!type) errors.push({ row: r, field: "type", message: "نوع المدرسة مطلوب" });
-    if (!stage) errors.push({ row: r, field: "stage", message: "المرحلة الدراسية مطلوبة" });
-    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) errors.push({ row: r, field: "contact_email", message: "بريد إلكتروني غير صالح" });
+    seenCodes.add(code);
 
-    if ((latRaw && (Number.isNaN(lat) || lat! < -90 || lat! > 90)) || (lngRaw && (Number.isNaN(lng) || lng! < -180 || lng! > 180)))
+    if (!p.name) errors.push({ row: r, field: "name", message: "اسم المدرسة مطلوب" });
+    if (!governorateName) errors.push({ row: r, field: "governorate", message: "المحافظة مطلوبة" });
+    else if (!gov) errors.push({ row: r, field: "governorate", message: `المحافظة «${governorateName}» غير موجودة في المنصة` });
+    if (!directorateName) errors.push({ row: r, field: "directorate", message: "المديرية مطلوبة" });
+    else if (!dir) errors.push({ row: r, field: "directorate", message: `المديرية «${directorateName}» غير مطابقة للمحافظة` });
+    if (!p.type) errors.push({ row: r, field: "type", message: "نوع المدرسة مطلوب" });
+    if (!p.stage) errors.push({ row: r, field: "stage", message: "المرحلة الدراسية مطلوبة" });
+    if (p.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(p.email)) errors.push({ row: r, field: "contact_email", message: "بريد إلكتروني غير صالح" });
+    const lat = p.lat, lng = p.lng;
+    if ((lat != null && (Number.isNaN(lat) || lat < -90 || lat > 90)) || (lng != null && (Number.isNaN(lng) || lng < -180 || lng > 180)))
       errors.push({ row: r, field: "coordinates", message: "إحداثيات غير صالحة (خط العرض -90..90، خط الطول -180..180)" });
-    if (!!latRaw !== !!lngRaw) errors.push({ row: r, field: "coordinates", message: "يجب إدخال خطي العرض والطول معاً" });
+    if ((lat == null) !== (lng == null)) errors.push({ row: r, field: "coordinates", message: "يجب إدخال خطي العرض والطول معاً" });
     if (session.roleKey === "EDUCATION_DIRECTOR" && directorateName) {
       const own = session.directorateId && directorates.find((x) => x.id === session.directorateId)?.name;
       if (own !== directorateName) errors.push({ row: r, field: "directorate", message: "لا يمكنك إضافة مدارس خارج مديريتك" });
     }
 
     if (errors.filter((e) => e.row === r).length === 0) {
-      valid.push({ code, name, governorate: governorateName!, directorate: directorateName!, type, stage, address: address || "", contact_phone: phone || undefined, contact_email: email, principal_name: principal, latitude: lat, longitude: lng });
+      valid.push({ code, name: p.name, governorate: governorateName, directorate: directorateName, type: p.type, stage: p.stage, address: p.address || "", contact_phone: p.phone, contact_email: p.email, principal_name: p.principal, latitude: lat, longitude: lng });
     }
-  });
+  }
 
   if (!commit) {
     return NextResponse.json({
       validCount: valid.length,
       errorCount: errors.length,
       errors: errors.slice(0, 500),
+      warnings: warnings.slice(0, 500),
+      headerRow: parsed.headerRow,
       sample: valid.slice(0, 5),
       totalRows: valid.length + new Set(errors.map((e) => e.row)).size,
     });
@@ -143,5 +152,5 @@ export async function POST(request: NextRequest) {
     }
   });
 
-  return NextResponse.json({ message: `تمت إضافة ${valid.length} مدرسة بنجاح`, imported: valid.length, errors: errors.slice(0, 500) });
+  return NextResponse.json({ message: `تمت إضافة ${valid.length} مدرسة بنجاح`, imported: valid.length, errors: errors.slice(0, 500), warnings: warnings.slice(0, 500) });
 }

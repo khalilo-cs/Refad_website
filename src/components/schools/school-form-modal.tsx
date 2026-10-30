@@ -24,7 +24,7 @@ export function SchoolFormModal({ open, onClose, onSaved, school }: { open: bool
       code: school.code, name: school.name, governorateId: school.governorate_id, directorateId: school.directorate_id, areaId: school.area_id ?? "",
       address: school.address ?? "", type: school.type, stage: school.stage, contactPhone: school.contact_phone ?? "", contactEmail: school.contact_email ?? "",
       principalName: school.principal_name ?? "", latitude: school.latitude ?? "", longitude: school.longitude ?? "", status: school.status,
-    } : { type: "حكومية", stage: "أساسي", dataSource: "MANUAL" });
+    } : { type: "مختلط", stage: "أساسي", dataSource: "MANUAL" });
     fetch("/api/lookup/governorates", { credentials: "include" }).then((r) => r.json()).then((d) => setGovs(Array.isArray(d) ? d : [])).catch(() => {});
   }, [open, school]);
   useEffect(() => {
@@ -95,13 +95,13 @@ export function SchoolFormModal({ open, onClose, onSaved, school }: { open: bool
           <div>
             <label className="label">النوع</label>
             <select className="input" value={f.type ?? ""} onChange={(e) => set("type", e.target.value)}>
-              {["حكومية", "أهلية", "خاصة"].map((t) => <option key={t}>{t}</option>)}
+              {[...new Set(["مختلط", "ذكور", "إناث", ...(f.type ? [f.type] : [])])].map((t) => <option key={t}>{t}</option>)}
             </select>
           </div>
           <div>
             <label className="label">المرحلة</label>
             <select className="input" value={f.stage ?? ""} onChange={(e) => set("stage", e.target.value)}>
-              {["أساسي", "ثانوي", "أساسي وثانوي", "رياض أطفال"].map((t) => <option key={t}>{t}</option>)}
+              {[...new Set(["أساسي", "ثانوي", "أساسي وثانوي", "رياض أطفال", ...(f.stage ? [f.stage] : [])])].map((t) => <option key={t}>{t}</option>)}
             </select>
           </div>
           {fld({ k: "principalName", label: "اسم مدير المدرسة" })}

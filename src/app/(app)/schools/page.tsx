@@ -222,6 +222,14 @@ function ImportModal({ open, onClose, onDone }: { open: boolean; onClose: () => 
                 </table>
               </div>
             )}
+            {preview.warnings?.length > 0 && (
+              <div>
+                <p className="mb-1 flex items-center gap-1 text-[12px] font-semibold text-warning"><TriangleAlert className="h-3.5 w-3.5" /> تنبيهات (لا تمنع الحفظ)</p>
+                <div className="max-h-36 overflow-y-auto rounded-xl border border-warning/25 bg-warning/5">
+                  <table className="w-full text-[12px]"><tbody>{preview.warnings.map((w: any, i: number) => <tr key={i} className="border-b border-gray-100 last:border-0"><td className="w-16 px-2 py-1 font-mono text-gray-500">صف {w.row}</td><td className="px-2 py-1 text-gray-700">{w.message}</td></tr>)}</tbody></table>
+                </div>
+              </div>
+            )}
             {preview.errors?.length > 0 && (
               <div>
                 <div className="mb-1 flex items-center justify-between">
