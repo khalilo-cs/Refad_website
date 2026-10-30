@@ -185,7 +185,7 @@ function CertificateModal({ school, year, canIssueRole, onClose }: { school: Row
   };
 
   return (
-    <Modal open onClose={onClose} title="شهادة تقدير مبنية على البيانات" description={`${school.name} — ${year}`} width="lg">
+    <Modal open onClose={onClose} title="شهادة تقدير مبنية على البيانات" description={`${school.name} — \u2066${year}\u2069`} width="lg">
       {!d ? <div className="skeleton h-40 rounded-xl" /> : (
         <div className="space-y-4">
           {d.draft.eligible ? (
@@ -210,7 +210,7 @@ function CertificateModal({ school, year, canIssueRole, onClose }: { school: Row
               <ul className="divide-y divide-gray-100 text-[12px]">
                 {d.issued.map((c) => (
                   <li key={c.id} className="flex flex-wrap items-center justify-between gap-2 py-1.5">
-                    <span><bdi dir="ltr" className="font-mono">{c.code}</bdi> · {c.academic_year} · {fmtDate(c.issued_at)}{c.revoked_at ? " · ملغاة" : ""}</span>
+                    <span><bdi dir="ltr" className="font-mono">{c.code}</bdi> · <bdi dir="ltr">{c.academic_year}</bdi> · {fmtDate(c.issued_at)}{c.revoked_at ? " · ملغاة" : ""}</span>
                     {!c.revoked_at && <button className="btn btn-ghost btn-sm" onClick={() => setPrint({ title: c.title, body: c.body, code: c.code, issuedAt: c.issued_at, school: school.name })}><Printer className="h-3.5 w-3.5" /> طباعة</button>}
                   </li>
                 ))}

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { SchoolWeaknessCard } from "@/components/self-assessment/school-weakness-card";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import dynamic from "next/dynamic";
@@ -19,7 +20,7 @@ import { REPORT_STATUS, SCORE_COLOR, VISIT_STATUS, VISIT_TYPE, fmtDate, fmtPerce
 
 const SchoolsMap = dynamic(() => import("@/components/maps/schools-map"), { ssr: false, loading: () => <div className="skeleton h-[220px] rounded-2xl" /> });
 
-type Tab = "overview" | "visits" | "profile" | "contacts" | "evidence" | "plans";
+type Tab = "overview" | "self" | "visits" | "profile" | "contacts" | "evidence" | "plans";
 
 const FACILITIES: [string, string][] = [
   ["has_science_lab", "معمل علوم"], ["has_computer_lab", "معمل حاسوب"], ["has_library", "مكتبة"], ["has_resource_room", "غرفة مصادر تعلم"],
@@ -40,7 +41,7 @@ export default function SchoolDetailPage() {
   const [data, setData] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
   const sp = useSearchParams();
-  const initialTab = (["overview", "visits", "profile", "contacts", "evidence", "plans"] as Tab[]).find((t) => t === sp.get("tab")) ?? "overview";
+  const initialTab = (["overview", "self", "visits", "profile", "contacts", "evidence", "plans"] as Tab[]).find((t) => t === sp.get("tab")) ?? "overview";
   const [tab, setTab] = useState<Tab>(initialTab);
   const [editOpen, setEditOpen] = useState(false);
   const [editSchool, setEditSchool] = useState<any>(null);
@@ -136,6 +137,7 @@ export default function SchoolDetailPage() {
         onChange={setTab}
         tabs={[
           { key: "overview", label: "نظرة عامة" },
+          ...(["SUPER_ADMIN", "EDUCATION_DIRECTOR", "INSPECTOR", "SCHOOL_PRINCIPAL", "QUALITY_COORDINATOR"].includes(user?.roleKey ?? "") ? [{ key: "self" as Tab, label: "التقييم الذاتي ونقاط الضعف" }] : []),
           { key: "visits", label: "الزيارات", count: data.visits.length },
           { key: "profile", label: "الملف والمرافق" },
           { key: "contacts", label: "جهات الاتصال والموقع" },
@@ -252,6 +254,8 @@ export default function SchoolDetailPage() {
       )}
 
       {tab === "profile" && <ProfileTab id={id} data={data} onSaved={load} canEdit={canManage || user?.roleKey === "INSPECTOR" || (user?.roleKey === "SCHOOL_PRINCIPAL" && (user as any)?.permissions?.manageSchoolProfile === true)} canVerify={["SUPER_ADMIN", "EDUCATION_DIRECTOR", "INSPECTOR"].includes(user?.roleKey ?? "")} />}
+
+      {tab === "self" && <div className="card p-5"><SchoolWeaknessCard schoolId={id} /></div>}
 
       {tab === "contacts" && (
         <div className="grid gap-4 lg:grid-cols-5">
