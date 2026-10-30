@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { isRemoteDb, queryOne } from "@/lib/db/sqlite";
 import { dbReadyOr503 } from "@/lib/db/ready";
+import { usesBlobStorage } from "@/lib/storage";
 
 export const runtime = "nodejs";
 
@@ -20,6 +21,7 @@ export async function GET() {
       service: "itqan-platform",
       database: dbOk ? "connected" : "disconnected",
       engine: isRemoteDb() ? "libsql" : "sqlite",
+      storage: usesBlobStorage() ? "blob" : "local",
     },
     { status: dbOk ? 200 : 503 }
   );

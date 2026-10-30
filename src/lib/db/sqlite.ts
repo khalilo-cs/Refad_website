@@ -41,8 +41,26 @@ export function fromJson<T = unknown>(text: string | null): T | null {
 /* اختيار المحرّك                                                      */
 /* ------------------------------------------------------------------ */
 
+/**
+ * إعداد قاعدة libSQL/Turso من البيئة. يقبل الأسماء التي تضيفها تكاملات Vercel
+ * ولو بسابقة مخصّصة (مثل STORAGE_TURSO_DATABASE_URL)، وLIBSQL_URL، وDATABASE_URL
+ * إن كان عنوان libsql.
+ */
+export function remoteDbConfig(): { url: string; authToken?: string } | null {
+  const env = process.env;
+  const pick = (k: string) => env[k]?.trim() || "";
+  let urlKey = ["TURSO_DATABASE_URL", "LIBSQL_URL"].find((k) => pick(k));
+  if (!urlKey) urlKey = Object.keys(env).find((k) => /(^|_)TURSO_DATABASE_URL$/.test(k) && pick(k));
+  if (!urlKey && /^libsql:\/\//.test(pick("DATABASE_URL"))) urlKey = "DATABASE_URL";
+  if (!urlKey) return null;
+  const tokenKey = urlKey.endsWith("TURSO_DATABASE_URL")
+    ? urlKey.replace(/DATABASE_URL$/, "AUTH_TOKEN")
+    : urlKey === "LIBSQL_URL" ? "LIBSQL_AUTH_TOKEN" : "DATABASE_AUTH_TOKEN";
+  return { url: pick(urlKey), authToken: pick(tokenKey) || pick("TURSO_AUTH_TOKEN") || undefined };
+}
+
 export function isRemoteDb(): boolean {
-  return Boolean(process.env.TURSO_DATABASE_URL?.trim());
+  return remoteDbConfig() !== null;
 }
 
 export function isServerlessRuntime(): boolean {
@@ -50,7 +68,7 @@ export function isServerlessRuntime(): boolean {
 }
 
 export const DB_NOT_CONFIGURED_MESSAGE =
-  "قاعدة البيانات غير مهيّأة على هذه الاستضافة. اضبط TURSO_DATABASE_URL و TURSO_AUTH_TOKEN في إعدادات البيئة ثم أعد النشر.";
+  "قاعدة البيانات غير مهيّأة على هذه الاستضافة: اربط قاعدة Turso بالمشروع من تبويب Storage في Vercel ثم أعد النشر (Redeploy).";
 
 export class DbNotConfiguredError extends Error {
   constructor() {
@@ -144,8 +162,8 @@ async function remote(): Promise<RemoteClient> {
     remoteReady = (async () => {
       const { createClient } = await import("@libsql/client");
       const client = createClient({
-        url: process.env.TURSO_DATABASE_URL!.trim(),
-        authToken: process.env.TURSO_AUTH_TOKEN?.trim() || undefined,
+        url: remoteDbConfig()!.url,
+        authToken: remoteDbConfig()!.authToken,
       }) as unknown as RemoteClient;
       await client.execute({ sql: "PRAGMA foreign_keys = ON", args: [] }).catch(() => undefined);
       await runMigrations(remoteRunner(client));

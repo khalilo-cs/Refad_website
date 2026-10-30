@@ -88,7 +88,7 @@ describe("حماية الاستضافة بلا قرص", () => {
       const fresh = await import("@/lib/db/sqlite");
       const err = await fresh.query("SELECT 1").catch((e) => e);
       expect(fresh.isDbNotConfigured(err)).toBe(true);
-      expect(String(err.message)).toContain("TURSO_DATABASE_URL");
+      expect(String(err.message)).toContain("Turso");
     } finally {
       process.env = saved;
     }
@@ -126,5 +126,41 @@ describe("رسائل الإعداد الناقص على الاستضافة", () 
       if (saved.VERCEL === undefined) delete process.env.VERCEL; else process.env.VERCEL = saved.VERCEL;
       if (saved.BLOB !== undefined) process.env.BLOB_READ_WRITE_TOKEN = saved.BLOB;
     }
+  });
+});
+
+describe("أسماء إعدادات Turso وBlob كما تضيفها تكاملات Vercel", () => {
+  const keep = { ...process.env };
+  const reset = () => { for (const k of Object.keys(process.env)) if (!(k in keep)) delete process.env[k]; Object.assign(process.env, keep); };
+
+  it("يقبل السابقة المخصّصة لقاعدة Turso ويأخذ الرمز المرافق لها", async () => {
+    const { remoteDbConfig } = await import("@/lib/db/sqlite");
+    delete process.env.TURSO_DATABASE_URL;
+    process.env.STORAGE_TURSO_DATABASE_URL = "libsql://itqan-org.turso.io";
+    process.env.STORAGE_TURSO_AUTH_TOKEN = "tok-123";
+    try {
+      expect(remoteDbConfig()).toEqual({ url: "libsql://itqan-org.turso.io", authToken: "tok-123" });
+    } finally { reset(); }
+  });
+
+  it("يقبل DATABASE_URL إن كان عنوان libsql فقط", async () => {
+    const { remoteDbConfig } = await import("@/lib/db/sqlite");
+    delete process.env.TURSO_DATABASE_URL;
+    process.env.DATABASE_URL = "postgres://x";
+    try {
+      expect(remoteDbConfig()).toBeNull();
+      process.env.DATABASE_URL = "libsql://db.turso.io";
+      expect(remoteDbConfig()?.url).toBe("libsql://db.turso.io");
+    } finally { reset(); }
+  });
+
+  it("يجد رمز Blob ولو بسابقة مخصّصة", async () => {
+    const { blobToken } = await import("@/lib/storage");
+    delete process.env.BLOB_READ_WRITE_TOKEN;
+    process.env.FILES_READ_WRITE_TOKEN = "vercel_blob_rw_abc";
+    process.env.OTHER_READ_WRITE_TOKEN = "not-a-blob-token";
+    try {
+      expect(blobToken()).toBe("vercel_blob_rw_abc");
+    } finally { reset(); }
   });
 });
