@@ -161,10 +161,10 @@ export async function seedDatabase(opts: SeedOptions = {}): Promise<{ demoPasswo
   // 2. الإعدادات الافتراضية
   // ----------------------------------------------------------
   const settings = [
-    { key: "system.name", value: { ar: "منصة إتقان للاعتماد المدرسي وضمان جودة التعليم" } },
+    { key: "system.name", value: { ar: "منصة رفاد للاعتماد المدرسي وضمان جودة التعليم" } },
     {
       key: "system.institution",
-      value: { ar: "منصة إتقان — مديرية الجراحي، محافظة الحديدة" },
+      value: { ar: "منصة رفاد — مديرية الجراحي، محافظة الحديدة" },
     },
     { key: "ratings.scale", value: RATING_SCALE },
     { key: "file.maxSizeMB", value: DEFAULT_SYSTEM_SETTINGS.maxFileSizeMB },
@@ -310,9 +310,9 @@ export async function seedDatabase(opts: SeedOptions = {}): Promise<{ demoPasswo
   const DEMO_NOTE =
     "سجل توضيحي للعرض الأول فقط. يُحذف أو يُستبدل بسجلات المدارس الفعلية عبر استيراد Excel/CSV أو الإدخال اليدوي.";
   const demoSchools = [
-    { id: uuid(), code: "RIFAD-DEMO-001", name: "مدرسة إتقان التجريبية (أ) — بيانات وهمية للعرض فقط", stage: "أساسي", lat: 14.945, lng: 43.455, type: "حكومية" },
-    { id: uuid(), code: "RIFAD-DEMO-002", name: "مدرسة إتقان التجريبية (ب) — بيانات وهمية للعرض فقط", stage: "ثانوي", lat: 14.9, lng: 43.5, type: "حكومية" },
-    { id: uuid(), code: "RIFAD-DEMO-003", name: "مدرسة إتقان التجريبية (ج) — بيانات وهمية للعرض فقط", stage: "أساسي", lat: 14.985, lng: 43.52, type: "حكومية" },
+    { id: uuid(), code: "RIFAD-DEMO-001", name: "مدرسة رفاد التجريبية (أ) — بيانات وهمية للعرض فقط", stage: "أساسي", lat: 14.945, lng: 43.455, type: "حكومية" },
+    { id: uuid(), code: "RIFAD-DEMO-002", name: "مدرسة رفاد التجريبية (ب) — بيانات وهمية للعرض فقط", stage: "ثانوي", lat: 14.9, lng: 43.5, type: "حكومية" },
+    { id: uuid(), code: "RIFAD-DEMO-003", name: "مدرسة رفاد التجريبية (ج) — بيانات وهمية للعرض فقط", stage: "أساسي", lat: 14.985, lng: 43.52, type: "حكومية" },
   ];
   for (const sc of demoSchools) {
     rows.push({

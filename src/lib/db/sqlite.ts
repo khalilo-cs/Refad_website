@@ -1,5 +1,5 @@
 /**
- * طبقة الوصول إلى قاعدة بيانات منصة إتقان.
+ * طبقة الوصول إلى قاعدة بيانات منصة رفاد.
  *
  * محرّكان بواجهة واحدة غير متزامنة:
  *   - SQLite محلي عبر better-sqlite3 (خادم عادي أو Docker بقرص دائم).
@@ -453,7 +453,7 @@ export async function dumpToSql(): Promise<string> {
      WHERE sql IS NOT NULL AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '_litestream%' AND name NOT LIKE 'libsql_%'
      ORDER BY CASE type WHEN 'table' THEN 1 WHEN 'index' THEN 2 WHEN 'trigger' THEN 3 ELSE 4 END, name`
   );
-  const lines = ["-- منصة إتقان — نسخة احتياطية", `-- ${nowISO()}`, "PRAGMA foreign_keys = OFF;", "BEGIN TRANSACTION;", ""];
+  const lines = ["-- منصة رفاد — نسخة احتياطية", `-- ${nowISO()}`, "PRAGMA foreign_keys = OFF;", "BEGIN TRANSACTION;", ""];
   for (const t of objects.filter((o) => o.type === "table")) {
     lines.push(`DROP TABLE IF EXISTS "${t.name}";`, `${t.sql};`);
     for (const row of await query<Record<string, unknown>>(`SELECT * FROM "${t.name}"`)) {

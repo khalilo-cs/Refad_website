@@ -87,7 +87,7 @@ export async function renderReportPdf(content: ReportContent, meta: PdfMeta): Pr
   doc.addFont("Amiri-Regular.ttf", "Amiri", "normal");
   doc.addFileToVFS("Amiri-Bold.ttf", f.bold);
   doc.addFont("Amiri-Bold.ttf", "Amiri", "bold");
-  doc.setProperties({ title: content.title, subject: `${meta.number} — ${meta.verificationCode}`, creator: "منصة إتقان" });
+  doc.setProperties({ title: content.title, subject: `${meta.number} — ${meta.verificationCode}`, creator: "منصة رفاد" });
 
   const mark = loadImage("caqae-mark.png");
   const moe = loadImage("moe-logo.png");
@@ -126,10 +126,10 @@ export async function renderReportPdf(content: ReportContent, meta: PdfMeta): Pr
       doc.addImage(moe, "PNG", M + 1.5, 5, 19, 20);
     }
     setFont(17, true, [255, 255, 255]);
-    drawText("منصة إتقان للاعتماد المدرسي وضمان جودة التعليم", PAGE_W / 2, 13, "center");
+    drawText("منصة رفاد للاعتماد المدرسي وضمان جودة التعليم", PAGE_W / 2, 13, "center");
     setFont(9.5, false, [226, 232, 240]);
     drawText(meta.issuer ?? "الجمهورية اليمنية — محافظة الحديدة — مديرية الجراحي", PAGE_W / 2, 19.5, "center");
-    drawText("مجلس الاعتماد الأكاديمي وضمان جودة التعليم  ·  وزارة التربية والتعليم", PAGE_W / 2, 24.5, "center");
+    drawText("تحت إشراف وزارة التربية والتعليم  ·  مجلس الاعتماد الأكاديمي وضمان جودة التعليم", PAGE_W / 2, 24.5, "center");
     void h;
   };
 
@@ -343,7 +343,7 @@ export async function renderReportPdf(content: ReportContent, meta: PdfMeta): Pr
   }
   y += 6;
   setFont(8.5, false, GRAY);
-  for (const l of wrapLogical(measure, "صدر هذا التقرير من منصة إتقان، وهو مستند إداري داخلي لا يحمل ختماً حكومياً ولا توقيعاً. للتحقق من صحته افتح رابط التحقق أو امسح الرمز المطبوع.", CW)) { drawText(l, RIGHT, y); y += 4.2; }
+  for (const l of wrapLogical(measure, "صدر هذا التقرير من منصة رفاد، وهو مستند إداري داخلي لا يحمل ختماً حكومياً ولا توقيعاً. للتحقق من صحته افتح رابط التحقق أو امسح الرمز المطبوع.", CW)) { drawText(l, RIGHT, y); y += 4.2; }
 
   /* ------------ التذييل والعلامة المائية لكل صفحة ------------ */
   const pages = doc.getNumberOfPages();

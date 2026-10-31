@@ -7,7 +7,7 @@ import Sidebar from "@/components/layout/sidebar";
 import TopBar from "@/components/layout/topbar";
 import RifadLogo from "@/components/brand/rifad-logo";
 import Link from "next/link";
-import { Lock } from "lucide-react";
+import { ListChecks, Lock } from "lucide-react";
 import { NAV_ITEMS, navFor } from "@/lib/nav";
 
 
@@ -34,6 +34,21 @@ export default function AppShell({ children }: { children: ReactNode }) {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
+
+  // الاختبار التفاعلي إجباري على مدير المدرسة ومنسق الجودة حتى يكتمل
+  const [quizRequired, setQuizRequired] = useState<{ answered: number; total: number } | null>(null);
+  useEffect(() => {
+    if (!user || !["SCHOOL_PRINCIPAL", "QUALITY_COORDINATOR"].includes(user.roleKey)) { setQuizRequired(null); return; }
+    fetch("/api/self-assessment/status", { credentials: "include" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => setQuizRequired(d?.required ? { answered: d.answered, total: d.total } : null))
+      .catch(() => setQuizRequired(null));
+  }, [user, pathname]);
+  const QUIZ_FREE = ["/self-assessment/quiz", "/settings", "/communication"];
+  const quizBlocked = !!quizRequired && !QUIZ_FREE.some((p) => pathname === p || pathname.startsWith(p + "/"));
+  useEffect(() => {
+    if (quizBlocked && (pathname === "/dashboard" || pathname === "/self-assessment")) router.replace("/self-assessment/quiz");
+  }, [quizBlocked, pathname, router]);
 
   // إشعار ترحيب مرة واحدة لكل جلسة، لا في كل تنقّل
   const welcomed = useRef(false);
@@ -77,7 +92,16 @@ export default function AppShell({ children }: { children: ReactNode }) {
   const section = "/" + (pathname.split("/")[1] ?? "");
   const known = NAV_ITEMS.some((n) => n.href === section);
   const allowed = !known || items.some((n) => n.href === section);
-  const content = allowed ? children : (
+  const content = quizBlocked ? (
+    <div className="mx-auto mt-10 max-w-lg rounded-2xl border border-gold/30 bg-white p-10 text-center shadow-sm">
+      <ListChecks className="mx-auto mb-3 h-10 w-10 text-gold" />
+      <h2 className="font-heading text-lg font-bold text-navy">أكمل الاختبار التفاعلي أولاً</h2>
+      <p className="mt-1.5 text-[13px] text-gray-600">
+        التقييم الذاتي إجباري قبل استخدام بقية أقسام المنصة. أجبت عن {quizRequired!.answered} من {quizRequired!.total} مؤشراً، ويُحفظ تقدّمك تلقائياً.
+      </p>
+      <Link href="/self-assessment/quiz" className="btn btn-primary btn-sm mt-5">متابعة الاختبار</Link>
+    </div>
+  ) : allowed ? children : (
     <div className="mx-auto mt-10 max-w-md rounded-2xl border border-gray-100 bg-white p-10 text-center shadow-sm">
       <Lock className="mx-auto mb-3 h-9 w-9 text-gray-300" />
       <h2 className="font-heading text-lg font-bold text-navy">هذا القسم غير متاح لحسابك</h2>

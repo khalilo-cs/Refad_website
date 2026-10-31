@@ -51,6 +51,7 @@ const rateSchema = z.object({
   isWeak: z.boolean().optional(),
   notes: z.string().max(1000).nullable().optional(),
   methods: z.array(z.enum(VERIFICATION_METHODS)).max(3).optional(),
+  evidenceHave: z.array(z.string().max(300)).max(30).optional(),
 });
 
 /**
@@ -68,8 +69,19 @@ export async function PUT(request: NextRequest) {
   const year = normalizeYear(parsed.data.year);
   const a = await getOrCreateAssessment(schoolId, year);
   if (a.status === "SUBMITTED") return bad("الاستمارة مُرسلة. التقييم مقفل؛ حدّث حالة المعالجة من خلال خطوات التحسين، أو اطلب من الإدارة إعادة فتحها.", 409);
-  if (!(await queryOne("SELECT id FROM indicators WHERE id = ?", [indicatorId]))) return bad("المؤشر غير موجود", 404);
+  const indRow = await queryOne<{ id: string; evidence: string }>("SELECT id, evidence FROM indicators WHERE id = ?", [indicatorId]);
+  if (!indRow) return bad("المؤشر غير موجود", 404);
+  let evidenceHave: string | undefined;
+  if (parsed.data.evidenceHave !== undefined) {
+    let allowed: string[] = [];
+    try { allowed = JSON.parse(indRow.evidence || "[]"); } catch { allowed = []; }
+    evidenceHave = JSON.stringify([...new Set(parsed.data.evidenceHave)].filter((e) => allowed.includes(e)));
+  }
   if (parsed.data.score != null && !(await queryOne("SELECT 1 FROM rating_scale WHERE is_active = 1 AND score = ?", [parsed.data.score]))) return bad("درجة غير موجودة في مقياس التقدير");
+  // الاختبار التفاعلي إجباري: لا يُقبل تقدير دون الإجابة عن سؤال الأدلة المتوفرة
+  if (parsed.data.score !== undefined && parsed.data.score !== null && parsed.data.evidenceHave === undefined) {
+    return bad("قيّم هذا المؤشر من الاختبار التفاعلي: حدّد الأدلة المتوفرة لديك أولاً", 422);
+  }
 
   let item = await queryOne<any>("SELECT * FROM self_assessment_items WHERE assessment_id = ? AND indicator_id = ?", [a.id, indicatorId]);
   const now = nowISO();
@@ -100,10 +112,11 @@ export async function PUT(request: NextRequest) {
 
   await exec(
     `UPDATE self_assessment_items SET score = ?, baseline_score = COALESCE(baseline_score, ?), is_weak = ?, weak_marked_at = ?,
-       improvement_status = ?, notes = ?, methods = ?, updated_by_id = ?, updated_at = ? WHERE id = ?`,
+       improvement_status = ?, notes = ?, methods = ?, evidence_have = ?, updated_by_id = ?, updated_at = ? WHERE id = ?`,
     [score ?? null, score ?? null, weak ? 1 : 0, weak ? item.weak_marked_at ?? now : null, status,
      parsed.data.notes !== undefined ? (parsed.data.notes?.trim() || null) : item.notes,
      parsed.data.methods !== undefined ? JSON.stringify([...new Set(parsed.data.methods)]) : item.methods ?? null,
+     evidenceHave !== undefined ? evidenceHave : item.evidence_have ?? null,
      session.userId, now, item.id]
   );
   await exec("UPDATE self_assessments SET updated_at = ? WHERE id = ?", [now, a.id]);

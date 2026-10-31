@@ -17,7 +17,7 @@ export async function GET() {
   }
 
   const wb = new ExcelJS.Workbook();
-  wb.creator = "منصة إتقان";
+  wb.creator = "منصة رفاد";
 
   const ws = wb.addWorksheet("المدارس", {
     views: [{ rightToLeft: true }],

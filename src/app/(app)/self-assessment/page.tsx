@@ -3,7 +3,7 @@
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
-  AlertTriangle, CheckCircle2, ChevronDown, ClipboardCheck, Clock, Flag, History, Loader2, Lock, PlayCircle, RotateCcw, Printer, Search, Send, ShieldCheck, Sparkles, Target, TrendingUp, Unlock,
+  AlertTriangle, CheckCircle2, ChevronDown, ClipboardCheck, Clock, Flag, History, Loader2, Lock, PlayCircle, RotateCcw, ListChecks, Printer, Search, Send, ShieldCheck, Sparkles, Target, TrendingUp, Unlock,
 } from "lucide-react";
 import { Modal, PageHeader } from "@/components/ui";
 import { ConfirmDialog } from "@/components/ui/extra";
@@ -15,7 +15,7 @@ type Ind = {
   indicatorId: string; code: string; title: string; itemId: string | null; score: number | null; baselineScore: number | null; isWeak: boolean; status: Status;
   plan: { action: string | null; responsible: string | null; dueDate: string | null; successMeasure: string | null; setAt: string | null };
   progressNote: string | null; improvedAt: string | null; reviewNote: string | null; verifiedAt: string | null; verifiedBy: string | null; overdue: boolean;
-  evidence: string[]; methods: string[]; notes: string | null;
+  evidence: string[]; evidenceHave: string[]; answered: boolean; methods: string[]; notes: string | null;
 };
 type Crit = { id: string; code: string; title: string; weight: number | null; achieved: boolean; percent: number | null; subs: { id: string; code: string; title: string; weight: number | null; indicators: Ind[] }[] };
 const METHODS = ["فحص وثائق", "ملاحظة", "مقابلة"];
@@ -108,7 +108,7 @@ function Inner() {
     return d;
   };
 
-  const rate = async (ind: Ind, patch: { score?: number; isWeak?: boolean; methods?: string[]; notes?: string | null }) => {
+  const rate = async (ind: Ind, patch: { score?: number; isWeak?: boolean; methods?: string[]; notes?: string | null; evidenceHave?: string[] }) => {
     if (!data) return;
     setBusy(ind.indicatorId);
     try {
@@ -238,7 +238,7 @@ function Inner() {
                           <ul className="divide-y divide-gray-100">
                             {s.indicators.map((i) => (
                               <IndicatorRow key={i.indicatorId} ind={i} data={data} busy={busy === i.indicatorId}
-                                onRate={(score) => rate(i, { score })} onWeak={(v) => rate(i, { isWeak: v })}
+                                onRate={(score) => rate(i, { score, evidenceHave: i.evidenceHave })} onWeak={(v) => rate(i, { isWeak: v })}
                                 onMethods={(m) => rate(i, { methods: m })} onNotes={(n) => rate(i, { notes: n })}
                                 onPlan={() => setPlanFor({ ind: i, required: i.status === "NEEDS_PLAN" })} onStart={() => step(i, { action: "start" })}
                                 onImprove={() => setImproveFor(i)} onReview={(kind) => setReviewFor({ ind: i, kind })} onHistory={() => setHistoryFor(i)} />
@@ -292,6 +292,9 @@ function StatusBanner({ data, onSubmit, onReopen, onYear }: { data: Data; onSubm
       <select className="input w-auto" value={data.year} onChange={(e) => onYear(e.target.value)} aria-label="العام الدراسي">
         {data.years.map((y) => <option key={y} value={y}>{y}</option>)}
       </select>
+      {data.canFill && !submitted && (
+        <a href="/self-assessment/quiz" className="btn btn-gold btn-sm"><ListChecks className="h-4 w-4" /> الاختبار التفاعلي</a>
+      )}
       {data.canFill && !submitted && (
         <button className="btn btn-primary btn-sm" disabled={data.blockers.length > 0} onClick={onSubmit} title={data.blockers.join("، ")}><Send className="h-4 w-4" /> إرسال للإدارة</button>
       )}
@@ -357,6 +360,9 @@ function IndicatorRow({ ind, data, busy, onRate, onWeak, onMethods, onNotes, onP
             )}
           </div>
         </div>
+        {data.canFill && !data.locked && !ind.answered ? (
+          <a href="/self-assessment/quiz" className="btn btn-gold btn-sm"><ListChecks className="h-3.5 w-3.5" /> أجب عنه في الاختبار التفاعلي</a>
+        ) : (
         <div className="flex flex-wrap items-center gap-1" role="radiogroup" aria-label={`تقدير المؤشر ${ind.code}`}>
           {data.scale.map((r, idx) => {
             const on = ind.score === r.score;
@@ -376,6 +382,7 @@ function IndicatorRow({ ind, data, busy, onRate, onWeak, onMethods, onNotes, onP
           )}
           {busy && <Loader2 className="h-4 w-4 animate-spin text-gray-400" />}
         </div>
+        )}
       </div>
 
       {/* الأدلة والشواهد وأداة التحقق والملاحظات — كما في الاستمارة الرسمية */}
@@ -391,7 +398,7 @@ function IndicatorRow({ ind, data, busy, onRate, onWeak, onMethods, onNotes, onP
           <div>
             <p className="mb-1 font-semibold text-navy">الأدلة والشواهد</p>
             {ind.evidence.length ? (
-              <ul className="list-disc space-y-0.5 ps-4 text-gray-700">{ind.evidence.map((e) => <li key={e}>{e}</li>)}</ul>
+              <ul className="space-y-0.5 text-gray-700">{ind.evidence.map((e) => <li key={e} className={ind.evidenceHave.includes(e) ? "text-success" : ""}>{ind.evidenceHave.includes(e) ? "✓ " : "▫ "}{e}</li>)}</ul>
             ) : <p className="text-gray-400">—</p>}
           </div>
           <div>

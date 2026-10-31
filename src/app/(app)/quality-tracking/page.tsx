@@ -245,7 +245,7 @@ function PrintableCertificate({ title, body, code, issuedAt, school }: { title: 
           <div><div className="mx-auto h-14 w-48 border-b border-gray-400" /><p className="mt-2">رئيس قسم الجودة والاعتماد المدرسي</p></div>
           <div><div className="mx-auto h-14 w-48 border-b border-gray-400" /><p className="mt-2">مدير إدارة التربية والتعليم</p></div>
         </div>
-        <p className="mt-6 text-[11px] text-gray-500">رمز التحقق: <b dir="ltr" className="font-mono">{code}</b> — تحقّق من صحتها: <bdi dir="ltr">{origin}/verify?code={code}</bdi> · {new Date(issuedAt).toLocaleDateString("ar-YE")}</p>
+        <p className="mt-6 text-[11px] text-gray-500">منصة رفاد — تحت إشراف وزارة التربية والتعليم · رمز التحقق: <b dir="ltr" className="font-mono">{code}</b> — تحقّق من صحتها: <bdi dir="ltr">{origin}/verify?code={code}</bdi> · {new Date(issuedAt).toLocaleDateString("ar-YE")}</p>
       </div>
     </div>
   );

@@ -18,7 +18,7 @@ const req = (url: string, method = "GET", body?: unknown) =>
   new NextRequest(`http://localhost${url}`, { method, headers: { "content-type": "application/json" }, body: body ? JSON.stringify(body) : undefined });
 const json = async (r: Response) => ({ status: r.status, body: await r.json().catch(() => ({})) });
 const ctx = (id: string) => ({ params: Promise.resolve({ id }) });
-const rate = (indicatorId: string, extra: object) => sa.PUT(req("/api/self-assessment", "PUT", { schoolId, year, indicatorId, ...extra }));
+const rate = (indicatorId: string, extra: object) => sa.PUT(req("/api/self-assessment", "PUT", { schoolId, year, indicatorId, evidenceHave: [], ...extra }));
 
 beforeAll(async () => {
   await setupTestDb();
@@ -137,5 +137,45 @@ describe("دورة التقييم الذاتي ومعالجة الضعف", () =>
     expect(g.body.draft.eligible).toBe(false);
     await as(EMAILS.principal);
     expect((await sa.GET(req(`/api/self-assessment?schoolId=${other}`))).status).toBe(403);
+  });
+});
+
+describe("الاختبار التفاعلي", () => {
+  it("إجباري: لا تقدير دون الإجابة عن سؤال الأدلة، وحالة الإلزام تظهر للمدير", async () => {
+    await as(EMAILS.quality);
+    const sid = (await q.queryOne<any>("SELECT school_id FROM users WHERE email = ?", [EMAILS.quality]))!.school_id;
+    await q.exec("UPDATE self_assessments SET status = 'DRAFT' WHERE school_id = ? AND academic_year = ?", [sid, year]);
+    const r = await sa.PUT(req("/api/self-assessment", "PUT", { schoolId: sid, year, indicatorId: indicators[0], score: 3 }));
+    expect(r.status).toBe(422);
+    // مؤشر لم يُجب عنه في الاختبار بعد
+    await q.exec("UPDATE self_assessment_items SET evidence_have = NULL WHERE indicator_id = ? AND assessment_id = (SELECT id FROM self_assessments WHERE school_id = ? AND academic_year = ?)", [indicators[0], sid, year]);
+    const status = (await import("@/app/api/self-assessment/status/route")) as any;
+    const st = await (await status.GET()).json();
+    expect(st.required).toBe(true);
+    await as(EMAILS.admin);
+    expect((await (await status.GET()).json()).required).toBe(false);
+  });
+
+  it("التقدير المقترح من نسبة الأدلة", async () => {
+    const { suggestScore } = await import("../self-assessment-shared");
+    const sc = [0, 1, 2, 3];
+    expect(suggestScore(2, 2, sc)).toBe(3);
+    expect(suggestScore(1, 2, sc)).toBe(2);
+    expect(suggestScore(1, 3, sc)).toBe(1);
+    expect(suggestScore(0, 3, sc)).toBe(0);
+    expect(suggestScore(0, 0, sc)).toBeNull();
+  });
+  it("يحفظ الأدلة المتوفرة ويقبل فقط أدلة المؤشر نفسه", async () => {
+    // مدرسة أخرى بمدير جديد حتى لا تتأثر بالاستمارة المرسلة أعلاه
+    await as(EMAILS.quality);
+    const sid = (await q.queryOne<any>("SELECT school_id FROM users WHERE email = ?", [EMAILS.quality]))!.school_id;
+    const ind = await q.queryOne<any>("SELECT id, evidence FROM indicators WHERE evidence <> '[]' ORDER BY code DESC LIMIT 1");
+    const ev = JSON.parse(ind.evidence);
+    // نفس مدرسة المدير وقد أُرسلت أعلاه: نعيد فتحها كما تفعل الإدارة
+    await q.exec("UPDATE self_assessments SET status = 'DRAFT' WHERE school_id = ? AND academic_year = ?", [sid, year]);
+    const r = await sa.PUT(req("/api/self-assessment", "PUT", { schoolId: sid, year, indicatorId: ind.id, score: 3, evidenceHave: [ev[0], "دليل مختلق"] }));
+    expect(r.status).toBe(200);
+    const row = await q.queryOne<any>("SELECT evidence_have FROM self_assessment_items WHERE indicator_id = ? ORDER BY updated_at DESC LIMIT 1", [ind.id]);
+    expect(JSON.parse(row.evidence_have)).toEqual([ev[0]]);
   });
 });

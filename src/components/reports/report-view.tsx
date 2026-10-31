@@ -24,7 +24,8 @@ export default function ReportView({ report, content }: { report: any; content: 
       <header className="relative z-10 flex items-center justify-between gap-4 bg-navy px-6 py-5 text-white">
         <RifadLogo size={56} />
         <div className="text-center">
-          <p className="font-heading text-xl font-bold">منصة إتقان للاعتماد المدرسي وضمان جودة التعليم</p>
+          <p className="font-heading text-xl font-bold">منصة رفاد للاعتماد المدرسي وضمان جودة التعليم</p>
+          <p className="text-[11px] text-white/70">تحت إشراف وزارة التربية والتعليم</p>
           <p className="mt-0.5 text-[12px] text-white/70">الجمهورية اليمنية — محافظة الحديدة — مديرية الجراحي</p>
           <p className="text-[11px] text-white/60">مجلس الاعتماد الأكاديمي وضمان جودة التعليم · وزارة التربية والتعليم</p>
         </div>
@@ -62,7 +63,7 @@ export default function ReportView({ report, content }: { report: any; content: 
           ) : (
             <p><b className="text-navy">حالة التقرير: {st.label}</b> — لم يُعتمد رسمياً بعد</p>
           )}
-          <p className="mt-1 text-[11.5px] text-gray-400">رمز التحقق: <span className="font-mono">{report.verification_code}</span> · صدر {fmtDate(content.generatedAt, true)}. مستند إداري داخلي من منصة إتقان، لا يحمل ختماً حكومياً ولا توقيعاً.</p>
+          <p className="mt-1 text-[11.5px] text-gray-400">رمز التحقق: <span className="font-mono">{report.verification_code}</span> · صدر {fmtDate(content.generatedAt, true)}. مستند إداري داخلي من منصة رفاد، لا يحمل ختماً حكومياً ولا توقيعاً.</p>
         </footer>
       </div>
     </article>

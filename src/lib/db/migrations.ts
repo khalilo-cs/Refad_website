@@ -365,6 +365,23 @@ export const MIGRATIONS: Migration[] = [
       ALTER TABLE self_assessment_items ADD COLUMN methods TEXT;
     `,
   },
+  {
+    id: 11,
+    name: "self-assessment-evidence-checklist",
+    sql: `
+      -- الأدلة التي أكّد المدير توفرها فعلاً (من قائمة أدلة المؤشر) في الاختبار التفاعلي
+      ALTER TABLE self_assessment_items ADD COLUMN evidence_have TEXT;
+    `,
+  },
+  {
+    id: 12,
+    name: "rename-platform-rifad",
+    sql: `
+      -- اسم المنصة: رفاد (تحت إشراف وزارة التربية والتعليم)
+      UPDATE settings SET value = replace(value, 'منصة إتقان', 'منصة رفاد') WHERE key IN ('system.name', 'system.footer') OR value LIKE '%منصة إتقان%';
+      UPDATE schools SET name = replace(name, 'مدرسة إتقان التجريبية', 'مدرسة رفاد التجريبية') WHERE code LIKE 'RIFAD-DEMO-%';
+    `,
+  },
 ];
 
 /** واجهة تنفيذ مستقلة عن المحرّك (SQLite محلي أو libSQL). */

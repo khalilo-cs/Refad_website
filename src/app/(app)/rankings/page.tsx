@@ -298,7 +298,7 @@ function Certificate({ row }: { row: Row }) {
           <div><div className="mx-auto h-14 w-48 border-b border-gray-400" /><p className="mt-2">رئيس قسم الجودة والاعتماد المدرسي</p></div>
           <div><div className="mx-auto h-14 w-48 border-b border-gray-400" /><p className="mt-2">مدير إدارة التربية والتعليم</p></div>
         </div>
-        <p className="mt-6 text-[10px] text-gray-400">صادرة من منصة إتقان من بيانات التقييم المسجّلة · {new Date().toLocaleDateString("ar-YE")}</p>
+        <p className="mt-6 text-[10px] text-gray-400">صادرة من منصة رفاد من بيانات التقييم المسجّلة · {new Date().toLocaleDateString("ar-YE")}</p>
       </div>
     </div>
   );

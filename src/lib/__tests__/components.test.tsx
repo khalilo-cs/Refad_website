@@ -25,7 +25,7 @@ describe("مكوّنات الهوية", () => {
 
   it("يركّب الشعار بالنص العربي", () => {
     const html = render(React.createElement(RifadLogo, { size: 40, withText: true }));
-    expect(html).toContain("إتقان");
+    expect(html).toContain("رفاد");
     expect(html).toContain("للاعتماد المدرسي وضمان جودة التعليم");
   });
 

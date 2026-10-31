@@ -129,6 +129,10 @@ export type TreeIndicator = {
   evidence: string[];
   /** أداة التحقق المستخدمة: فحص وثائق / ملاحظة / مقابلة */
   methods: string[];
+  /** الأدلة التي أكّد المدير توفرها */
+  evidenceHave: string[];
+  /** أُجيب عنه في الاختبار التفاعلي */
+  answered: boolean;
 };
 export type TreeSub = { id: string; code: string; title: string; weight: number | null; indicators: TreeIndicator[] };
 export type TreeCriterion = { id: string; code: string; title: string; weight: number | null; subs: TreeSub[]; achieved: boolean; percent: number | null };
@@ -166,6 +170,8 @@ export async function buildTree(assessmentId: string | null): Promise<{ criteria
       updatedAt: it?.updated_at ?? null,
       evidence: jsonList(r.evidence),
       methods: jsonList(it?.methods),
+      evidenceHave: jsonList(it?.evidence_have),
+      answered: it?.evidence_have != null && it?.score != null,
     };
   };
 
@@ -211,6 +217,8 @@ function jsonList(v: unknown): string[] {
 
 /** أدوات التحقق من الأدلة كما في الاستمارة الرسمية. */
 export const VERIFICATION_METHODS = ["فحص وثائق", "ملاحظة", "مقابلة"] as const;
+
+export { suggestScore } from "./self-assessment-shared";
 
 /** أسباب منع الإرسال: مؤشرات غير مقيّمة، أو ضعف بلا خطة. */
 export function submitBlockers(summary: Summary): string[] {

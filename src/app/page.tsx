@@ -136,7 +136,7 @@ export default async function LandingPage() {
 
               <p className="mt-5 max-w-xl text-[15px] leading-[1.9] text-white/70">
                 <span className="mb-2 block font-semibold text-gold-bright/90">{BRAND.slogan}</span>
-                منصة إتقان تحوّل استمارة التقييم الذاتي المدرسية إلى نظام رقمي متكامل:
+                منصة رفاد تحوّل استمارة التقييم الذاتي المدرسية إلى نظام رقمي متكامل:
                 تقييم ميداني على 109 مؤشراً، حساب دقيق للدرجات، تقارير عربية معتمدة،
                 وتتبّع مستمر للتحسين — كل شيء موثّق وقابل للتحقق.
               </p>
@@ -302,7 +302,7 @@ export default async function LandingPage() {
           <div className="flex items-center gap-3">
             <RifadLogo size={34} id="rf-home-foot" />
             <div>
-              <p className="font-heading text-sm font-bold text-navy">منصة إتقان</p>
+              <p className="font-heading text-sm font-bold text-navy">منصة رفاد</p>
               <p className="text-[11px] text-gray-400">للاعتماد المدرسي وضمان جودة التعليم</p>
             </div>
           </div>

@@ -18,13 +18,13 @@ export function SelfAssessmentNudge() {
   if (!s) return null;
   const { summary: m } = s;
   const todo: string[] = [];
-  if (m.rated < m.total) todo.push(`قيّم ${m.total - m.rated} مؤشرات متبقية`);
+  if (m.rated < m.total) todo.push(`أكمل الاختبار التفاعلي: ${m.total - m.rated} مؤشرات متبقية`);
   if (m.needsPlan) todo.push(`ضع خطة لـ${m.needsPlan} نقاط ضعف`);
   if (m.overdue) todo.push(`${m.overdue} خطط تجاوزت موعدها`);
   if (s.status !== "SUBMITTED" && m.rated === m.total && !m.needsPlan) todo.push("أرسل الاستمارة للإدارة");
   const urgent = m.needsPlan > 0 || m.overdue > 0;
   return (
-    <Link href="/self-assessment" className={`card flex flex-wrap items-center gap-3 p-4 transition hover:shadow-md ${urgent ? "border-danger/30" : ""}`}>
+    <Link href={m.rated < m.total && s.status !== "SUBMITTED" ? "/self-assessment/quiz" : "/self-assessment"} className={`card flex flex-wrap items-center gap-3 p-4 transition hover:shadow-md ${urgent ? "border-danger/30" : ""}`}>
       <span className={`flex h-11 w-11 items-center justify-center rounded-xl ${urgent ? "bg-danger/10 text-danger" : "bg-turquoise/10 text-turquoise"}`}>
         {urgent ? <AlertTriangle className="h-5 w-5" /> : <ClipboardCheck className="h-5 w-5" />}
       </span>

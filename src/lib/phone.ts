@@ -141,7 +141,7 @@ export const DEFAULT_WA_MESSAGE =
 export function credentialsMessage(o: { name: string; loginUrl: string; login: string; password: string; mustChange?: boolean }): string {
   return [
     `السلام عليكم ورحمة الله وبركاته ${o.name}،`,
-    "تم إنشاء حسابك في منصة إتقان للاعتماد المدرسي وضمان جودة التعليم.",
+    "تم إنشاء حسابك في منصة رفاد للاعتماد المدرسي وضمان جودة التعليم.",
     `الرابط: ${o.loginUrl}`,
     `اسم المستخدم: ${o.login}`,
     `كلمة المرور المؤقتة: ${o.password}`,

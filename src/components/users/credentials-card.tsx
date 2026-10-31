@@ -31,7 +31,7 @@ export function CredentialsModal({ name, phone, hasWhatsapp = true, credentials,
     const w = window.open("", "_blank", "width=480,height=600");
     if (!w) return add({ type: "error", message: "منع المتصفح نافذة الطباعة" });
     const esc = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
-    w.document.write(`<!doctype html><html dir="rtl" lang="ar"><meta charset="utf-8"><title>بيانات الدخول</title><body style="font-family:sans-serif;padding:24px"><h2>منصة إتقان للاعتماد المدرسي</h2><p>${esc(name)}</p><p>رابط الدخول: <bdi dir="ltr">${esc(loginUrl)}</bdi></p><p>اسم الدخول: <b dir="ltr">${esc(credentials.login)}</b></p><p>كلمة المرور المؤقتة: <b dir="ltr" style="font-family:monospace;font-size:18px">${esc(credentials.password)}</b></p>${credentials.mustChange ? "<p>سيُطلب منك تغيير كلمة المرور عند أول دخول.</p>" : ""}<p style="color:#b45309">سلّم هذه الورقة لصاحبها فقط ثم أتلفها.</p></body></html>`);
+    w.document.write(`<!doctype html><html dir="rtl" lang="ar"><meta charset="utf-8"><title>بيانات الدخول</title><body style="font-family:sans-serif;padding:24px"><h2>منصة رفاد للاعتماد المدرسي</h2><p>${esc(name)}</p><p>رابط الدخول: <bdi dir="ltr">${esc(loginUrl)}</bdi></p><p>اسم الدخول: <b dir="ltr">${esc(credentials.login)}</b></p><p>كلمة المرور المؤقتة: <b dir="ltr" style="font-family:monospace;font-size:18px">${esc(credentials.password)}</b></p>${credentials.mustChange ? "<p>سيُطلب منك تغيير كلمة المرور عند أول دخول.</p>" : ""}<p style="color:#b45309">سلّم هذه الورقة لصاحبها فقط ثم أتلفها.</p></body></html>`);
     w.document.close();
     w.focus();
     w.print();

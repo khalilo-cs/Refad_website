@@ -70,7 +70,7 @@ function Inner() {
                   <tr key={i.indicatorId}>
                     <td style={{ textAlign: "center" }}>{i.code}</td>
                     <td>{i.title}</td>
-                    <td>{i.evidence.map((e: string) => <div key={e}>▪ {e}</div>)}</td>
+                    <td>{i.evidence.map((e: string) => <div key={e}>{(i.evidenceHave ?? []).includes(e) ? "☑" : "▪"} {e}</div>)}</td>
                     {METHODS.map((m) => <td key={m} className="mark">{i.methods.includes(m) ? "✓" : ""}</td>)}
                     {scale.map((r) => <td key={r.score} className="mark">{i.score === r.score ? "✓" : ""}</td>)}
                     <td>{[i.isWeak ? "نقطة ضعف" : "", i.plan.action ? `خطة: ${i.plan.action}` : "", i.notes ?? ""].filter(Boolean).join(" — ")}</td>
@@ -86,7 +86,7 @@ function Inner() {
         <div><div className="mx-auto h-10 w-40 border-b border-gray-500" />منسق الجودة</div>
         <div><div className="mx-auto h-10 w-40 border-b border-gray-500" />التاريخ</div>
       </div>
-      <p className="mt-4 text-center text-[9px] text-gray-500">مستخرجة من منصة إتقان — نسبة التحقق الكلية {d.summary.percent ?? "—"}% · مقيَّم {d.summary.rated}/{d.summary.total}</p>
+      <p className="mt-4 text-center text-[9px] text-gray-500">مستخرجة من منصة رفاد (تحت إشراف وزارة التربية والتعليم) — نسبة التحقق الكلية {d.summary.percent ?? "—"}% · مقيَّم {d.summary.rated}/{d.summary.total}</p>
     </div>
   );
 }

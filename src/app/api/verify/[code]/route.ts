@@ -60,7 +60,7 @@ export async function GET(_request: Request, ctx: { params: Promise<{ code: stri
           issuedAt: cert.issued_at,
           verificationCode: cert.code,
         },
-        note: "هذه الشهادة صادرة من منصة إتقان بناءً على بيانات التقييم الذاتي والتحسين المعتمدة من الإدارة.",
+        note: "هذه الشهادة صادرة من منصة رفاد بناءً على بيانات التقييم الذاتي والتحسين المعتمدة من الإدارة.",
       });
     }
     return NextResponse.json(
