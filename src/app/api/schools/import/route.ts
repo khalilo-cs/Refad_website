@@ -30,6 +30,8 @@ export async function POST(request: NextRequest) {
 
   const { searchParams } = new URL(request.url);
   const commit = searchParams.get("commit") === "true";
+  // وضع التحديث: المدرسة الموجودة (بالرمز أو بالاسم في نفس المديرية) تُحدَّث بيانات مديرها وهاتفها بدل رفضها كمكررة
+  const updateMode = searchParams.get("update") === "true";
 
   const formData = await request.formData();
   const file = formData.get("file") as File | null;
@@ -55,10 +57,11 @@ export async function POST(request: NextRequest) {
   // قواميس الأسماء للمحافظات والمديريات
   const governorates = await query<{ id: string; name: string }>("SELECT id, name FROM governorates");
   const directorates = await query<{ id: string; name: string; governorate_id: string }>("SELECT id, name, governorate_id FROM directorates");
-  const existingCodes = await query<{ code: string }>("SELECT code FROM schools");
+  const existingCodes = await query<{ id: string; code: string; name: string; directorate_id: string }>("SELECT id, code, name, directorate_id FROM schools");
   const codeSet = new Set(existingCodes.map((x) => x.code));
 
   const valid: ParsedRow[] = [];
+  const updates: Array<{ id: string; code: string; name: string; principal_name?: string; contact_phone?: string; address?: string; type: string; stage: string }> = [];
   const errors: Array<{ row: number; field: string; message: string }> = [];
   const seenCodes = new Set<string>();
 
@@ -84,6 +87,19 @@ export async function POST(request: NextRequest) {
     const gov = governorates.find((g) => g.name === governorateName);
     const dir = directorates.find((x) => x.name === directorateName && (!gov || x.governorate_id === gov.id));
     let code = p.code;
+
+    if (updateMode) {
+      const match = (!p.tempCode && existingCodes.find((e) => e.code === p.code))
+        || (dir && existingCodes.find((e) => e.name.trim() === p.name.trim() && e.directorate_id === dir.id));
+      if (match) {
+        if (session.roleKey === "EDUCATION_DIRECTOR" && session.directorateId && match.directorate_id !== session.directorateId) {
+          errors.push({ row: r, field: "directorate", message: "لا يمكنك تعديل مدارس خارج مديريتك" });
+        } else {
+          updates.push({ id: match.id, code: match.code, name: match.name, principal_name: p.principal, contact_phone: p.phone, address: p.address, type: p.type, stage: p.stage });
+        }
+        continue;
+      }
+    }
 
     if (p.tempCode) {
       if (dir && existingNames.some((e) => e.name === p.name && e.directorate_id === dir.id)) {
@@ -124,6 +140,8 @@ export async function POST(request: NextRequest) {
 
   if (!commit) {
     return NextResponse.json({
+      updateCount: updates.length,
+      updateSample: updates.slice(0, 5).map((u) => ({ code: u.code, name: u.name, hasPrincipal: !!u.principal_name, hasPhone: !!u.contact_phone })),
       validCount: valid.length,
       errorCount: errors.length,
       errors: errors.slice(0, 500),
@@ -134,10 +152,10 @@ export async function POST(request: NextRequest) {
     });
   }
 
-  if (valid.length === 0) {
+  if (valid.length === 0 && updates.length === 0) {
     return NextResponse.json({ message: "لا توجد صفوف صالحة للحفظ", errors }, { status: 400 });
   }
-  await transaction(async () => {
+  if (valid.length) await transaction(async () => {
     for (const row of valid) {
       const g = governorates.find((x: { id: string; name: string }) => x.name === row.governorate)!;
       const d = directorates.find((x: { id: string; name: string; governorate_id: string }) => x.name === row.directorate && x.governorate_id === g.id)!;
@@ -156,5 +174,26 @@ export async function POST(request: NextRequest) {
     }
   });
 
-  return NextResponse.json({ message: `تمت إضافة ${valid.length} مدرسة بنجاح`, imported: valid.length, errors: errors.slice(0, 500), warnings: warnings.slice(0, 500) });
+  // تحديث المدارس الموجودة: اسم المدير والهاتف من الكشف، وتُكمَّل الحقول الفارغة فقط
+  let updated = 0;
+  if (updates.length) {
+    await transaction(async () => {
+      const now = nowISO();
+      for (const u of updates) {
+        await exec(
+          `UPDATE schools SET
+             principal_name = COALESCE(?, principal_name),
+             contact_phone = COALESCE(?, contact_phone),
+             address = COALESCE(NULLIF(address, ''), ?),
+             last_updated_at = ?
+           WHERE id = ?`,
+          [u.principal_name || null, u.contact_phone || null, u.address || null, now, u.id]
+        );
+        updated++;
+      }
+      await auditLog({ userId: session.userId, action: "UPDATE", entityType: "School", newValues: { source: "EXCEL_IMPORT_UPDATE", count: updates.length } });
+    });
+  }
+
+  return NextResponse.json({ message: `أُضيفت ${valid.length} مدرسة وحُدّثت بيانات ${updated} مدرسة`, imported: valid.length, updated, errors: errors.slice(0, 500), warnings: warnings.slice(0, 500) });
 }

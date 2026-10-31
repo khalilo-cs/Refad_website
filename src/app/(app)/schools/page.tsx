@@ -178,6 +178,7 @@ function ImportModal({ open, onClose, onDone }: { open: boolean; onClose: () => 
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<any>(null);
   const [busy, setBusy] = useState(false);
+  const [update, setUpdate] = useState(true);
   useEffect(() => { if (!open) { setFile(null); setPreview(null); } }, [open]);
 
   const run = async (f: File, commit: boolean) => {
@@ -185,7 +186,10 @@ function ImportModal({ open, onClose, onDone }: { open: boolean; onClose: () => 
     try {
       const fd = new FormData();
       fd.append("file", f);
-      const res = await fetch(`/api/schools/import${commit ? "?commit=true" : ""}`, { method: "POST", credentials: "include", body: fd });
+      const qs = new URLSearchParams();
+      if (commit) qs.set("commit", "true");
+      if (update) qs.set("update", "true");
+      const res = await fetch(`/api/schools/import?${qs}`, { method: "POST", credentials: "include", body: fd });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || "تعذّر قراءة الملف");
       if (commit) { add({ type: "success", message: data.message }); onDone(); }
@@ -212,6 +216,10 @@ function ImportModal({ open, onClose, onDone }: { open: boolean; onClose: () => 
           {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
           <a href="/api/schools/import/template" className="btn btn-ghost btn-sm"><Download className="h-3.5 w-3.5" /> تنزيل القالب</a>
         </div>
+        <label className="flex items-start gap-2 rounded-xl bg-turquoise/5 p-3 text-[12.5px] text-gray-700">
+          <input type="checkbox" className="mt-0.5" checked={update} disabled={busy} onChange={(e) => { setUpdate(e.target.checked); if (file) setPreview(null); }} />
+          <span><b className="text-navy">تحديث المدارس الموجودة</b> — المدرسة المسجّلة مسبقاً (بالرمز أو بالاسم في نفس المديرية) تُحدَّث بيانات مديرها ورقم هاتفه من الملف بدل رفضها كمكررة، والمدارس غير الموجودة تُضاف.</span>
+        </label>
         <label className={`flex cursor-pointer flex-col items-center gap-2 rounded-2xl border-2 border-dashed p-6 transition ${busy ? "opacity-60" : "border-gray-200 hover:border-turquoise hover:bg-turquoise-soft/30"}`}>
           {busy ? <Loader2 className="h-6 w-6 animate-spin text-turquoise" /> : <FileUp className="h-6 w-6 text-turquoise" />}
           <span className="text-sm font-semibold text-navy">{file ? file.name : "اختر ملف xlsx أو csv"}</span>
@@ -220,8 +228,9 @@ function ImportModal({ open, onClose, onDone }: { open: boolean; onClose: () => 
 
         {preview && (
           <div className="space-y-3 animate-fade-up">
-            <div className="grid grid-cols-3 gap-2 text-center">
-              <Stat label="صفوف صالحة" v={preview.validCount} tone="success" />
+            <div className="grid grid-cols-2 gap-2 text-center sm:grid-cols-4">
+              <Stat label="مدارس جديدة" v={preview.validCount} tone="success" />
+              <Stat label="مدارس ستُحدَّث" v={preview.updateCount ?? 0} tone="navy" />
               <Stat label="صفوف بها أخطاء" v={new Set((preview.errors ?? []).map((e: any) => e.row)).size} tone="danger" />
               <Stat label="إجمالي الصفوف" v={preview.totalRows ?? preview.validCount} tone="navy" />
             </div>
@@ -254,8 +263,8 @@ function ImportModal({ open, onClose, onDone }: { open: boolean; onClose: () => 
             )}
             <div className="flex justify-end gap-2 border-t border-gray-100 pt-3">
               <button className="btn btn-ghost btn-sm" onClick={onClose}>إلغاء</button>
-              <button className="btn btn-primary btn-sm" disabled={busy || preview.validCount === 0} onClick={() => file && run(file, true)}>
-                {busy && <Loader2 className="h-3.5 w-3.5 animate-spin" />} تأكيد وحفظ {preview.validCount} مدرسة
+              <button className="btn btn-primary btn-sm" disabled={busy || (preview.validCount === 0 && !preview.updateCount)} onClick={() => file && run(file, true)}>
+                {busy && <Loader2 className="h-3.5 w-3.5 animate-spin" />} تأكيد: إضافة {preview.validCount} وتحديث {preview.updateCount ?? 0}
               </button>
             </div>
           </div>
