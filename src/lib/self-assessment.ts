@@ -133,6 +133,8 @@ export type TreeIndicator = {
   evidenceHave: string[];
   /** أُجيب عنه في الاختبار التفاعلي */
   answered: boolean;
+  /** عدد الشواهد المرفوعة للمؤشر في هذه المدرسة */
+  files: number;
 };
 export type TreeSub = { id: string; code: string; title: string; weight: number | null; indicators: TreeIndicator[] };
 export type TreeCriterion = { id: string; code: string; title: string; weight: number | null; subs: TreeSub[]; achieved: boolean; percent: number | null };
@@ -143,7 +145,7 @@ export type Summary = {
 };
 
 /** يبني الاستمارة كاملة (معيار ← معيار فرعي ← مؤشر) مع حالة كل مؤشر وملخص. */
-export async function buildTree(assessmentId: string | null): Promise<{ criteria: TreeCriterion[]; summary: Summary; maxScore: number }> {
+export async function buildTree(assessmentId: string | null, schoolId?: string | null): Promise<{ criteria: TreeCriterion[]; summary: Summary; maxScore: number }> {
   const maxScore = (await queryOne<{ m: number }>("SELECT MAX(score) m FROM rating_scale WHERE is_active = 1"))?.m || 3;
   const crit = await query<any>("SELECT id, code, title, weight FROM criteria ORDER BY order_index, code");
   const subs = await query<any>("SELECT id, code, title, weight, criterion_id FROM sub_criteria ORDER BY order_index, code");
@@ -155,6 +157,14 @@ export async function buildTree(assessmentId: string | null): Promise<{ criteria
       )
     : [];
   const byInd = new Map(items.map((i) => [i.indicator_id, i]));
+  const fileCounts = new Map<string, number>();
+  if (schoolId) {
+    const fc = await query<{ indicator_id: string; n: number }>(
+      "SELECT indicator_id, COUNT(*) n FROM evidence WHERE school_id = ? AND indicator_id IS NOT NULL GROUP BY indicator_id",
+      [schoolId]
+    );
+    for (const r of fc) fileCounts.set(r.indicator_id, Number(r.n));
+  }
   const today = new Date().toISOString().slice(0, 10);
 
   const toInd = (r: any): TreeIndicator => {
@@ -172,6 +182,7 @@ export async function buildTree(assessmentId: string | null): Promise<{ criteria
       methods: jsonList(it?.methods),
       evidenceHave: jsonList(it?.evidence_have),
       answered: it?.evidence_have != null && it?.score != null,
+      files: fileCounts.get(r.id) ?? 0,
     };
   };
 

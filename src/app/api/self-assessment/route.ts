@@ -29,7 +29,12 @@ export async function GET(request: NextRequest) {
   if (!school) return bad("المدرسة غير موجودة", 404);
   const fill = canFill(session, schoolId);
   const assessment = fill ? await getOrCreateAssessment(schoolId, year) : await getAssessment(schoolId, year);
-  const { criteria, summary, maxScore } = await buildTree(assessment?.id ?? null);
+  const { criteria, summary, maxScore } = await buildTree(assessment?.id ?? null, schoolId);
+  // المقارنة بالعام السابق
+  const [y1] = year.split("-").map(Number);
+  const prevYear = `${y1 - 1}-${y1}`;
+  const prevA = await getAssessment(schoolId, prevYear);
+  const previous = prevA ? { year: prevYear, ...(await buildTree(prevA.id)).summary } : null;
   const scale = await query<any>("SELECT key, label_ar, score FROM rating_scale WHERE is_active = 1 ORDER BY order_index");
   const years = (await query<{ academic_year: string }>("SELECT academic_year FROM self_assessments WHERE school_id = ? ORDER BY academic_year DESC", [schoolId])).map((r) => r.academic_year);
   if (!years.includes(currentAcademicYear())) years.unshift(currentAcademicYear());
@@ -40,6 +45,7 @@ export async function GET(request: NextRequest) {
     canFill: fill, canReview: !fill,
     locked: assessment?.status === "SUBMITTED",
     scale, maxScore, criteria, summary, blockers: submitBlockers(summary),
+    previous: previous ? { year: previous.year, percent: previous.percent, weak: previous.weak, verified: previous.verified, rated: previous.rated } : null,
   });
 }
 

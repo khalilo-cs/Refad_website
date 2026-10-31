@@ -199,3 +199,24 @@ describe("المتابعة على مستوى المديرية", () => {
     expect(await q.queryOne("SELECT 1 FROM notifications WHERE user_id = ? AND title = 'تذكير: خطط التحسين'", [principalId])).toBeTruthy();
   });
 });
+
+describe("الشواهد والمقارنة بالعام السابق", () => {
+  it("يعدّ الشواهد المرفوعة لكل مؤشر ويقارن بالعام السابق", async () => {
+    await as(EMAILS.principal);
+    const ind = indicators[3];
+    const uploader = (await q.queryOne<any>("SELECT id FROM users WHERE email = ?", [EMAILS.principal]))!.id;
+    await q.exec(
+      "INSERT INTO evidence (id, name, original_name, mime_type, size, storage_key, url, school_id, indicator_id, uploaded_by_id) VALUES (?,?,?,?,?,?,?,?,?,?)",
+      ["ev-sa-1", "محضر", "m.pdf", "application/pdf", 10, "k", "/x", schoolId, ind, uploader]
+    );
+    // عام سابق مُرسل بنسبة معروفة
+    const [y1] = year.split("-").map(Number);
+    const prev = `${y1 - 1}-${y1}`;
+    await q.exec("INSERT INTO self_assessments (id, school_id, academic_year, status) VALUES ('prev-a', ?, ?, 'SUBMITTED')", [schoolId, prev]);
+    await q.exec("INSERT INTO self_assessment_items (id, assessment_id, indicator_id, score, baseline_score, is_weak) VALUES ('prev-i', 'prev-a', ?, 1, 1, 1)", [ind]);
+    const g = await json(await sa.GET(req(`/api/self-assessment?year=${year}`)));
+    const it = g.body.criteria.flatMap((c: any) => c.subs.flatMap((s: any) => s.indicators)).find((i: any) => i.indicatorId === ind);
+    expect(it.files).toBe(1);
+    expect(g.body.previous).toMatchObject({ year: prev, weak: 1, rated: 1 });
+  });
+});

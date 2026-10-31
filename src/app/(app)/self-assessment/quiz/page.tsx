@@ -8,10 +8,11 @@ import {
 import { PageHeader } from "@/components/ui";
 import { useSession, useToast } from "@/components/providers";
 import { suggestScore } from "@/lib/self-assessment-shared";
+import { EvidenceDrawer } from "@/components/evaluation/evidence-drawer";
 
 type Ind = {
   indicatorId: string; code: string; title: string; itemId: string | null; score: number | null; isWeak: boolean; status: string;
-  evidence: string[]; evidenceHave: string[]; methods: string[]; notes: string | null; plan: { action: string | null };
+  evidence: string[]; evidenceHave: string[]; methods: string[]; notes: string | null; plan: { action: string | null }; files: number;
 };
 type Data = {
   school: { id: string; name: string }; year: string; canFill: boolean; locked: boolean; assessment: { status: string } | null;
@@ -46,6 +47,7 @@ export default function SelfAssessmentQuiz() {
   // خطة فورية للضعف
   const [planFor, setPlanFor] = useState<{ itemId: string; step: Step } | null>(null);
   const [plan, setPlan] = useState({ planAction: "", responsible: "", dueDate: "" });
+  const [filesOpen, setFilesOpen] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -213,6 +215,10 @@ export default function SelfAssessmentQuiz() {
             )}
           </div>
 
+          <button type="button" onClick={() => setFilesOpen(true)} className="inline-flex items-center gap-1.5 rounded-lg border border-turquoise/40 px-3 py-1.5 text-[12.5px] font-semibold text-turquoise hover:bg-turquoise/5">
+            📎 أرفق صورة أو ملفاً للشواهد (اختياري){cur.ind.files ? ` — ${cur.ind.files} مرفوع` : ""}
+          </button>
+
           <div>
             <p className="mb-2 text-[13px] font-semibold text-navy">كيف تحققت من ذلك؟</p>
             <div className="flex flex-wrap gap-2">
@@ -257,6 +263,9 @@ export default function SelfAssessmentQuiz() {
           </div>
         </div>
       </div>
+
+      <EvidenceDrawer open={filesOpen} onClose={() => setFilesOpen(false)} schoolId={data.school.id}
+        indicator={{ indicatorId: cur.ind.indicatorId, code: cur.ind.code, title: cur.ind.title }} canUpload onChanged={() => void load()} />
 
       {planFor && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-navy-deep/50 p-4" role="dialog" aria-modal="true" aria-label="خطة تحسين">

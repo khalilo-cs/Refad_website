@@ -9,13 +9,14 @@ import { Modal, PageHeader } from "@/components/ui";
 import { ConfirmDialog } from "@/components/ui/extra";
 import { useSession, useToast } from "@/components/providers";
 import { fmtDate } from "@/lib/labels";
+import { EvidenceDrawer } from "@/components/evaluation/evidence-drawer";
 
 type Status = "NONE" | "NEEDS_PLAN" | "PLANNED" | "IN_PROGRESS" | "IMPROVED" | "VERIFIED";
 type Ind = {
   indicatorId: string; code: string; title: string; itemId: string | null; score: number | null; baselineScore: number | null; isWeak: boolean; status: Status;
   plan: { action: string | null; responsible: string | null; dueDate: string | null; successMeasure: string | null; setAt: string | null };
   progressNote: string | null; improvedAt: string | null; reviewNote: string | null; verifiedAt: string | null; verifiedBy: string | null; overdue: boolean;
-  evidence: string[]; evidenceHave: string[]; answered: boolean; methods: string[]; notes: string | null;
+  evidence: string[]; evidenceHave: string[]; answered: boolean; files: number; methods: string[]; notes: string | null;
 };
 type Crit = { id: string; code: string; title: string; weight: number | null; achieved: boolean; percent: number | null; subs: { id: string; code: string; title: string; weight: number | null; indicators: Ind[] }[] };
 const METHODS = ["فحص وثائق", "ملاحظة", "مقابلة"];
@@ -25,6 +26,7 @@ type Data = {
   year: string; years: string[]; assessment: { id: string; status: string; submittedAt: string | null } | null;
   canFill: boolean; canReview: boolean; locked: boolean; scale: { key: string; label_ar: string; score: number }[]; maxScore: number;
   criteria: Crit[]; summary: Summary; blockers: string[];
+  previous: { year: string; percent: number | null; weak: number; verified: number; rated: number } | null;
 };
 
 /** ألوان الحالة: أحمر ضعيف بلا خطة، برتقالي خطة، أزرق تنفيذ، أخضر فاتح تحسّن بانتظار الاعتماد، أخضر معتمد. */
@@ -65,6 +67,7 @@ function Inner() {
   const [improveFor, setImproveFor] = useState<Ind | null>(null);
   const [reviewFor, setReviewFor] = useState<{ ind: Ind; kind: "verify" | "return" } | null>(null);
   const [historyFor, setHistoryFor] = useState<Ind | null>(null);
+  const [filesFor, setFilesFor] = useState<Ind | null>(null);
   const [confirmSubmit, setConfirmSubmit] = useState(false);
 
   const isSchool = !!user && ["SCHOOL_PRINCIPAL", "QUALITY_COORDINATOR"].includes(user.roleKey);
@@ -194,7 +197,7 @@ function Inner() {
       {data && (
         <>
           <StatusBanner data={data} onSubmit={() => setConfirmSubmit(true)} onReopen={() => submit("reopen")} onYear={(y) => nav({ year: y })} />
-          <SummaryCards s={data.summary} onFilter={setFilter} />
+          <SummaryCards s={data.summary} previous={data.previous} onFilter={setFilter} />
 
           <div className="card flex flex-wrap items-center gap-2 p-3">
             <div className="relative min-w-[200px] flex-1 sm:max-w-xs">
@@ -241,7 +244,7 @@ function Inner() {
                                 onRate={(score) => rate(i, { score, evidenceHave: i.evidenceHave })} onWeak={(v) => rate(i, { isWeak: v })}
                                 onMethods={(m) => rate(i, { methods: m })} onNotes={(n) => rate(i, { notes: n })}
                                 onPlan={() => setPlanFor({ ind: i, required: i.status === "NEEDS_PLAN" })} onStart={() => step(i, { action: "start" })}
-                                onImprove={() => setImproveFor(i)} onReview={(kind) => setReviewFor({ ind: i, kind })} onHistory={() => setHistoryFor(i)} />
+                                onImprove={() => setImproveFor(i)} onReview={(kind) => setReviewFor({ ind: i, kind })} onHistory={() => setHistoryFor(i)} onFiles={() => setFilesFor(i)} />
                             ))}
                           </ul>
                         </div>
@@ -268,6 +271,11 @@ function Inner() {
           onSave={(note) => step(reviewFor.ind, { action: reviewFor.kind, note }, () => setReviewFor(null))} />
       )}
       {historyFor && <HistoryModal ind={historyFor} onClose={() => setHistoryFor(null)} />}
+      {data && (
+        <EvidenceDrawer open={!!filesFor} onClose={() => setFilesFor(null)} schoolId={data.school.id}
+          indicator={filesFor ? { indicatorId: filesFor.indicatorId, code: filesFor.code, title: filesFor.title } : null}
+          canUpload={data.canFill} onChanged={() => void load()} />
+      )}
       <ConfirmDialog open={confirmSubmit} tone="primary" title="إرسال الاستمارة للإدارة"
         message="بعد الإرسال يُقفل التقييم، وتستمر في تحديث حالة خطط التحسين (بدء التنفيذ، ثم إعلان التحسّن) حتى تعتمدها الإدارة."
         confirmLabel="إرسال" onConfirm={() => submit("submit")} onClose={() => setConfirmSubmit(false)} />
@@ -304,7 +312,7 @@ function StatusBanner({ data, onSubmit, onReopen, onYear }: { data: Data; onSubm
   );
 }
 
-function SummaryCards({ s, onFilter }: { s: Summary; onFilter: (f: Filter) => void }) {
+function SummaryCards({ s, previous, onFilter }: { s: Summary; previous: Data["previous"]; onFilter: (f: Filter) => void }) {
   const pct = s.total ? Math.round((s.rated / s.total) * 100) : 0;
   const cards: [string, number | string, string, Filter][] = [
     ["نسبة التحقق", s.percent != null ? `${s.percent}%` : "—", "text-navy", "all"],
@@ -319,6 +327,11 @@ function SummaryCards({ s, onFilter }: { s: Summary; onFilter: (f: Filter) => vo
     <div className="space-y-3">
       <div className="card p-4">
         <div className="mb-1.5 flex items-center justify-between text-[12.5px]"><span className="text-gray-600">اكتمال التقييم: {s.rated} من {s.total} مؤشراً</span><b className="text-navy">{pct}%</b></div>
+        {previous && previous.percent != null && s.percent != null && (
+          <p className={`mb-1.5 text-[12px] ${s.percent >= previous.percent ? "text-success" : "text-danger"}`}>
+            مقارنة بالعام <bdi dir="ltr">{previous.year}</bdi>: نسبة التحقق {previous.percent}% ← {s.percent}% ({s.percent >= previous.percent ? "+" : ""}{s.percent - previous.percent} نقطة) · نقاط الضعف {previous.weak} ← {s.weak}
+          </p>
+        )}
         <div className="h-2.5 overflow-hidden rounded-full bg-gray-100" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100} aria-label="اكتمال التقييم">
           <div className="h-full rounded-full bg-turquoise transition-all" style={{ width: `${pct}%` }} />
         </div>
@@ -336,10 +349,10 @@ function SummaryCards({ s, onFilter }: { s: Summary; onFilter: (f: Filter) => vo
   );
 }
 
-function IndicatorRow({ ind, data, busy, onRate, onWeak, onMethods, onNotes, onPlan, onStart, onImprove, onReview, onHistory }: {
+function IndicatorRow({ ind, data, busy, onRate, onWeak, onMethods, onNotes, onPlan, onStart, onImprove, onReview, onHistory, onFiles }: {
   ind: Ind; data: Data; busy: boolean; onRate: (s: number) => void; onWeak: (v: boolean) => void; onMethods: (m: string[]) => void; onNotes: (n: string | null) => void;
   onPlan: () => void; onStart: () => void; onImprove: () => void;
-  onReview: (k: "verify" | "return") => void; onHistory: () => void;
+  onReview: (k: "verify" | "return") => void; onHistory: () => void; onFiles: () => void;
 }) {
   const st = STATUS[ind.status];
   const canRate = data.canFill && !data.locked;
@@ -391,6 +404,7 @@ function IndicatorRow({ ind, data, busy, onRate, onWeak, onMethods, onNotes, onP
           <ChevronDown className={`h-3.5 w-3.5 transition ${showDetails ? "rotate-180" : ""}`} /> الأدلة والشواهد{ind.evidence.length ? ` (${ind.evidence.length})` : ""}
         </button>
         {ind.methods.length > 0 && <span className="text-gray-500">أداة التحقق: {ind.methods.join("، ")}</span>}
+        {ind.files > 0 && <button type="button" onClick={onFiles} className="text-gray-500 hover:text-turquoise">📎 {ind.files} شاهد مرفوع</button>}
         {ind.notes && !showDetails && <span className="max-w-[420px] truncate text-gray-500">ملاحظات: {ind.notes}</span>}
       </div>
       {showDetails && (
@@ -400,6 +414,9 @@ function IndicatorRow({ ind, data, busy, onRate, onWeak, onMethods, onNotes, onP
             {ind.evidence.length ? (
               <ul className="space-y-0.5 text-gray-700">{ind.evidence.map((e) => <li key={e} className={ind.evidenceHave.includes(e) ? "text-success" : ""}>{ind.evidenceHave.includes(e) ? "✓ " : "▫ "}{e}</li>)}</ul>
             ) : <p className="text-gray-400">—</p>}
+            <button type="button" onClick={onFiles} className="mt-2 inline-flex items-center gap-1 rounded-lg border border-turquoise/40 px-2.5 py-1 font-semibold text-turquoise hover:bg-turquoise/5">
+              📎 {data.canFill ? "رفع الشواهد" : "عرض الشواهد"}{ind.files ? ` (${ind.files})` : ""}
+            </button>
           </div>
           <div>
             <p className="mb-1 font-semibold text-navy">أداة التحقق من الأدلة</p>

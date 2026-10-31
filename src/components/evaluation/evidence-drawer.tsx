@@ -13,7 +13,7 @@ const TYPES = ["وثيقة رسمية", "خطة", "تقرير", "محضر", "س�
 export function EvidenceDrawer({
   open, onClose, schoolId, visitId, indicator, canUpload, onChanged,
 }: {
-  open: boolean; onClose: () => void; schoolId: string; visitId: string;
+  open: boolean; onClose: () => void; schoolId: string; visitId?: string | null;
   indicator: { indicatorId: string; code: string; title: string } | null; canUpload: boolean; onChanged: () => void;
 }) {
   const { add } = useToast();
@@ -28,11 +28,14 @@ export function EvidenceDrawer({
     if (!indicator) return;
     setLoading(true);
     try {
-      const r = await fetch(`/api/evidence?visitId=${visitId}&indicatorId=${indicator.indicatorId}`, { credentials: "include" });
+      const qs = new URLSearchParams({ indicatorId: indicator.indicatorId });
+      if (visitId) qs.set("visitId", visitId);
+      else qs.set("schoolId", schoolId);
+      const r = await fetch(`/api/evidence?${qs}`, { credentials: "include" });
       const d = await r.json();
       setItems(d.evidence ?? []);
     } finally { setLoading(false); }
-  }, [visitId, indicator]);
+  }, [visitId, schoolId, indicator]);
   useEffect(() => { if (open) void load(); }, [open, load]);
 
   const upload = (file: File) => {
@@ -40,7 +43,7 @@ export function EvidenceDrawer({
     const fd = new FormData();
     fd.append("file", file);
     fd.append("schoolId", schoolId);
-    fd.append("visitId", visitId);
+    if (visitId) fd.append("visitId", visitId);
     fd.append("indicatorId", indicator.indicatorId);
     fd.append("documentType", type);
     if (desc) fd.append("description", desc);
