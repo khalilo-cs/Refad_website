@@ -220,3 +220,15 @@ describe("الشواهد والمقارنة بالعام السابق", () => {
     expect(g.body.previous).toMatchObject({ year: prev, weak: 1, rated: 1 });
   });
 });
+
+describe("التنبيهات اليومية التلقائية", () => {
+  it("تنبّه بالخطط المتأخرة مرة واحدة في اليوم", async () => {
+    const { runDailyReminders } = await import("../self-assessment-reminders");
+    const a = await q.queryOne<any>("SELECT id FROM self_assessments WHERE school_id = ? AND academic_year = ?", [schoolId, year]);
+    await q.exec("UPDATE self_assessment_items SET is_weak = 1, improvement_status = 'IN_PROGRESS', plan_action = 'خطة', plan_due_date = '2000-01-01' WHERE assessment_id = ? AND indicator_id = ?", [a.id, indicators[indicators.length - 1]]);
+    expect(await runDailyReminders("2099-05-05")).toBe(true);
+    expect(await runDailyReminders("2099-05-05")).toBe(false);
+    const pid = (await q.queryOne<any>("SELECT id FROM users WHERE email = ?", [EMAILS.principal]))!.id;
+    expect(await q.queryOne("SELECT 1 FROM notifications WHERE user_id = ? AND title = 'خطط تحسين متأخرة'", [pid])).toBeTruthy();
+  });
+});

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { runDailyReminders } from "@/lib/self-assessment-reminders";
 import { getServerSession } from "@/lib/auth";
 import { queryOne } from "@/lib/db/sqlite";
 import { currentAcademicYear, getAssessment, SCHOOL_ROLES } from "@/lib/self-assessment";
@@ -13,6 +14,7 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   const session = await getServerSession();
   if (!session) return NextResponse.json({ message: "غير مصادق" }, { status: 401 });
+  await runDailyReminders();
   if (!SCHOOL_ROLES.includes(session.roleKey) || !session.schoolId) return NextResponse.json({ required: false });
   const year = currentAcademicYear();
   const total = (await queryOne<{ n: number }>("SELECT COUNT(*) n FROM indicators"))?.n ?? 0;

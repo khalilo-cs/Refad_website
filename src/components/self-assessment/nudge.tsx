@@ -28,11 +28,11 @@ export function SelfAssessmentNudge() {
       <span className={`flex h-11 w-11 items-center justify-center rounded-xl ${urgent ? "bg-danger/10 text-danger" : "bg-turquoise/10 text-turquoise"}`}>
         {urgent ? <AlertTriangle className="h-5 w-5" /> : <ClipboardCheck className="h-5 w-5" />}
       </span>
-      <div className="min-w-0 flex-1">
+      <div className="min-w-[200px] flex-1">
         <p className="font-heading text-[14.5px] font-bold text-navy">استمارة التقييم الذاتي — <bdi dir="ltr">{s.year}</bdi></p>
         <p className="text-[12.5px] text-gray-600">{todo.length ? todo.join(" · ") : "لا مطلوب الآن. تابع تنفيذ خطط التحسين وحدّث حالتها."}</p>
       </div>
-      <div className="flex gap-3 text-center text-[11px]">
+      <div className="flex w-full justify-around gap-3 border-t border-gray-100 pt-2 text-center text-[11px] sm:w-auto sm:border-0 sm:pt-0">
         <span><b className="block font-heading text-lg text-sky-700">{m.planned + m.inProgress}</b>قيد المعالجة</span>
         <span><b className="block font-heading text-lg text-emerald-700">{m.improved}</b>بانتظار الاعتماد</span>
         <span><b className="flex items-center justify-center gap-1 font-heading text-lg text-success"><TrendingUp className="h-4 w-4" />{m.verified}</b>تحسّن معتمد</span>

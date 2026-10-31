@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { runDailyReminders } from "@/lib/self-assessment-reminders";
 import { getServerSession } from "@/lib/auth";
 import { query } from "@/lib/db/sqlite";
 import { schoolScope } from "@/lib/scope";
@@ -11,6 +12,7 @@ export const dynamic = "force-dynamic";
 export async function GET(request: NextRequest) {
   const session = await getServerSession();
   if (!session) return NextResponse.json({ message: "غير مصادق" }, { status: 401 });
+  await runDailyReminders();
   if (!REVIEWER_ROLES.includes(session.roleKey) || session.mustChangePassword) return NextResponse.json({ message: "غير مصرح" }, { status: 403 });
   const year = normalizeYear(request.nextUrl.searchParams.get("year"));
   const scope = await schoolScope(session, "s");
