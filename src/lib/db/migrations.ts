@@ -357,6 +357,14 @@ export const MIGRATIONS: Migration[] = [
       CREATE INDEX IF NOT EXISTS idx_certificates_school ON certificates(school_id, academic_year);
     `,
   },
+  {
+    id: 10,
+    name: "self-assessment-verification-methods",
+    sql: `
+      -- أداة التحقق من الأدلة كما في الاستمارة الرسمية: فحص وثائق، ملاحظة، مقابلة
+      ALTER TABLE self_assessment_items ADD COLUMN methods TEXT;
+    `,
+  },
 ];
 
 /** واجهة تنفيذ مستقلة عن المحرّك (SQLite محلي أو libSQL). */

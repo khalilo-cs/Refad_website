@@ -53,6 +53,20 @@ describe("دورة التقييم الذاتي ومعالجة الضعف", () =>
     expect(n).toBeTruthy();
   });
 
+  it("أداة التحقق والملاحظات والأدلة كما في الاستمارة الرسمية", async () => {
+    await as(EMAILS.principal);
+    const r = await json(await rate(indicators[5], { methods: ["فحص وثائق", "مقابلة"], notes: "تم الاطلاع على المحضر" }));
+    expect(r.status).toBe(200);
+    expect((await rate(indicators[5], { methods: ["شيء آخر"] })).status).toBe(400);
+    const g = await json(await sa.GET(req(`/api/self-assessment?year=${year}`)));
+    const ind = g.body.criteria.flatMap((c: any) => c.subs.flatMap((s: any) => s.indicators)).find((i: any) => i.indicatorId === indicators[5]);
+    expect(ind.methods).toEqual(["فحص وثائق", "مقابلة"]);
+    expect(ind.notes).toBe("تم الاطلاع على المحضر");
+    expect(ind.evidence.length).toBeGreaterThan(0);
+    expect(ind.isWeak).toBe(false);
+    expect(g.body.criteria[0].weight).toBe(15);
+  });
+
   it("علامة الضعف اليدوية على مؤشر جيد", async () => {
     await as(EMAILS.principal);
     const r = await json(await rate(indicators[1], { score: 2, isWeak: true }));

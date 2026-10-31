@@ -4,7 +4,7 @@ import { getServerSession } from "@/lib/auth";
 import { exec, nowISO, query, queryOne, uuid } from "@/lib/db/sqlite";
 import {
   buildTree, canFill, canView, currentAcademicYear, getAssessment, getOrCreateAssessment, isWeakScore, logEvent, normalizeYear,
-  notifyReviewers, submitBlockers,
+  notifyReviewers, submitBlockers, VERIFICATION_METHODS,
 } from "@/lib/self-assessment";
 
 export const runtime = "nodejs";
@@ -50,6 +50,7 @@ const rateSchema = z.object({
   score: z.number().int().min(0).max(10).nullable().optional(),
   isWeak: z.boolean().optional(),
   notes: z.string().max(1000).nullable().optional(),
+  methods: z.array(z.enum(VERIFICATION_METHODS)).max(3).optional(),
 });
 
 /**
@@ -99,8 +100,11 @@ export async function PUT(request: NextRequest) {
 
   await exec(
     `UPDATE self_assessment_items SET score = ?, baseline_score = COALESCE(baseline_score, ?), is_weak = ?, weak_marked_at = ?,
-       improvement_status = ?, notes = COALESCE(?, notes), updated_by_id = ?, updated_at = ? WHERE id = ?`,
-    [score ?? null, score ?? null, weak ? 1 : 0, weak ? item.weak_marked_at ?? now : null, status, parsed.data.notes ?? null, session.userId, now, item.id]
+       improvement_status = ?, notes = ?, methods = ?, updated_by_id = ?, updated_at = ? WHERE id = ?`,
+    [score ?? null, score ?? null, weak ? 1 : 0, weak ? item.weak_marked_at ?? now : null, status,
+     parsed.data.notes !== undefined ? (parsed.data.notes?.trim() || null) : item.notes,
+     parsed.data.methods !== undefined ? JSON.stringify([...new Set(parsed.data.methods)]) : item.methods ?? null,
+     session.userId, now, item.id]
   );
   await exec("UPDATE self_assessments SET updated_at = ? WHERE id = ?", [now, a.id]);
 

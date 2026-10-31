@@ -125,9 +125,13 @@ export type TreeIndicator = {
   plan: { action: string | null; responsible: string | null; dueDate: string | null; successMeasure: string | null; setAt: string | null };
   progressNote: string | null; improvedAt: string | null; reviewNote: string | null; verifiedAt: string | null; verifiedBy: string | null;
   notes: string | null; overdue: boolean; updatedAt: string | null;
+  /** الأدلة والشواهد المقترحة في الاستمارة الرسمية */
+  evidence: string[];
+  /** أداة التحقق المستخدمة: فحص وثائق / ملاحظة / مقابلة */
+  methods: string[];
 };
-export type TreeSub = { id: string; code: string; title: string; indicators: TreeIndicator[] };
-export type TreeCriterion = { id: string; code: string; title: string; subs: TreeSub[]; achieved: boolean; percent: number | null };
+export type TreeSub = { id: string; code: string; title: string; weight: number | null; indicators: TreeIndicator[] };
+export type TreeCriterion = { id: string; code: string; title: string; weight: number | null; subs: TreeSub[]; achieved: boolean; percent: number | null };
 
 export type Summary = {
   total: number; rated: number; weak: number; needsPlan: number; planned: number; inProgress: number; improved: number; verified: number; overdue: number;
@@ -137,9 +141,9 @@ export type Summary = {
 /** يبني الاستمارة كاملة (معيار ← معيار فرعي ← مؤشر) مع حالة كل مؤشر وملخص. */
 export async function buildTree(assessmentId: string | null): Promise<{ criteria: TreeCriterion[]; summary: Summary; maxScore: number }> {
   const maxScore = (await queryOne<{ m: number }>("SELECT MAX(score) m FROM rating_scale WHERE is_active = 1"))?.m || 3;
-  const crit = await query<any>("SELECT id, code, title FROM criteria ORDER BY order_index, code");
-  const subs = await query<any>("SELECT id, code, title, criterion_id FROM sub_criteria ORDER BY order_index, code");
-  const inds = await query<any>("SELECT id, code, title, criterion_id, sub_criterion_id FROM indicators ORDER BY order_index, code");
+  const crit = await query<any>("SELECT id, code, title, weight FROM criteria ORDER BY order_index, code");
+  const subs = await query<any>("SELECT id, code, title, weight, criterion_id FROM sub_criteria ORDER BY order_index, code");
+  const inds = await query<any>("SELECT id, code, title, evidence, criterion_id, sub_criterion_id FROM indicators ORDER BY order_index, code");
   const items = assessmentId
     ? await query<any>(
         `SELECT i.*, v.name AS verified_by_name FROM self_assessment_items i LEFT JOIN users v ON v.id = i.verified_by_id WHERE i.assessment_id = ?`,
@@ -160,6 +164,8 @@ export async function buildTree(assessmentId: string | null): Promise<{ criteria
       verifiedAt: it?.verified_at ?? null, verifiedBy: it?.verified_by_name ?? null, notes: it?.notes ?? null,
       overdue: !!it?.plan_due_date && it.plan_due_date < today && (status === "PLANNED" || status === "IN_PROGRESS"),
       updatedAt: it?.updated_at ?? null,
+      evidence: jsonList(r.evidence),
+      methods: jsonList(it?.methods),
     };
   };
 
@@ -168,10 +174,10 @@ export async function buildTree(assessmentId: string | null): Promise<{ criteria
 
   const criteria: TreeCriterion[] = crit.map((c) => {
     const cSubs: TreeSub[] = subs.filter((s) => s.criterion_id === c.id).map((s) => ({
-      id: s.id, code: s.code, title: s.title, indicators: inds.filter((i) => i.sub_criterion_id === s.id).map(toInd),
+      id: s.id, code: s.code, title: s.title, weight: s.weight ?? null, indicators: inds.filter((i) => i.sub_criterion_id === s.id).map(toInd),
     }));
     const direct = inds.filter((i) => i.criterion_id === c.id && !i.sub_criterion_id).map(toInd);
-    if (direct.length) cSubs.unshift({ id: `${c.id}-direct`, code: c.code, title: c.title, indicators: direct });
+    if (direct.length) cSubs.unshift({ id: `${c.id}-direct`, code: c.code, title: c.title, weight: null, indicators: direct });
     const all = cSubs.flatMap((s) => s.indicators);
     const rated = all.filter((i) => i.score != null);
     for (const i of all) {
@@ -191,11 +197,20 @@ export async function buildTree(assessmentId: string | null): Promise<{ criteria
     const openWeak = all.some((i) => i.isWeak && i.status !== "VERIFIED");
     const achieved = all.length > 0 && rated.length === all.length && !openWeak && (percent ?? 0) >= 80;
     if (achieved) summary.achievedCriteria++;
-    return { id: c.id, code: c.code, title: c.title, subs: cSubs, achieved, percent };
+    return { id: c.id, code: c.code, title: c.title, weight: c.weight ?? null, subs: cSubs, achieved, percent };
   });
   summary.percent = summary.rated ? Math.round((scoreSum / (summary.rated * maxScore)) * 100) : null;
   return { criteria, summary, maxScore };
 }
+
+function jsonList(v: unknown): string[] {
+  if (Array.isArray(v)) return v.map(String);
+  if (typeof v !== "string" || !v) return [];
+  try { const a = JSON.parse(v); return Array.isArray(a) ? a.map(String) : []; } catch { return []; }
+}
+
+/** أدوات التحقق من الأدلة كما في الاستمارة الرسمية. */
+export const VERIFICATION_METHODS = ["فحص وثائق", "ملاحظة", "مقابلة"] as const;
 
 /** أسباب منع الإرسال: مؤشرات غير مقيّمة، أو ضعف بلا خطة. */
 export function submitBlockers(summary: Summary): string[] {
