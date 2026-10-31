@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { canSeeHref } from "@/lib/nav";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { ArrowDown, ArrowUp, Building2, Download, FileUp, Loader2, MapPin, Plus, Search, TriangleAlert } from "lucide-react";
@@ -84,7 +85,7 @@ export default function SchoolsPage() {
           <>
             <a href={`/api/schools/export?format=xlsx${directorateId ? `&directorateId=${directorateId}` : ""}`} className="btn btn-ghost btn-sm"><Download className="h-3.5 w-3.5" /> Excel</a>
             <a href={`/api/schools/export?format=csv${directorateId ? `&directorateId=${directorateId}` : ""}`} className="btn btn-ghost btn-sm"><Download className="h-3.5 w-3.5" /> CSV</a>
-            <Link href="/map" className="btn btn-ghost btn-sm"><MapPin className="h-3.5 w-3.5" /> الخريطة</Link>
+            {canSeeHref(user?.roleKey, (user as any)?.permissions, "/map") && <Link href="/map" className="btn btn-ghost btn-sm"><MapPin className="h-3.5 w-3.5" /> الخريطة</Link>}
             {canManage && (
               <>
                 <button onClick={() => setImportOpen(true)} className="btn btn-ghost btn-sm"><FileUp className="h-3.5 w-3.5" /> استيراد</button>

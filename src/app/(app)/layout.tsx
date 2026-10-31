@@ -6,7 +6,9 @@ import { useRouter, usePathname } from "next/navigation";
 import Sidebar from "@/components/layout/sidebar";
 import TopBar from "@/components/layout/topbar";
 import RifadLogo from "@/components/brand/rifad-logo";
-import { navFor } from "@/lib/nav";
+import Link from "next/link";
+import { Lock } from "lucide-react";
+import { NAV_ITEMS, navFor } from "@/lib/nav";
 
 
 export default function AppShell({ children }: { children: ReactNode }) {
@@ -42,6 +44,11 @@ export default function AppShell({ children }: { children: ReactNode }) {
       router.replace("/login");
       return;
     }
+    // حساب بكلمة مرور مؤقتة: صفحة التغيير أولاً (يحميها الخادم أيضاً)
+    if (user.mustChangePassword) {
+      window.location.replace("/change-password");
+      return;
+    }
     if (!welcomed.current) {
       welcomed.current = true;
       add({ type: "success", message: `أهلاً ${user.name}` });
@@ -65,10 +72,26 @@ export default function AppShell({ children }: { children: ReactNode }) {
   }
 
 
+  const items = navFor(user?.roleKey, (user as any)?.permissions);
+  // صفحة من القائمة لا يملكها الدور: رسالة واضحة بدل شاشة فارغة أو أخطاء
+  const section = "/" + (pathname.split("/")[1] ?? "");
+  const known = NAV_ITEMS.some((n) => n.href === section);
+  const allowed = !known || items.some((n) => n.href === section);
+  const content = allowed ? children : (
+    <div className="mx-auto mt-10 max-w-md rounded-2xl border border-gray-100 bg-white p-10 text-center shadow-sm">
+      <Lock className="mx-auto mb-3 h-9 w-9 text-gray-300" />
+      <h2 className="font-heading text-lg font-bold text-navy">هذا القسم غير متاح لحسابك</h2>
+      <p className="mt-1.5 text-[13px] text-gray-600">صلاحيات دورك ({user?.role}) لا تشمل هذه الصفحة. إن كنت تحتاجها فاطلب ذلك من مدير النظام.</p>
+      <Link href="/dashboard" className="btn btn-primary btn-sm mt-5">العودة إلى لوحتي</Link>
+    </div>
+  );
+
+  if (user?.mustChangePassword) return null;
+
   return (
     <div className="relative flex h-screen overflow-hidden bg-background">
       <Sidebar
-        items={navFor(user?.roleKey, (user as any)?.permissions)}
+        items={items}
         open={sidebarOpen}
         onToggle={() => setSidebarOpen((o) => !o)}
         onLogout={logout}
@@ -90,7 +113,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
       >
         <TopBar user={user} onLogout={logout} onToggleSidebar={() => setSidebarOpen((o) => !o)} />
         <main className="flex-1 overflow-y-auto">
-          <div className="mx-auto max-w-[1500px] px-4 py-6 lg:px-8 lg:py-8">{children}</div>
+          <div className="mx-auto max-w-[1500px] px-4 py-6 lg:px-8 lg:py-8">{content}</div>
         </main>
       </div>
     </div>

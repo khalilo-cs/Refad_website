@@ -53,7 +53,8 @@ function LoginForm() {
       }
       // تحديث حالة الجلسة قبل الانتقال حتى تظهر القائمة وبيانات المستخدم فوراً
       await reload();
-      router.replace(data.user?.mustChangePassword ? "/settings?force=1" : callbackUrl);
+      if (data.user?.mustChangePassword) { window.location.replace("/change-password"); return; }
+      router.replace(callbackUrl);
       router.refresh();
     } catch {
       setError("تعذّر الاتصال بالخادم. تحقق من الشبكة وأعد المحاولة.");

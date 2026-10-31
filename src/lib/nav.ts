@@ -24,8 +24,8 @@ const ROLE_NAV: Record<string, string[]> = {
   SUPER_ADMIN: ALL,
   EDUCATION_DIRECTOR: ["dashboard", "quality-tracking", "self-assessment", "schools", "map", "visits", "evaluation", "evidence", "reports", "improvement", "rankings", "directory", "communication", "settings"],
   INSPECTOR: ["dashboard", "quality-tracking", "self-assessment", "schools", "map", "visits", "evaluation", "evidence", "reports", "improvement", "rankings", "directory", "communication", "settings"],
-  SCHOOL_PRINCIPAL: ["dashboard", "self-assessment", "schools", "visits", "evidence", "reports", "improvement", "communication", "settings"],
-  QUALITY_COORDINATOR: ["dashboard", "self-assessment", "schools", "evidence", "reports", "improvement", "communication", "settings"],
+  SCHOOL_PRINCIPAL: ["dashboard", "self-assessment", "schools", "visits", "evaluation", "evidence", "reports", "improvement", "communication", "settings"],
+  QUALITY_COORDINATOR: ["dashboard", "self-assessment", "schools", "visits", "evaluation", "evidence", "reports", "improvement", "communication", "settings"],
   TEACHER: ["dashboard", "evidence", "communication", "settings"],
   PARENT: ["dashboard", "communication", "settings"],
   GUEST: ["dashboard"],
@@ -35,4 +35,11 @@ export function navFor(roleKey: string | undefined, permissions?: Record<string,
   const keys = new Set(ROLE_NAV[roleKey ?? ""] ?? ["dashboard", "settings"]);
   if (permissions?.all === true) ALL.forEach((k) => keys.add(k));
   return NAV_ITEMS.filter((n) => keys.has(n.key));
+}
+
+/** هل يصل الدور إلى رابط داخلي؟ (لإخفاء الأزرار المؤدية إلى أقسام خارج صلاحياته) */
+export function canSeeHref(roleKey: string | undefined, permissions: Record<string, unknown> | undefined, href: string): boolean {
+  const section = "/" + (href.split(/[?#]/)[0].split("/")[1] ?? "");
+  if (!NAV_ITEMS.some((n) => n.href === section)) return true;
+  return navFor(roleKey, permissions).some((n) => n.href === section);
 }

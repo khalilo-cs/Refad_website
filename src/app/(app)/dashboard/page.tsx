@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { SelfAssessmentNudge } from "@/components/self-assessment/nudge";
+import { canSeeHref } from "@/lib/nav";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import {
@@ -44,6 +45,7 @@ export default function DashboardPage() {
   const [schools, setSchools] = useState<any[]>([]);
 
   const staff = !!user && !["PARENT", "TEACHER", "GUEST"].includes(user.roleKey);
+  const see = (href: string) => canSeeHref(user?.roleKey, (user as any)?.permissions, href);
 
   const load = useCallback(async (f: Filters) => {
     setLoading(true);
@@ -210,10 +212,10 @@ export default function DashboardPage() {
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-2 md:w-[230px]">
-                  <Link href="/evaluation" className="btn btn-gold btn-sm justify-center"><ClipboardList className="h-3.5 w-3.5" /> التقييم</Link>
-                  <Link href="/reports" className="btn btn-sm justify-center border border-white/20 bg-white/10 text-white hover:bg-white/20"><FileCheck2 className="h-3.5 w-3.5" /> التقارير</Link>
-                  <Link href="/map" className="btn btn-sm justify-center border border-white/20 bg-white/10 text-white hover:bg-white/20"><MapPin className="h-3.5 w-3.5" /> الخريطة</Link>
-                  <Link href="/improvement" className="btn btn-sm justify-center border border-white/20 bg-white/10 text-white hover:bg-white/20"><Wrench className="h-3.5 w-3.5" /> التحسين</Link>
+                  {see("/evaluation") && <Link href="/evaluation" className="btn btn-gold btn-sm justify-center"><ClipboardList className="h-3.5 w-3.5" /> التقييم</Link>}
+                  {see("/reports") && <Link href="/reports" className="btn btn-sm justify-center border border-white/20 bg-white/10 text-white hover:bg-white/20"><FileCheck2 className="h-3.5 w-3.5" /> التقارير</Link>}
+                  {see("/map") && <Link href="/map" className="btn btn-sm justify-center border border-white/20 bg-white/10 text-white hover:bg-white/20"><MapPin className="h-3.5 w-3.5" /> الخريطة</Link>}
+                  {see("/improvement") && <Link href="/improvement" className="btn btn-sm justify-center border border-white/20 bg-white/10 text-white hover:bg-white/20"><Wrench className="h-3.5 w-3.5" /> التحسين</Link>}
                 </div>
               </div>
             </section>
@@ -222,14 +224,14 @@ export default function DashboardPage() {
           {/* ===== المؤشرات الرئيسية ===== */}
           <Rise>
             <div className="grid grid-cols-2 gap-3.5 lg:grid-cols-4">
-              <Kpi href="/schools" icon={Building2} tone="navy" label="المدارس المسجلة" value={stats.schools.total} hint={`${stats.schools.active} فعّالة`} />
-              <Kpi href="/visits?status=IN_PROGRESS" icon={CalendarCheck} tone="teal" label="زيارات اليوم" value={stats.schools.visitedToday + stats.visits.today} hint={`${stats.schools.visitedToday} مدرسة تمت زيارتها`} />
-              <Kpi href="/visits?status=SCHEDULED" icon={Activity} tone="gold" label="الزيارات المجدولة" value={stats.visits.scheduled} hint={`${stats.visits.inProgress} جارية · ${stats.visits.executed} منفّذة`} />
-              <Kpi href="/visits?status=OVERDUE" icon={AlertTriangle} tone={stats.visits.overdue ? "rose" : "emerald"} label="زيارات متأخرة" value={stats.visits.overdue} hint="فات موعدها دون بدء" />
-              <Kpi href="/evidence" icon={FileCheck2} tone="emerald" label="اكتمال الأدلة المقبولة" value={stats.evidence.completion} suffix="%" digits={0} hint={`${stats.evidence.withAccepted} من ${stats.evidence.evaluated} مؤشراً مقيَّماً · ${stats.evidence.pending} بانتظار المراجعة`} empty="لا تقييمات بعد" />
-              <Kpi href="/improvement" icon={Wrench} tone="navy" label="خطط تحسين مفتوحة" value={stats.improvement.plansOpen} hint={`${stats.improvement.actionsDueSoon} إجراء يستحق خلال أسبوع`} />
-              <Kpi href="/improvement?status=OVERDUE" icon={ShieldAlert} tone={stats.improvement.actionsOverdue ? "rose" : "emerald"} label="إجراءات متأخرة" value={stats.improvement.actionsOverdue} hint="تجاوزت الموعد النهائي" />
-              <Kpi href="/reports?status=UNDER_REVIEW" icon={ClipboardList} tone="gold" label="تقارير بانتظار الاعتماد" value={stats.reports?.UNDER_REVIEW ?? 0} hint={`${stats.reports?.APPROVED ?? 0} معتمد · ${stats.reports?.DRAFT ?? 0} مسودة`} />
+              <Kpi href="/schools" allowed={see("/schools")} icon={Building2} tone="navy" label="المدارس المسجلة" value={stats.schools.total} hint={`${stats.schools.active} فعّالة`} />
+              <Kpi href="/visits?status=IN_PROGRESS" allowed={see("/visits?status=IN_PROGRESS")} icon={CalendarCheck} tone="teal" label="زيارات اليوم" value={stats.schools.visitedToday + stats.visits.today} hint={`${stats.schools.visitedToday} مدرسة تمت زيارتها`} />
+              <Kpi href="/visits?status=SCHEDULED" allowed={see("/visits?status=SCHEDULED")} icon={Activity} tone="gold" label="الزيارات المجدولة" value={stats.visits.scheduled} hint={`${stats.visits.inProgress} جارية · ${stats.visits.executed} منفّذة`} />
+              <Kpi href="/visits?status=OVERDUE" allowed={see("/visits?status=OVERDUE")} icon={AlertTriangle} tone={stats.visits.overdue ? "rose" : "emerald"} label="زيارات متأخرة" value={stats.visits.overdue} hint="فات موعدها دون بدء" />
+              <Kpi href="/evidence" allowed={see("/evidence")} icon={FileCheck2} tone="emerald" label="اكتمال الأدلة المقبولة" value={stats.evidence.completion} suffix="%" digits={0} hint={`${stats.evidence.withAccepted} من ${stats.evidence.evaluated} مؤشراً مقيَّماً · ${stats.evidence.pending} بانتظار المراجعة`} empty="لا تقييمات بعد" />
+              <Kpi href="/improvement" allowed={see("/improvement")} icon={Wrench} tone="navy" label="خطط تحسين مفتوحة" value={stats.improvement.plansOpen} hint={`${stats.improvement.actionsDueSoon} إجراء يستحق خلال أسبوع`} />
+              <Kpi href="/improvement?status=OVERDUE" allowed={see("/improvement?status=OVERDUE")} icon={ShieldAlert} tone={stats.improvement.actionsOverdue ? "rose" : "emerald"} label="إجراءات متأخرة" value={stats.improvement.actionsOverdue} hint="تجاوزت الموعد النهائي" />
+              <Kpi href="/reports?status=UNDER_REVIEW" allowed={see("/reports?status=UNDER_REVIEW")} icon={ClipboardList} tone="gold" label="تقارير بانتظار الاعتماد" value={stats.reports?.UNDER_REVIEW ?? 0} hint={`${stats.reports?.APPROVED ?? 0} معتمد · ${stats.reports?.DRAFT ?? 0} مسودة`} />
             </div>
           </Rise>
 
@@ -402,7 +404,7 @@ export default function DashboardPage() {
               <div className="card p-5 lg:col-span-3">
                 <div className="mb-3 flex items-center justify-between">
                   <Head title="التوزيع الجغرافي" sub="النقاط من إحداثيات أدخلتها الجهات المعتمدة" inline />
-                  <Link href="/map" className="text-[12px] font-semibold text-turquoise hover:underline">الخريطة الكاملة <ArrowLeft className="inline h-3 w-3" /></Link>
+                  {see("/map") && <Link href="/map" className="text-[12px] font-semibold text-turquoise hover:underline">الخريطة الكاملة <ArrowLeft className="inline h-3 w-3" /></Link>}
                 </div>
                 {stats.map.length === 0 ? (
                   <EmptyState icon={MapPin} title="لا إحداثيات مُدخلة" description="أضف الإحداثيات من صفحة المدرسة لتظهر على الخريطة." />
@@ -497,15 +499,15 @@ function Head({ title, sub, inline }: { title: string; sub?: string; inline?: bo
   );
 }
 
-function Kpi({ href, icon: Icon, tone, label, value, hint, suffix = "", digits = 0, empty }: {
-  href: string; icon: any; tone: string; label: string; value: number | null; hint?: string; suffix?: string; digits?: number; empty?: string;
+function Kpi({ href, allowed = true, icon: Icon, tone, label, value, hint, suffix = "", digits = 0, empty }: {
+  href: string; allowed?: boolean; icon: any; tone: string; label: string; value: number | null; hint?: string; suffix?: string; digits?: number; empty?: string;
 }) {
   const tones: Record<string, string> = {
     navy: "bg-navy/8 text-navy ring-navy/10", teal: "bg-turquoise/10 text-turquoise ring-turquoise/15",
     gold: "bg-gold/12 text-gold ring-gold/20", rose: "bg-danger/8 text-danger ring-danger/15", emerald: "bg-emerald/10 text-emerald ring-emerald/15",
   };
   return (
-    <Link href={href} className="card card-elevated card-accent group block p-4 sm:p-5">
+    <Link href={allowed ? href : "#"} onClick={(e) => { if (!allowed) e.preventDefault(); }} aria-disabled={!allowed} className={`card card-elevated card-accent group block p-4 sm:p-5 ${allowed ? "" : "pointer-events-none"}`}>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-[12px] font-medium text-gray-600">{label}</p>

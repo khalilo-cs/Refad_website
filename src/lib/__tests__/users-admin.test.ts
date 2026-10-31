@@ -131,8 +131,9 @@ describe("إلزام تغيير كلمة المرور على الخادم", () =
     const api = middleware(mk("/api/schools"));
     expect(api.status).toBe(403);
     expect((await api.json()).mustChangePassword).toBe(true);
-    expect(middleware(mk("/schools")).headers.get("location")).toContain("/settings?force=1");
+    expect(middleware(mk("/schools")).headers.get("location")).toContain("/change-password");
     expect(middleware(mk("/api/account")).status).toBe(200);
-    expect(middleware(mk("/settings")).status).toBe(200);
+    expect(middleware(mk("/change-password")).status).toBe(200);
+    expect(middleware(mk("/settings")).headers.get("location")).toContain("/change-password");
   });
 });
