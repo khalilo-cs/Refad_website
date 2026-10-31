@@ -14,6 +14,40 @@ describe("فحص الملفات المرفوعة بمحتواها لا باسم�
     expect(sniffFile(webp, "a.webp")?.mime).toBe("image/webp");
   });
 
+  it("يقبل GIF وBMP وTIFF", () => {
+    const gif = Buffer.concat([Buffer.from("GIF89a"), Buffer.alloc(10)]);
+    expect(sniffFile(gif, "a.gif")?.mime).toBe("image/gif");
+    expect(sniffFile(buf(0x42, 0x4d), "a.bmp")?.mime).toBe("image/bmp");
+    expect(sniffFile(buf(0x49, 0x49, 0x2a, 0x00), "a.tif")?.mime).toBe("image/tiff");
+  });
+
+  it("يقبل MP3 وMP4 وWAV", () => {
+    expect(sniffFile(Buffer.concat([Buffer.from("ID3"), Buffer.alloc(16)]), "a.mp3")?.mime).toBe("audio/mpeg");
+    const mp4 = Buffer.concat([Buffer.alloc(4), Buffer.from("ftypiso"), Buffer.from("m"), Buffer.alloc(8)]);
+    expect(sniffFile(mp4, "a.mp4")?.mime).toBe("video/mp4");
+    const wav = Buffer.concat([Buffer.from("RIFF"), Buffer.alloc(4), Buffer.from("WAVE"), Buffer.alloc(8)]);
+    expect(sniffFile(wav, "a.wav")?.mime).toBe("audio/wav");
+  });
+
+  it("يقبل TXT وJSON وXML وMarkdown", () => {
+    expect(sniffFile(Buffer.from("Hello world test file contents"), "a.txt")?.mime).toBe("text/plain");
+    expect(sniffFile(Buffer.from('{"key": "value", "n": 1}'), "a.json")?.mime).toBe("application/json");
+    expect(sniffFile(Buffer.from('<?xml version="1.0"?>'), "a.xml")?.mime).toBe("application/xml");
+    expect(sniffFile(Buffer.from("# Heading\n\nParagraph"), "a.md")?.mime).toBe("text/markdown");
+  });
+
+  it("يقبل ZIP وRAR و7z والأرشيفات", () => {
+    const zip = Buffer.concat([Buffer.from([0x50, 0x4b, 0x03, 0x04]), Buffer.alloc(20)]);
+    expect(sniffFile(zip, "a.zip")?.mime).toBe("application/zip");
+    expect(sniffFile(Buffer.concat([Buffer.from("Rar!"), Buffer.alloc(16)]), "a.rar")?.mime).toBe("application/x-rar-compressed");
+  });
+
+  it("يقبل PPTX وODT", () => {
+    const zip = Buffer.concat([Buffer.from([0x50, 0x4b, 0x03, 0x04]), Buffer.alloc(20)]);
+    expect(sniffFile(zip, "s.pptx")?.mime).toContain("presentation");
+    expect(sniffFile(zip, "d.odt")?.mime).toContain("opendocument");
+  });
+
   it("يرفض تنفيذياً مُسمّى .pdf", () => {
     expect(sniffFile(Buffer.from("MZ\x90\x00 executable payload here"), "evil.pdf")).toBeNull();
   });
@@ -24,11 +58,12 @@ describe("فحص الملفات المرفوعة بمحتواها لا باسم�
     }
   });
 
-  it("يرفض ملف ZIP باسم لا يطابق Office، ويقبل docx/xlsx", () => {
+  it("يقبل ZIP و docx/xlsx/pptx", () => {
     const zip = Buffer.concat([Buffer.from([0x50, 0x4b, 0x03, 0x04]), Buffer.alloc(20)]);
-    expect(sniffFile(zip, "x.zip")).toBeNull();
+    expect(sniffFile(zip, "x.zip")?.mime).toBe("application/zip");
     expect(sniffFile(zip, "r.docx")?.ext).toBe("docx");
     expect(sniffFile(zip, "r.xlsx")?.ext).toBe("xlsx");
+    expect(sniffFile(zip, "r.pptx")?.ext).toBe("pptx");
   });
 
   it("يقبل CSV نصياً ويرفض ثنائياً", () => {

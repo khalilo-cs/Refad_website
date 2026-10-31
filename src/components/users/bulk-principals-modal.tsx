@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Download, Loader2, MessageCircle, Phone } from "lucide-react";
+import { Download, FileSpreadsheet, FileText, Loader2, MessageCircle, Phone } from "lucide-react";
 import { Modal } from "@/components/ui";
 import { useToast } from "@/components/providers";
-import { downloadCsv } from "@/lib/csv";
+import { exportCredentialsCsv, exportCredentialsPdf, exportCredentialsXlsx, type CredentialRow } from "@/lib/credentials-export";
 import { credentialsMessage, telHref, whatsappHref } from "@/lib/phone";
 
 type Pending = { id: string; name: string; code: string; principal_name: string | null; contact_phone: string | null };
@@ -61,9 +61,17 @@ export function BulkPrincipalsModal({ onClose, onDone }: { onClose: () => void; 
           <div className="rounded-xl border border-success/30 bg-success/5 p-3">
             <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
               <p className="text-[13px] font-semibold text-success">أُنشئ {created.length} حساباً — بيانات الدخول تظهر هنا فقط</p>
-              <button type="button" className="btn btn-primary btn-sm" onClick={() => downloadCsv("بيانات-دخول-المدراء.csv", [["المدرسة", "الاسم", "اسم الدخول", "كلمة المرور المؤقتة", "الهاتف"], ...created.map((c) => [c.school, c.name, c.login, c.password, c.phone ?? ""])])}>
-                <Download className="h-3.5 w-3.5" /> تنزيل CSV
-              </button>
+              <div className="flex flex-wrap gap-1.5">
+                <button type="button" className="btn btn-primary btn-sm" onClick={() => exportCredentialsPdf(created as CredentialRow[], loginUrl)}>
+                  <FileText className="h-3.5 w-3.5" /> PDF للطباعة
+                </button>
+                <button type="button" className="btn btn-ghost btn-sm" onClick={() => void exportCredentialsXlsx(created as CredentialRow[])}>
+                  <FileSpreadsheet className="h-3.5 w-3.5" /> Excel
+                </button>
+                <button type="button" className="btn btn-ghost btn-sm" onClick={() => exportCredentialsCsv(created as CredentialRow[])}>
+                  <Download className="h-3.5 w-3.5" /> CSV
+                </button>
+              </div>
             </div>
             <p className="mb-2 text-[11.5px] text-warning">احفظ الملف أو أرسل البيانات الآن؛ لا يمكن عرض كلمات المرور لاحقاً (يمكنك إعادة تعيين أي كلمة من صفحة المستخدمين).</p>
             <ul className="max-h-48 divide-y divide-gray-100 overflow-y-auto text-[12px]">

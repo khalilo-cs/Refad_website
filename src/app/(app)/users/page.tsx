@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { CheckCircle2, KeyRound, Loader2, Lock, LockOpen, LogOut, Pencil, Power, Search, ShieldCheck, UserPlus, Users } from "lucide-react";
+import { CheckCircle2, Download, FileSpreadsheet, KeyRound, Loader2, Lock, LockOpen, LogOut, Pencil, Power, Search, ShieldCheck, Trash2, UserPlus, Users } from "lucide-react";
 import { Modal, PageHeader } from "@/components/ui";
 import { ConfirmDialog, Pagination, useDebounced } from "@/components/ui/extra";
 import { PhoneActions } from "@/components/ui/contact";
@@ -38,7 +38,7 @@ export default function UsersPage() {
   const [dirs, setDirs] = useState<Lookup[]>([]);
   const [form, setForm] = useState<{ user: U | null } | null>(null);
   const [creds, setCreds] = useState<{ name: string; phone: string | null; hasWhatsapp: boolean; credentials: Credentials } | null>(null);
-  const [confirm, setConfirm] = useState<{ u: U; kind: "reset" | "lock" | "unlock" | "disable" | "enable" | "revoke" } | null>(null);
+  const [confirm, setConfirm] = useState<{ u: U; kind: "reset" | "lock" | "unlock" | "disable" | "enable" | "revoke" | "delete" } | null>(null);
   const [bulk, setBulk] = useState(false);
   const limit = 25;
 
@@ -87,7 +87,13 @@ export default function UsersPage() {
     else if (kind === "unlock") await patch(u, { isLocked: false }, "تم فتح الحساب");
     else if (kind === "disable") await patch(u, { isActive: false }, "تم تعطيل الحساب");
     else if (kind === "enable") await patch(u, { isActive: true }, "تم تفعيل الحساب");
-    else await patch(u, { revokeSessions: true }, "أُنهيت جلسات المستخدم");
+    else if (kind === "revoke") await patch(u, { revokeSessions: true }, "أُنهيت جلسات المستخدم");
+    else if (kind === "delete") {
+      const r = await fetch(`/api/users/${u.id}`, { method: "DELETE", credentials: "include" });
+      const d = await r.json();
+      if (!r.ok) add({ type: "error", message: d.message });
+      else { add({ type: "success", message: d.message }); void load(); }
+    }
   };
 
   if (user && user.roleKey !== "SUPER_ADMIN") {
@@ -107,6 +113,7 @@ export default function UsersPage() {
     disable: ["تعطيل الحساب", "سيُنهى دخول المستخدم ولن يستطيع الدخول حتى تعيد تفعيله."],
     enable: ["تفعيل الحساب", "سيستطيع المستخدم الدخول مجدداً."],
     revoke: ["إنهاء كل الجلسات", "سيُطلب من المستخدم تسجيل الدخول من جديد على كل أجهزته."],
+    delete: ["حذف الحساب", "سيُعطَّل الحساب نهائياً ولن يستطيع المستخدم الدخول. يمكنك إعادة تفعيله لاحقاً من صفحة المستخدمين."],
   } as const;
 
   return (
@@ -116,7 +123,9 @@ export default function UsersPage() {
         subtitle="إنشاء الحسابات وتسليم بيانات الدخول والتواصل مع أصحابها، والصلاحيات مطبَّقة في الخادم"
         icon={Users}
         actions={
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
+            <a href="/api/users/export?format=xlsx" className="btn btn-ghost btn-sm"><FileSpreadsheet className="h-4 w-4" /> تصدير Excel</a>
+            <a href="/api/users/export?format=csv" className="btn btn-ghost btn-sm"><Download className="h-4 w-4" /> تصدير CSV</a>
             <button onClick={() => setBulk(true)} className="btn btn-ghost btn-sm"><Users className="h-4 w-4" /> حسابات مدراء المدارس</button>
             <button onClick={() => setForm({ user: null })} className="btn btn-primary btn-sm"><UserPlus className="h-4 w-4" /> مستخدم جديد</button>
           </div>
@@ -179,6 +188,7 @@ export default function UsersPage() {
                         : <IconBtn label="قفل الحساب" onClick={() => setConfirm({ u, kind: "lock" })} disabled={u.id === user?.userId}><Lock className="h-3.5 w-3.5" /></IconBtn>}
                       <IconBtn label={u.is_active === 1 ? "تعطيل" : "تفعيل"} onClick={() => setConfirm({ u, kind: u.is_active === 1 ? "disable" : "enable" })} disabled={u.id === user?.userId}><Power className="h-3.5 w-3.5" /></IconBtn>
                       <IconBtn label="إنهاء الجلسات" onClick={() => setConfirm({ u, kind: "revoke" })}><LogOut className="h-3.5 w-3.5" /></IconBtn>
+                      <IconBtn label="حذف الحساب" onClick={() => setConfirm({ u, kind: "delete" })} disabled={u.id === user?.userId}><Trash2 className="h-3.5 w-3.5" /></IconBtn>
                     </div>
                   </td>
                 </tr>
@@ -199,7 +209,7 @@ export default function UsersPage() {
       {bulk && <BulkPrincipalsModal onClose={() => setBulk(false)} onDone={load} />}
       {creds && <CredentialsModal name={creds.name} phone={creds.phone} hasWhatsapp={creds.hasWhatsapp} credentials={creds.credentials} onClose={() => setCreds(null)} />}
       <ConfirmDialog
-        open={!!confirm} tone={confirm && ["lock", "disable"].includes(confirm.kind) ? "danger" : "primary"}
+        open={!!confirm} tone={confirm && ["lock", "disable", "delete"].includes(confirm.kind) ? "danger" : "primary"}
         title={confirm ? `${CONFIRM_TEXT[confirm.kind][0]} — ${confirm.u.name}` : ""} message={confirm ? CONFIRM_TEXT[confirm.kind][1] : ""}
         confirmLabel="تأكيد" onConfirm={runConfirm} onClose={() => setConfirm(null)}
       />

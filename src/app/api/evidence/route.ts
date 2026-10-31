@@ -133,7 +133,7 @@ export async function POST(request: Request) {
 
   const buf = Buffer.from(await file.arrayBuffer());
   const kind = sniffFile(buf, file.name);
-  if (!kind) return bad("نوع الملف غير مسموح أو محتواه لا يطابق امتداده. المسموح: PDF، صور، Word، Excel، CSV.");
+  if (!kind) return bad("نوع الملف غير مسموح أو محتواه لا يطابق امتداده. الملفات التنفيذية والبرمجية محظورة.");
 
   const visitId = String(form.get("visitId") ?? "") || replacing?.visit_id || null;
   const indicatorId = String(form.get("indicatorId") ?? "") || replacing?.indicator_id || null;

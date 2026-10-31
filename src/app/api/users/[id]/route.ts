@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { getServerSession, authorize, auditLog } from "@/lib/auth";
-import { queryOne, nowISO , exec } from "@/lib/db/sqlite";
+import { queryOne, nowISO, exec, query } from "@/lib/db/sqlite";
 import { generatePassword, normalizeUsername } from "@/lib/credentials";
 import { normalizePhoneField, wa } from "@/lib/school-input";
+import { clientIp } from "@/lib/security";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -271,6 +272,70 @@ export async function PATCH(
     return NextResponse.json(
       {
         message: "تعذّر تحديث المستخدم",
+        debug: process.env.NODE_ENV !== "production" ? e?.message : undefined,
+      },
+      { status: 500 }
+    );
+  }
+}
+
+/**
+ * DELETE /api/users/[id]
+ * حذف حساب مستخدم (تعطيل ناعم: is_active=0 مع تسجيل سبب الحذف).
+ * SUPER_ADMIN فقط، ولا يمكن حذف الحساب الذاتي أو آخر مدير نظام نشط.
+ */
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const session = await getServerSession();
+    if (!session) return NextResponse.json({ message: "غير مصادق" }, { status: 401 });
+    if (!authorize(session, { roles: ["SUPER_ADMIN"] }).allowed) {
+      return NextResponse.json({ message: "حذف المستخدمين مقصور على مدير النظام" }, { status: 403 });
+    }
+
+    const { id } = await params;
+    if (id === session.userId) {
+      return NextResponse.json({ message: "لا يمكنك حذف حسابك أنت" }, { status: 409 });
+    }
+
+    const target = await loadUser(id);
+    if (!target) {
+      return NextResponse.json({ message: "المستخدم غير موجود" }, { status: 404 });
+    }
+
+    if (target.role_key === "SUPER_ADMIN") {
+      const admins = await queryOne<{ n: number }>(
+        `SELECT COUNT(*) AS n FROM users u JOIN roles r ON u.role_id = r.id
+         WHERE r.key = 'SUPER_ADMIN' AND u.is_active = 1 AND u.id != ?`,
+        [id]
+      );
+      if ((admins?.n ?? 0) === 0) {
+        return NextResponse.json({ message: "لا يمكن حذف آخر مدير نظام نشط" }, { status: 409 });
+      }
+    }
+
+    await exec(
+      `UPDATE users SET is_active = 0, token_version = token_version + 1, updated_at = ? WHERE id = ?`,
+      [nowISO(), id]
+    );
+
+    await auditLog({
+      userId: session.userId,
+      action: "USER_DELETED",
+      entityType: "user",
+      entityId: id,
+      oldValues: { name: target.name, email: target.email, role: target.role_key, isActive: target.is_active },
+      ipAddress: clientIp(request),
+      userAgent: request.headers.get("user-agent") ?? null,
+    });
+
+    return NextResponse.json({ message: `تم حذف حساب "${target.name}" وتعطيله` });
+  } catch (e: any) {
+    return NextResponse.json(
+      {
+        message: "تعذّر حذف المستخدم",
         debug: process.env.NODE_ENV !== "production" ? e?.message : undefined,
       },
       { status: 500 }

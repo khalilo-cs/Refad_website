@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Check, Copy, MessageCircle, Printer, TriangleAlert } from "lucide-react";
+import { Check, Copy, Download, MessageCircle, Printer, TriangleAlert } from "lucide-react";
 import { Modal } from "@/components/ui";
 import { useToast } from "@/components/providers";
 import { credentialsMessage, whatsappHref } from "@/lib/phone";
@@ -61,6 +61,12 @@ export function CredentialsModal({ name, phone, hasWhatsapp = true, credentials,
           </button>
           {wa && <a href={wa} target="_blank" rel="noopener noreferrer" className="btn btn-primary btn-sm"><MessageCircle className="h-4 w-4" /> إرسال عبر واتساب</a>}
           <button type="button" className="btn btn-ghost btn-sm" onClick={print}><Printer className="h-4 w-4" /> طباعة</button>
+          <button type="button" className="btn btn-ghost btn-sm" onClick={() => {
+            const txt = `منصة رفاد — بيانات الدخول\n${name}\nرابط الدخول: ${loginUrl}\nاسم الدخول: ${credentials.login}\nكلمة المرور المؤقتة: ${credentials.password}\n${credentials.mustChange ? "يُطلب تغييرها عند أول دخول.\n" : ""}`;
+            const url = URL.createObjectURL(new Blob(["﻿" + txt], { type: "text/plain;charset=utf-8" }));
+            const a = document.createElement("a"); a.href = url; a.download = `بيانات-دخول-${credentials.login}.txt`; a.click();
+            setTimeout(() => URL.revokeObjectURL(url), 1000);
+          }}><Download className="h-4 w-4" /> تنزيل ملف</button>
           <button type="button" className="btn btn-ghost btn-sm ms-auto" onClick={onClose}>تم</button>
         </div>
       </div>

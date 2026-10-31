@@ -60,7 +60,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   await auditLog({ userId, action: "EVIDENCE_DOWNLOAD", entityType: "evidence", entityId: id, ipAddress: clientIp(request) });
 
   // العرض داخل الصفحة مسموح لـ PDF والصور فقط؛ ما عداها يُنزَّل دائماً
-  const inlineOk = sp.get("inline") === "1" && (mime === "application/pdf" || mime.startsWith("image/"));
+  const inlineOk = sp.get("inline") === "1" && (mime === "application/pdf" || mime.startsWith("image/") || mime.startsWith("video/") || mime.startsWith("audio/") || mime === "text/plain");
   const encoded = encodeURIComponent(original);
   return new NextResponse(new Uint8Array(data), {
     headers: {
