@@ -2,14 +2,15 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Award, Download, Loader2, Printer, Search, ShieldCheck } from "lucide-react";
+import { Award, BarChart3, Bell, Download, Loader2, MessageCircle, Printer, Search, ShieldCheck } from "lucide-react";
+import { whatsappHref } from "@/lib/phone";
 import { Modal, PageHeader } from "@/components/ui";
 import { useSession, useToast } from "@/components/providers";
 import { downloadCsv } from "@/lib/csv";
 import { fmtDate } from "@/lib/labels";
 
 type Row = {
-  id: string; name: string; code: string; principalName: string | null; directorate: string; status: "NOT_STARTED" | "DRAFT" | "SUBMITTED";
+  id: string; name: string; code: string; principalName: string | null; phone: string | null; hasWhatsapp: boolean; directorate: string; status: "NOT_STARTED" | "DRAFT" | "SUBMITTED";
   submittedAt: string | null; updatedAt: string | null; rated: number; total: number; percent: number | null;
   weak: number; needsPlan: number; planned: number; inProgress: number; improved: number; verified: number; overdue: number;
 };
@@ -27,6 +28,25 @@ export default function QualityTrackingPage() {
   const [q, setQ] = useState("");
   const [focus, setFocus] = useState<Focus>("");
   const [cert, setCert] = useState<Row | null>(null);
+  const [view, setView] = useState<"schools" | "insights">("schools");
+  const [remind, setRemind] = useState<{ message: string; text: string; schools: { schoolId: string; name: string; phone: string | null; hasWhatsapp: boolean; notified: number }[] } | null>(null);
+  const [reminding, setReminding] = useState(false);
+
+  const sendReminder = async (kind: "quiz" | "plans" | "submit", list: Row[]) => {
+    if (!list.length) return add({ type: "info", message: "لا مدارس تحتاج هذا التذكير" });
+    setReminding(true);
+    try {
+      const r = await fetch("/api/self-assessment/remind", { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ kind, schoolIds: list.map((x) => x.id) }) });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.message);
+      add({ type: "success", message: d.message });
+      setRemind({ message: d.message, text: d.whatsappText, schools: d.schools });
+    } catch (e: any) {
+      add({ type: "error", message: e.message });
+    } finally {
+      setReminding(false);
+    }
+  };
 
   const load = useCallback(async () => {
     const r = await fetch(`/api/self-assessment/overview${year ? `?year=${year}` : ""}`, { credentials: "include" });
@@ -86,7 +106,23 @@ export default function QualityTrackingPage() {
         ))}
       </div>
 
-      <div className="card">
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="flex rounded-xl bg-gray-100 p-1 text-[12.5px]" role="tablist">
+          <button role="tab" aria-selected={view === "schools"} onClick={() => setView("schools")} className={`rounded-lg px-3 py-1.5 ${view === "schools" ? "bg-white font-semibold text-navy shadow-sm" : "text-gray-600"}`}>المدارس</button>
+          <button role="tab" aria-selected={view === "insights"} onClick={() => setView("insights")} className={`inline-flex items-center gap-1 rounded-lg px-3 py-1.5 ${view === "insights" ? "bg-white font-semibold text-navy shadow-sm" : "text-gray-600"}`}><BarChart3 className="h-3.5 w-3.5" /> نقاط الضعف الشائعة</button>
+        </div>
+        {view === "schools" && data && (
+          <div className="ms-auto flex flex-wrap gap-2">
+            <button className="btn btn-ghost btn-sm" disabled={reminding} onClick={() => sendReminder("quiz", data.schools.filter((x) => x.status !== "SUBMITTED" && x.rated < x.total))}><Bell className="h-3.5 w-3.5" /> ذكّر من لم يكمل الاختبار</button>
+            <button className="btn btn-ghost btn-sm" disabled={reminding} onClick={() => sendReminder("plans", data.schools.filter((x) => x.needsPlan > 0 || x.overdue > 0))}><Bell className="h-3.5 w-3.5" /> ذكّر بالخطط الناقصة والمتأخرة</button>
+            <button className="btn btn-ghost btn-sm" disabled={reminding} onClick={() => sendReminder("submit", data.schools.filter((x) => x.status === "DRAFT" && x.rated === x.total))}><Bell className="h-3.5 w-3.5" /> ذكّر بالإرسال</button>
+          </div>
+        )}
+      </div>
+
+      {view === "insights" && data && <Insights year={data.year} />}
+
+      <div className={`card ${view === "schools" ? "" : "hidden"}`}>
         <div className="flex flex-wrap items-center gap-2 border-b border-gray-100 p-3">
           <div className="relative min-w-[200px] flex-1 sm:max-w-xs">
             <Search className="pointer-events-none absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
@@ -120,6 +156,7 @@ export default function QualityTrackingPage() {
                       <td className="px-3 py-2.5">
                         <div className="flex gap-1">
                           <Link className="btn btn-ghost btn-sm" href={`/self-assessment?schoolId=${s.id}&year=${data.year}`}>فتح</Link>
+                          {s.status !== "SUBMITTED" && <button className="btn btn-ghost btn-sm" disabled={reminding} onClick={() => sendReminder(s.rated < s.total ? "quiz" : s.needsPlan ? "plans" : "submit", [s])} title="تذكير المدرسة"><Bell className="h-3.5 w-3.5" /></button>}
                           {s.status === "SUBMITTED" && <button className="btn btn-ghost btn-sm" onClick={() => setCert(s)} title="شهادة تقدير مبنية على البيانات"><Award className="h-3.5 w-3.5" /></button>}
                         </div>
                       </td>
@@ -132,6 +169,22 @@ export default function QualityTrackingPage() {
           </div>
         )}
       </div>
+      {remind && (
+        <Modal open onClose={() => setRemind(null)} title="أُرسل التذكير" description={remind.message} width="md">
+          <p className="mb-2 text-[12.5px] text-gray-600">لإيصال التذكير أسرع، راسل المدراء عبر واتساب برسالة جاهزة:</p>
+          <ul className="max-h-80 divide-y divide-gray-100 overflow-y-auto text-[12.5px]">
+            {remind.schools.map((x) => {
+              const wa = x.phone && x.hasWhatsapp ? whatsappHref(x.phone, remind.text) : null;
+              return (
+                <li key={x.schoolId} className="flex items-center justify-between gap-2 py-2">
+                  <span className="min-w-0 truncate">{x.name}{x.notified === 0 && <span className="ms-1 text-warning">(بلا حساب)</span>}</span>
+                  {wa ? <a href={wa} target="_blank" rel="noopener noreferrer" className="btn btn-ghost btn-sm"><MessageCircle className="h-3.5 w-3.5 text-[#128C7E]" /> واتساب</a> : <span className="text-[11px] text-gray-400">لا رقم واتساب</span>}
+                </li>
+              );
+            })}
+          </ul>
+        </Modal>
+      )}
       {cert && data && <CertificateModal school={cert} year={data.year} canIssueRole={!!user && ["SUPER_ADMIN", "EDUCATION_DIRECTOR"].includes(user.roleKey)} onClose={() => setCert(null)} />}
     </div>
   );
@@ -246,6 +299,56 @@ function PrintableCertificate({ title, body, code, issuedAt, school }: { title: 
           <div><div className="mx-auto h-14 w-48 border-b border-gray-400" /><p className="mt-2">مدير إدارة التربية والتعليم</p></div>
         </div>
         <p className="mt-6 text-[11px] text-gray-500">منصة رفاد — تحت إشراف وزارة التربية والتعليم · رمز التحقق: <b dir="ltr" className="font-mono">{code}</b> — تحقّق من صحتها: <bdi dir="ltr">{origin}/verify?code={code}</bdi> · {new Date(issuedAt).toLocaleDateString("ar-YE")}</p>
+      </div>
+    </div>
+  );
+}
+
+type Insight = { year: string; schools: number; criteria: { code: string; title: string; percent: number }[]; indicators: { id: string; code: string; title: string; criterion: string; rated: number; weak: number; open: number; verified: number; percent: number; topMissing: { name: string; count: number }[] }[] };
+
+/** نقاط الضعف الشائعة: أين تحتاج المدارس تدريباً أو دعماً على مستوى المديرية. */
+function Insights({ year }: { year: string }) {
+  const [d, setD] = useState<Insight | null>(null);
+  const [err, setErr] = useState("");
+  useEffect(() => {
+    fetch(`/api/self-assessment/insights?year=${year}`, { credentials: "include" })
+      .then(async (r) => { const j = await r.json(); if (!r.ok) throw new Error(j.message); setD(j); })
+      .catch((e) => setErr(e.message));
+  }, [year]);
+  if (err) return <div className="card p-6 text-center text-danger">{err}</div>;
+  if (!d) return <div className="skeleton h-64 rounded-2xl" />;
+  if (!d.schools) return <div className="card p-8 text-center text-[13px] text-gray-500">لا توجد تقييمات ذاتية لهذا العام بعد.</div>;
+  return (
+    <div className="grid gap-4 lg:grid-cols-5">
+      <div className="card p-5 lg:col-span-2">
+        <h3 className="mb-1 font-heading text-[15px] font-bold text-navy">متوسط التحقق في كل معيار</h3>
+        <p className="mb-3 text-[11.5px] text-gray-500">من التقييم الذاتي لـ{d.schools} مدرسة</p>
+        <div className="space-y-3">
+          {d.criteria.map((c) => (
+            <div key={c.code}>
+              <div className="mb-1 flex justify-between text-[12px]"><span className="text-gray-700">المعيار {c.code}: {c.title}</span><b className="text-navy">{c.percent}%</b></div>
+              <div className="h-2 overflow-hidden rounded-full bg-gray-100"><div className={`h-full rounded-full ${c.percent >= 80 ? "bg-success" : c.percent >= 50 ? "bg-warning" : "bg-danger"}`} style={{ width: `${c.percent}%` }} /></div>
+            </div>
+          ))}
+        </div>
+      </div>
+      <div className="card p-5 lg:col-span-3">
+        <h3 className="mb-1 font-heading text-[15px] font-bold text-navy">أكثر المؤشرات ضعفاً</h3>
+        <p className="mb-3 text-[11.5px] text-gray-500">مرشّحة لورش تدريبية وزيارات دعم فني. «الأدلة الأكثر غياباً» من إجابات المدراء في الاختبار التفاعلي.</p>
+        {d.indicators.length === 0 ? <p className="py-6 text-center text-[13px] text-success">لا مؤشرات ضعيفة مشتركة.</p> : (
+          <ul className="divide-y divide-gray-100">
+            {d.indicators.map((i) => (
+              <li key={i.id} className="py-2.5">
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <p className="min-w-0 flex-1 text-[13px] text-navy"><b className="me-1 font-mono text-[11.5px] text-gray-500">{i.code}</b>{i.title}</p>
+                  <span className="shrink-0 rounded-full bg-danger/10 px-2 py-0.5 text-[11px] font-semibold text-danger">ضعيف في {i.weak} من {i.rated} مدرسة</span>
+                </div>
+                <p className="mt-0.5 text-[11px] text-gray-500">تحقق {i.percent}% · مفتوح {i.open} · عولج واعتُمد {i.verified}</p>
+                {i.topMissing.length > 0 && <p className="mt-0.5 text-[11px] text-warning">الأدلة الأكثر غياباً: {i.topMissing.map((m) => `${m.name} (${m.count})`).join("، ")}</p>}
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
     </div>
   );

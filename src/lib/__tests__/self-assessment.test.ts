@@ -179,3 +179,23 @@ describe("الاختبار التفاعلي", () => {
     expect(JSON.parse(row.evidence_have)).toEqual([ev[0]]);
   });
 });
+
+describe("المتابعة على مستوى المديرية", () => {
+  it("نقاط الضعف الشائعة والتذكير للإدارة فقط", async () => {
+    const insights = (await import("@/app/api/self-assessment/insights/route")) as any;
+    const remind = (await import("@/app/api/self-assessment/remind/route")) as any;
+    await as(EMAILS.principal);
+    expect((await insights.GET(req(`/api/self-assessment/insights?year=${year}`))).status).toBe(403);
+    expect((await remind.POST(req("/api/self-assessment/remind", "POST", { schoolIds: [schoolId] }))).status).toBe(403);
+    await as(EMAILS.admin);
+    const g = await json(await insights.GET(req(`/api/self-assessment/insights?year=${year}`)));
+    expect(g.status).toBe(200);
+    expect(g.body.schools).toBeGreaterThan(0);
+    expect(g.body.criteria.length).toBeGreaterThan(0);
+    const r = await json(await remind.POST(req("/api/self-assessment/remind", "POST", { schoolIds: [schoolId], kind: "plans" })));
+    expect(r.status).toBe(200);
+    expect(r.body.schools[0].notified).toBeGreaterThan(0);
+    const principalId = (await q.queryOne<any>("SELECT id FROM users WHERE email = ?", [EMAILS.principal]))!.id;
+    expect(await q.queryOne("SELECT 1 FROM notifications WHERE user_id = ? AND title = 'تذكير: خطط التحسين'", [principalId])).toBeTruthy();
+  });
+});

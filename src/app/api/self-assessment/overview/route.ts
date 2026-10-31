@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
   const max = (await query<{ m: number }>("SELECT MAX(score) m FROM rating_scale WHERE is_active = 1"))[0]?.m || 3;
   const today = new Date().toISOString().slice(0, 10);
   const rows = await query<any>(
-    `SELECT s.id, s.name, s.code, s.principal_name, d.name AS directorate_name, a.id AS assessment_id, a.status, a.submitted_at, a.updated_at,
+    `SELECT s.id, s.name, s.code, s.principal_name, s.contact_phone, s.has_whatsapp, d.name AS directorate_name, a.id AS assessment_id, a.status, a.submitted_at, a.updated_at,
        COUNT(i.id) FILTER (WHERE i.score IS NOT NULL) AS rated,
        SUM(CASE WHEN i.score IS NOT NULL THEN i.score ELSE 0 END) AS score_sum,
        COUNT(i.id) FILTER (WHERE i.is_weak = 1) AS weak,
@@ -37,7 +37,7 @@ export async function GET(request: NextRequest) {
     [today, year, ...scope.params]
   );
   const schools = rows.map((r) => ({
-    id: r.id, name: r.name, code: r.code, principalName: r.principal_name, directorate: r.directorate_name,
+    id: r.id, name: r.name, code: r.code, principalName: r.principal_name, phone: r.contact_phone, hasWhatsapp: r.has_whatsapp !== 0, directorate: r.directorate_name,
     status: r.assessment_id ? r.status : "NOT_STARTED", submittedAt: r.submitted_at, updatedAt: r.updated_at,
     rated: Number(r.rated), total, percent: Number(r.rated) ? Math.round((Number(r.score_sum) / (Number(r.rated) * max)) * 100) : null,
     weak: Number(r.weak), needsPlan: Number(r.needs_plan), planned: Number(r.planned), inProgress: Number(r.in_progress),

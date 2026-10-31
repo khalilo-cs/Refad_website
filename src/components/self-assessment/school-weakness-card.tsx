@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { AlertTriangle, CheckCircle2, ClipboardCheck } from "lucide-react";
 
-type Ind = { indicatorId: string; code: string; title: string; isWeak: boolean; status: string; overdue: boolean; plan: { action: string | null; dueDate: string | null } };
+type Ind = { indicatorId: string; code: string; title: string; isWeak: boolean; status: string; overdue: boolean; plan: { action: string | null; dueDate: string | null }; evidence: string[]; evidenceHave: string[]; answered: boolean };
 const CHIP: Record<string, [string, string]> = {
   NEEDS_PLAN: ["ضعيف — بلا خطة", "bg-danger/10 text-danger"],
   PLANNED: ["خطة موضوعة", "bg-warning/10 text-warning"],
@@ -51,6 +51,9 @@ export function SchoolWeaknessCard({ schoolId }: { schoolId: string }) {
               <div className="min-w-0 flex-1">
                 <p className="text-[13px] text-navy"><b className="me-1 font-mono text-[11.5px] text-gray-500">{i.code}</b>{i.title}</p>
                 <p className="text-[11px] text-gray-500">{i.crit}{i.plan.action ? ` · الخطة: ${i.plan.action}` : ""}</p>
+                {i.answered && i.evidence.some((e) => !i.evidenceHave.includes(e)) && (
+                  <p className="text-[11px] text-warning">أدلة غير متوفرة: {i.evidence.filter((e) => !i.evidenceHave.includes(e)).join("، ")}</p>
+                )}
               </div>
               <div className="flex items-center gap-1.5">
                 {i.overdue && <span className="inline-flex items-center gap-1 rounded-full bg-warning/10 px-2 py-0.5 text-[11px] text-warning"><AlertTriangle className="h-3 w-3" /> متأخر</span>}
