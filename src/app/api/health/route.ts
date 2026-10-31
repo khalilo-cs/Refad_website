@@ -18,7 +18,7 @@ export async function GET() {
   return NextResponse.json(
     {
       status: dbOk ? "ok" : "db_error",
-      service: "itqan-platform",
+      service: "rifad-platform",
       database: dbOk ? "connected" : "disconnected",
       engine: isRemoteDb() ? "libsql" : "sqlite",
       storage: usesBlobStorage() ? "blob" : "local",

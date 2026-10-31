@@ -42,6 +42,17 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
 ));
 
 // src/lib/db/migrations.ts
+async function skipExistingColumns(db, sql) {
+  const known = /* @__PURE__ */ new Map();
+  let out = sql;
+  for (const [stmt, table, column] of sql.matchAll(/ALTER\s+TABLE\s+(\w+)\s+ADD\s+COLUMN\s+(\w+)[^;]*;/gi)) {
+    if (!known.has(table)) {
+      known.set(table, new Set((await db.all(`PRAGMA table_info(${table})`)).map((c) => c.name)));
+    }
+    if (known.get(table).has(column)) out = out.replace(stmt, "");
+  }
+  return out;
+}
 async function runMigrations(db) {
   const hasUsers = await db.all("SELECT 1 FROM sqlite_master WHERE type='table' AND name='users'");
   if (!hasUsers.length) return 0;
@@ -52,8 +63,9 @@ async function runMigrations(db) {
   let count = 0;
   for (const m of MIGRATIONS) {
     if (applied.has(m.id)) continue;
+    const sql = await skipExistingColumns(db, m.sql);
     await db.inTransaction(async () => {
-      await db.script(m.sql);
+      await db.script(sql);
       await db.script(`INSERT INTO schema_migrations (id, name) VALUES (${m.id}, '${m.name.replace(/'/g, "''")}')`);
     });
     count++;
@@ -304,6 +316,140 @@ var init_migrations = __esm({
       WHERE key IN ('system.name', 'system.institution') AND value LIKE '%\u0631\u0650\u0641\u0627\u062F%';
       UPDATE schools SET name = replace(name, '\u0645\u062F\u0631\u0633\u0629 \u0631\u0650\u0641\u0627\u062F \u0627\u0644\u062A\u062C\u0631\u064A\u0628\u064A\u0629', '\u0645\u062F\u0631\u0633\u0629 \u0625\u062A\u0642\u0627\u0646 \u0627\u0644\u062A\u062C\u0631\u064A\u0628\u064A\u0629') WHERE code LIKE 'RIFAD-DEMO-%';
     `
+      },
+      {
+        id: 8,
+        name: "contacts-locations-people",
+        sql: `
+      -- \u062C\u0647\u0627\u062A \u0627\u062A\u0635\u0627\u0644 \u0625\u0636\u0627\u0641\u064A\u0629 \u0644\u0644\u0645\u062F\u0631\u0633\u0629 (\u0648\u0643\u064A\u0644\u060C \u0645\u0646\u0633\u0642 \u062C\u0648\u062F\u0629\u060C \u062D\u0627\u0631\u0633...). \u0627\u0644\u062C\u0647\u0629 \u0627\u0644\u0631\u0626\u064A\u0633\u064A\u0629 (\u0627\u0644\u0645\u062F\u064A\u0631) \u0641\u064A \u062C\u062F\u0648\u0644 \u0627\u0644\u0645\u062F\u0627\u0631\u0633 \u0646\u0641\u0633\u0647.
+      CREATE TABLE IF NOT EXISTS school_contacts (
+        id TEXT PRIMARY KEY,
+        school_id TEXT NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+        role TEXT NOT NULL,
+        name TEXT NOT NULL,
+        phone TEXT,
+        has_whatsapp INTEGER NOT NULL DEFAULT 1,
+        email TEXT,
+        notes TEXT,
+        created_by_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+      CREATE INDEX IF NOT EXISTS idx_school_contacts_school ON school_contacts(school_id);
+
+      -- \u0627\u0644\u0623\u0634\u062E\u0627\u0635: \u0627\u0644\u0645\u0633\u0645\u0649 \u0627\u0644\u0648\u0638\u064A\u0641\u064A\u060C \u0647\u0644 \u0631\u0642\u0645\u0647 \u0639\u0644\u0649 \u0648\u0627\u062A\u0633\u0627\u0628\u060C \u0648\u0627\u0633\u0645 \u0645\u0633\u062A\u062E\u062F\u0645 \u0628\u062F\u064A\u0644 \u0639\u0646 \u0627\u0644\u0628\u0631\u064A\u062F (\u0644\u0645\u0646 \u0644\u0627 \u0628\u0631\u064A\u062F \u0644\u0647\u0645)
+      ALTER TABLE users ADD COLUMN job_title TEXT;
+      ALTER TABLE users ADD COLUMN has_whatsapp INTEGER NOT NULL DEFAULT 1;
+      ALTER TABLE users ADD COLUMN username TEXT;
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_users_username ON users(lower(username)) WHERE username IS NOT NULL;
+
+      -- \u0627\u0644\u0645\u062F\u0627\u0631\u0633: \u0647\u0644 \u0627\u0644\u0647\u0627\u062A\u0641 \u0627\u0644\u0631\u0633\u0645\u064A \u0639\u0644\u0649 \u0648\u0627\u062A\u0633\u0627\u0628\u060C \u0648\u0645\u0635\u062F\u0631 \u0627\u0644\u0645\u0648\u0642\u0639 \u0648\u062A\u0627\u0631\u064A\u062E \u062A\u062D\u062F\u064A\u062F\u0647
+      ALTER TABLE schools ADD COLUMN has_whatsapp INTEGER NOT NULL DEFAULT 1;
+      ALTER TABLE schools ADD COLUMN location_source TEXT;
+      ALTER TABLE schools ADD COLUMN location_updated_at TEXT;
+    `
+      },
+      {
+        id: 9,
+        name: "self-assessment-improvement-cycle",
+        sql: `
+      -- \u0627\u0633\u062A\u0645\u0627\u0631\u0629 \u0627\u0644\u062A\u0642\u064A\u064A\u0645 \u0627\u0644\u0630\u0627\u062A\u064A \u0644\u0643\u0644 \u0645\u062F\u0631\u0633\u0629 \u0641\u064A \u0643\u0644 \u0639\u0627\u0645 \u062F\u0631\u0627\u0633\u064A
+      CREATE TABLE IF NOT EXISTS self_assessments (
+        id TEXT PRIMARY KEY,
+        school_id TEXT NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+        academic_year TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'DRAFT',
+        submitted_at TEXT,
+        submitted_by_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+        UNIQUE (school_id, academic_year)
+      );
+      CREATE INDEX IF NOT EXISTS idx_self_assessments_year ON self_assessments(academic_year);
+
+      -- \u062A\u0642\u064A\u064A\u0645 \u0643\u0644 \u0645\u0624\u0634\u0631 \u0648\u062F\u0648\u0631\u0629 \u0645\u0639\u0627\u0644\u062C\u0629 \u0627\u0644\u0636\u0639\u0641: \u0636\u0639\u064A\u0641 \u2190 \u062E\u0637\u0629 \u2190 \u062A\u0646\u0641\u064A\u0630 \u2190 \u062A\u062D\u0633\u0651\u0646 \u2190 \u0627\u0639\u062A\u0645\u0627\u062F
+      CREATE TABLE IF NOT EXISTS self_assessment_items (
+        id TEXT PRIMARY KEY,
+        assessment_id TEXT NOT NULL REFERENCES self_assessments(id) ON DELETE CASCADE,
+        indicator_id TEXT NOT NULL REFERENCES indicators(id) ON DELETE CASCADE,
+        baseline_score INTEGER,
+        score INTEGER,
+        is_weak INTEGER NOT NULL DEFAULT 0,
+        weak_marked_at TEXT,
+        improvement_status TEXT NOT NULL DEFAULT 'NONE',
+        plan_action TEXT,
+        plan_responsible TEXT,
+        plan_due_date TEXT,
+        plan_success_measure TEXT,
+        plan_set_at TEXT,
+        progress_note TEXT,
+        improved_at TEXT,
+        review_note TEXT,
+        verified_by_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+        verified_at TEXT,
+        notes TEXT,
+        updated_by_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+        UNIQUE (assessment_id, indicator_id)
+      );
+      CREATE INDEX IF NOT EXISTS idx_sa_items_assessment ON self_assessment_items(assessment_id);
+      CREATE INDEX IF NOT EXISTS idx_sa_items_status ON self_assessment_items(improvement_status);
+
+      -- \u062A\u0627\u0631\u064A\u062E \u0643\u0644 \u0645\u0624\u0634\u0631 (\u0644\u0627 \u064A\u064F\u0639\u062F\u064E\u0651\u0644): \u0643\u0627\u0646 \u0636\u0639\u064A\u0641\u0627\u064B \u062B\u0645 \u0639\u064F\u0645\u0644 \u0639\u0644\u064A\u0647 \u062B\u0645 \u062A\u062D\u0633\u0651\u0646
+      CREATE TABLE IF NOT EXISTS self_assessment_history (
+        id TEXT PRIMARY KEY,
+        item_id TEXT NOT NULL REFERENCES self_assessment_items(id) ON DELETE CASCADE,
+        event TEXT NOT NULL,
+        from_value TEXT,
+        to_value TEXT,
+        note TEXT,
+        user_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+        created_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+      CREATE INDEX IF NOT EXISTS idx_sa_history_item ON self_assessment_history(item_id);
+
+      -- \u0634\u0647\u0627\u062F\u0627\u062A \u0627\u0644\u062A\u0643\u0631\u064A\u0645 \u0627\u0644\u0635\u0627\u062F\u0631\u0629 \u0645\u0646 \u0628\u064A\u0627\u0646\u0627\u062A \u0627\u0644\u0645\u0646\u0635\u0629\u060C \u0642\u0627\u0628\u0644\u0629 \u0644\u0644\u062A\u062D\u0642\u0642 \u0628\u0631\u0645\u0632
+      CREATE TABLE IF NOT EXISTS certificates (
+        id TEXT PRIMARY KEY,
+        code TEXT NOT NULL UNIQUE,
+        school_id TEXT NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+        academic_year TEXT NOT NULL,
+        kind TEXT NOT NULL,
+        title TEXT NOT NULL,
+        body TEXT NOT NULL,
+        details TEXT NOT NULL DEFAULT '{}',
+        issued_by_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+        issued_at TEXT NOT NULL DEFAULT (datetime('now')),
+        revoked_at TEXT
+      );
+      CREATE INDEX IF NOT EXISTS idx_certificates_school ON certificates(school_id, academic_year);
+    `
+      },
+      {
+        id: 10,
+        name: "self-assessment-verification-methods",
+        sql: `
+      -- \u0623\u062F\u0627\u0629 \u0627\u0644\u062A\u062D\u0642\u0642 \u0645\u0646 \u0627\u0644\u0623\u062F\u0644\u0629 \u0643\u0645\u0627 \u0641\u064A \u0627\u0644\u0627\u0633\u062A\u0645\u0627\u0631\u0629 \u0627\u0644\u0631\u0633\u0645\u064A\u0629: \u0641\u062D\u0635 \u0648\u062B\u0627\u0626\u0642\u060C \u0645\u0644\u0627\u062D\u0638\u0629\u060C \u0645\u0642\u0627\u0628\u0644\u0629
+      ALTER TABLE self_assessment_items ADD COLUMN methods TEXT;
+    `
+      },
+      {
+        id: 11,
+        name: "self-assessment-evidence-checklist",
+        sql: `
+      -- \u0627\u0644\u0623\u062F\u0644\u0629 \u0627\u0644\u062A\u064A \u0623\u0643\u0651\u062F \u0627\u0644\u0645\u062F\u064A\u0631 \u062A\u0648\u0641\u0631\u0647\u0627 \u0641\u0639\u0644\u0627\u064B (\u0645\u0646 \u0642\u0627\u0626\u0645\u0629 \u0623\u062F\u0644\u0629 \u0627\u0644\u0645\u0624\u0634\u0631) \u0641\u064A \u0627\u0644\u0627\u062E\u062A\u0628\u0627\u0631 \u0627\u0644\u062A\u0641\u0627\u0639\u0644\u064A
+      ALTER TABLE self_assessment_items ADD COLUMN evidence_have TEXT;
+    `
+      },
+      {
+        id: 12,
+        name: "rename-platform-rifad",
+        sql: `
+      -- \u0627\u0633\u0645 \u0627\u0644\u0645\u0646\u0635\u0629: \u0631\u0641\u0627\u062F (\u062A\u062D\u062A \u0625\u0634\u0631\u0627\u0641 \u0648\u0632\u0627\u0631\u0629 \u0627\u0644\u062A\u0631\u0628\u064A\u0629 \u0648\u0627\u0644\u062A\u0639\u0644\u064A\u0645)
+      UPDATE settings SET value = replace(value, '\u0645\u0646\u0635\u0629 \u0625\u062A\u0642\u0627\u0646', '\u0645\u0646\u0635\u0629 \u0631\u0641\u0627\u062F') WHERE key IN ('system.name', 'system.footer') OR value LIKE '%\u0645\u0646\u0635\u0629 \u0625\u062A\u0642\u0627\u0646%';
+      UPDATE schools SET name = replace(name, '\u0645\u062F\u0631\u0633\u0629 \u0625\u062A\u0642\u0627\u0646 \u0627\u0644\u062A\u062C\u0631\u064A\u0628\u064A\u0629', '\u0645\u062F\u0631\u0633\u0629 \u0631\u0641\u0627\u062F \u0627\u0644\u062A\u062C\u0631\u064A\u0628\u064A\u0629') WHERE code LIKE 'RIFAD-DEMO-%';
+    `
       }
     ];
   }
@@ -315,7 +461,7 @@ var init_schema_generated = __esm({
   "src/lib/db/schema.generated.ts"() {
     "use strict";
     SCHEMA_SQL = `-- ============================================================================
--- \u0645\u062E\u0637\u0637 \u0642\u0627\u0639\u062F\u0629 \u0628\u064A\u0627\u0646\u0627\u062A \u0645\u0646\u0635\u0629 \u0625\u062A\u0642\u0627\u0646 \u0644\u0644\u0627\u0639\u062A\u0645\u0627\u062F \u0627\u0644\u0645\u062F\u0631\u0633\u064A \u0648\u0636\u0645\u0627\u0646 \u062C\u0648\u062F\u0629 \u0627\u0644\u062A\u0639\u0644\u064A\u0645
+-- \u0645\u062E\u0637\u0637 \u0642\u0627\u0639\u062F\u0629 \u0628\u064A\u0627\u0646\u0627\u062A \u0645\u0646\u0635\u0629 \u0631\u0641\u0627\u062F \u0644\u0644\u0627\u0639\u062A\u0645\u0627\u062F \u0627\u0644\u0645\u062F\u0631\u0633\u064A \u0648\u0636\u0645\u0627\u0646 \u062C\u0648\u062F\u0629 \u0627\u0644\u062A\u0639\u0644\u064A\u0645
 -- \u0645\u062A\u0648\u0627\u0641\u0642 \u0645\u0639 SQLite (\u0627\u0644\u062A\u0634\u063A\u064A\u0644 \u0627\u0644\u0641\u0648\u0631\u064A) \u0648\u0642\u0627\u0628\u0644 \u0644\u0644\u0646\u0642\u0644 \u0625\u0644\u0649 PostgreSQL \u0644\u0644\u0646\u0634\u0631 \u0627\u0644\u0625\u0646\u062A\u0627\u062C\u064A.
 -- ============================================================================
 
@@ -13846,10 +13992,10 @@ async function seedDatabase(opts = {}) {
   await insert(rows);
   rows.length = 0;
   const settings = [
-    { key: "system.name", value: { ar: "\u0645\u0646\u0635\u0629 \u0625\u062A\u0642\u0627\u0646 \u0644\u0644\u0627\u0639\u062A\u0645\u0627\u062F \u0627\u0644\u0645\u062F\u0631\u0633\u064A \u0648\u0636\u0645\u0627\u0646 \u062C\u0648\u062F\u0629 \u0627\u0644\u062A\u0639\u0644\u064A\u0645" } },
+    { key: "system.name", value: { ar: "\u0645\u0646\u0635\u0629 \u0631\u0641\u0627\u062F \u0644\u0644\u0627\u0639\u062A\u0645\u0627\u062F \u0627\u0644\u0645\u062F\u0631\u0633\u064A \u0648\u0636\u0645\u0627\u0646 \u062C\u0648\u062F\u0629 \u0627\u0644\u062A\u0639\u0644\u064A\u0645" } },
     {
       key: "system.institution",
-      value: { ar: "\u0645\u0646\u0635\u0629 \u0625\u062A\u0642\u0627\u0646 \u2014 \u0645\u062F\u064A\u0631\u064A\u0629 \u0627\u0644\u062C\u0631\u0627\u062D\u064A\u060C \u0645\u062D\u0627\u0641\u0638\u0629 \u0627\u0644\u062D\u062F\u064A\u062F\u0629" }
+      value: { ar: "\u0645\u0646\u0635\u0629 \u0631\u0641\u0627\u062F \u2014 \u0645\u062F\u064A\u0631\u064A\u0629 \u0627\u0644\u062C\u0631\u0627\u062D\u064A\u060C \u0645\u062D\u0627\u0641\u0638\u0629 \u0627\u0644\u062D\u062F\u064A\u062F\u0629" }
     },
     { key: "ratings.scale", value: RATING_SCALE },
     { key: "file.maxSizeMB", value: DEFAULT_SYSTEM_SETTINGS.maxFileSizeMB },
@@ -13975,9 +14121,9 @@ async function seedDatabase(opts = {}) {
   }
   const DEMO_NOTE = "\u0633\u062C\u0644 \u062A\u0648\u0636\u064A\u062D\u064A \u0644\u0644\u0639\u0631\u0636 \u0627\u0644\u0623\u0648\u0644 \u0641\u0642\u0637. \u064A\u064F\u062D\u0630\u0641 \u0623\u0648 \u064A\u064F\u0633\u062A\u0628\u062F\u0644 \u0628\u0633\u062C\u0644\u0627\u062A \u0627\u0644\u0645\u062F\u0627\u0631\u0633 \u0627\u0644\u0641\u0639\u0644\u064A\u0629 \u0639\u0628\u0631 \u0627\u0633\u062A\u064A\u0631\u0627\u062F Excel/CSV \u0623\u0648 \u0627\u0644\u0625\u062F\u062E\u0627\u0644 \u0627\u0644\u064A\u062F\u0648\u064A.";
   const demoSchools = [
-    { id: uuid(), code: "RIFAD-DEMO-001", name: "\u0645\u062F\u0631\u0633\u0629 \u0625\u062A\u0642\u0627\u0646 \u0627\u0644\u062A\u062C\u0631\u064A\u0628\u064A\u0629 (\u0623) \u2014 \u0628\u064A\u0627\u0646\u0627\u062A \u0648\u0647\u0645\u064A\u0629 \u0644\u0644\u0639\u0631\u0636 \u0641\u0642\u0637", stage: "\u0623\u0633\u0627\u0633\u064A", lat: 14.945, lng: 43.455, type: "\u062D\u0643\u0648\u0645\u064A\u0629" },
-    { id: uuid(), code: "RIFAD-DEMO-002", name: "\u0645\u062F\u0631\u0633\u0629 \u0625\u062A\u0642\u0627\u0646 \u0627\u0644\u062A\u062C\u0631\u064A\u0628\u064A\u0629 (\u0628) \u2014 \u0628\u064A\u0627\u0646\u0627\u062A \u0648\u0647\u0645\u064A\u0629 \u0644\u0644\u0639\u0631\u0636 \u0641\u0642\u0637", stage: "\u062B\u0627\u0646\u0648\u064A", lat: 14.9, lng: 43.5, type: "\u062D\u0643\u0648\u0645\u064A\u0629" },
-    { id: uuid(), code: "RIFAD-DEMO-003", name: "\u0645\u062F\u0631\u0633\u0629 \u0625\u062A\u0642\u0627\u0646 \u0627\u0644\u062A\u062C\u0631\u064A\u0628\u064A\u0629 (\u062C) \u2014 \u0628\u064A\u0627\u0646\u0627\u062A \u0648\u0647\u0645\u064A\u0629 \u0644\u0644\u0639\u0631\u0636 \u0641\u0642\u0637", stage: "\u0623\u0633\u0627\u0633\u064A", lat: 14.985, lng: 43.52, type: "\u062D\u0643\u0648\u0645\u064A\u0629" }
+    { id: uuid(), code: "RIFAD-DEMO-001", name: "\u0645\u062F\u0631\u0633\u0629 \u0631\u0641\u0627\u062F \u0627\u0644\u062A\u062C\u0631\u064A\u0628\u064A\u0629 (\u0623) \u2014 \u0628\u064A\u0627\u0646\u0627\u062A \u0648\u0647\u0645\u064A\u0629 \u0644\u0644\u0639\u0631\u0636 \u0641\u0642\u0637", stage: "\u0623\u0633\u0627\u0633\u064A", lat: 14.945, lng: 43.455, type: "\u062D\u0643\u0648\u0645\u064A\u0629" },
+    { id: uuid(), code: "RIFAD-DEMO-002", name: "\u0645\u062F\u0631\u0633\u0629 \u0631\u0641\u0627\u062F \u0627\u0644\u062A\u062C\u0631\u064A\u0628\u064A\u0629 (\u0628) \u2014 \u0628\u064A\u0627\u0646\u0627\u062A \u0648\u0647\u0645\u064A\u0629 \u0644\u0644\u0639\u0631\u0636 \u0641\u0642\u0637", stage: "\u062B\u0627\u0646\u0648\u064A", lat: 14.9, lng: 43.5, type: "\u062D\u0643\u0648\u0645\u064A\u0629" },
+    { id: uuid(), code: "RIFAD-DEMO-003", name: "\u0645\u062F\u0631\u0633\u0629 \u0631\u0641\u0627\u062F \u0627\u0644\u062A\u062C\u0631\u064A\u0628\u064A\u0629 (\u062C) \u2014 \u0628\u064A\u0627\u0646\u0627\u062A \u0648\u0647\u0645\u064A\u0629 \u0644\u0644\u0639\u0631\u0636 \u0641\u0642\u0637", stage: "\u0623\u0633\u0627\u0633\u064A", lat: 14.985, lng: 43.52, type: "\u062D\u0643\u0648\u0645\u064A\u0629" }
   ];
   for (const sc of demoSchools) {
     rows.push({
@@ -14216,8 +14362,18 @@ function nowISO() {
 function toJson(value) {
   return JSON.stringify(value ?? null);
 }
+function remoteDbConfig() {
+  const env = process.env;
+  const pick = (k) => env[k]?.trim() || "";
+  let urlKey = ["TURSO_DATABASE_URL", "LIBSQL_URL"].find((k) => pick(k));
+  if (!urlKey) urlKey = Object.keys(env).find((k) => /(^|_)TURSO_DATABASE_URL$/.test(k) && pick(k));
+  if (!urlKey && /^libsql:\/\//.test(pick("DATABASE_URL"))) urlKey = "DATABASE_URL";
+  if (!urlKey) return null;
+  const tokenKey = urlKey.endsWith("TURSO_DATABASE_URL") ? urlKey.replace(/DATABASE_URL$/, "AUTH_TOKEN") : urlKey === "LIBSQL_URL" ? "LIBSQL_AUTH_TOKEN" : "DATABASE_AUTH_TOKEN";
+  return { url: pick(urlKey), authToken: pick(tokenKey) || pick("TURSO_AUTH_TOKEN") || void 0 };
+}
 function isRemoteDb() {
-  return Boolean(process.env.TURSO_DATABASE_URL?.trim());
+  return remoteDbConfig() !== null;
 }
 function isServerlessRuntime() {
   return Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.NETLIFY);
@@ -14282,8 +14438,8 @@ async function remote() {
     remoteReady = (async () => {
       const { createClient: createClient2 } = await Promise.resolve().then(() => (init_node2(), node_exports));
       const client = createClient2({
-        url: process.env.TURSO_DATABASE_URL.trim(),
-        authToken: process.env.TURSO_AUTH_TOKEN?.trim() || void 0
+        url: remoteDbConfig().url,
+        authToken: remoteDbConfig().authToken
       });
       await client.execute({ sql: "PRAGMA foreign_keys = ON", args: [] }).catch(() => void 0);
       await runMigrations(remoteRunner(client));
@@ -14479,7 +14635,7 @@ var init_sqlite = __esm({
     import_node_async_hooks = require("node:async_hooks");
     init_migrations();
     init_schema_generated();
-    DB_NOT_CONFIGURED_MESSAGE = "\u0642\u0627\u0639\u062F\u0629 \u0627\u0644\u0628\u064A\u0627\u0646\u0627\u062A \u063A\u064A\u0631 \u0645\u0647\u064A\u0651\u0623\u0629 \u0639\u0644\u0649 \u0647\u0630\u0647 \u0627\u0644\u0627\u0633\u062A\u0636\u0627\u0641\u0629. \u0627\u0636\u0628\u0637 TURSO_DATABASE_URL \u0648 TURSO_AUTH_TOKEN \u0641\u064A \u0625\u0639\u062F\u0627\u062F\u0627\u062A \u0627\u0644\u0628\u064A\u0626\u0629 \u062B\u0645 \u0623\u0639\u062F \u0627\u0644\u0646\u0634\u0631.";
+    DB_NOT_CONFIGURED_MESSAGE = "\u0642\u0627\u0639\u062F\u0629 \u0627\u0644\u0628\u064A\u0627\u0646\u0627\u062A \u063A\u064A\u0631 \u0645\u0647\u064A\u0651\u0623\u0629 \u0639\u0644\u0649 \u0647\u0630\u0647 \u0627\u0644\u0627\u0633\u062A\u0636\u0627\u0641\u0629: \u0627\u0631\u0628\u0637 \u0642\u0627\u0639\u062F\u0629 Turso \u0628\u0627\u0644\u0645\u0634\u0631\u0648\u0639 \u0645\u0646 \u062A\u0628\u0648\u064A\u0628 Storage \u0641\u064A Vercel \u062B\u0645 \u0623\u0639\u062F \u0627\u0644\u0646\u0634\u0631 (Redeploy).";
     DbNotConfiguredError = class extends Error {
       constructor() {
         super(DB_NOT_CONFIGURED_MESSAGE);

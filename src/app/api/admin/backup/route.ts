@@ -37,7 +37,7 @@ export async function GET() {
       return new NextResponse(sql, {
         headers: {
           "Content-Type": "application/sql; charset=utf-8",
-          "Content-Disposition": `attachment; filename="itqan-backup-${stamp}.sql"`,
+          "Content-Disposition": `attachment; filename="rifad-backup-${stamp}.sql"`,
           "Cache-Control": "no-store",
         },
       });
@@ -46,7 +46,7 @@ export async function GET() {
     }
   }
 
-  const tmp = path.join(os.tmpdir(), `itqan-backup-${Date.now()}.db`);
+  const tmp = path.join(os.tmpdir(), `rifad-backup-${Date.now()}.db`);
 
   try {
     await exec("VACUUM INTO ?", [tmp]);
@@ -70,7 +70,7 @@ export async function GET() {
     return new NextResponse(buf as unknown as BodyInit, {
       headers: {
         "Content-Type": "application/vnd.sqlite3",
-        "Content-Disposition": `attachment; filename="itqan-backup-${stamp}.db"`,
+        "Content-Disposition": `attachment; filename="rifad-backup-${stamp}.db"`,
         "Content-Length": String(buf.length),
         "Cache-Control": "no-store",
         "X-Backup-Schools": String(counts?.schools ?? 0),
