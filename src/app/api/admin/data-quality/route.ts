@@ -29,7 +29,7 @@ export async function GET() {
 
   const users = await query<any>(
     `SELECT u.id, u.name, u.username, u.email, u.phone, u.is_active, u.is_locked, u.last_login_at, u.must_change_password, r.name AS role_name
-     FROM users u JOIN roles r ON r.id = u.role_id ORDER BY u.created_at`
+     FROM users u JOIN roles r ON r.id = u.role_id WHERE u.deleted_at IS NULL ORDER BY u.created_at`
   );
   const uBrief = (u: any) => ({ id: u.id, name: u.name, login: u.username ?? u.email, role: u.role_name });
   const total = schools.length || 1;

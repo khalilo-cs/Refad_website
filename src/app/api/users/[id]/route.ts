@@ -27,7 +27,7 @@ async function loadUser(id: string) {
   return await queryOne<UserRow>(
     `SELECT u.id, u.name, u.email, u.role_id, u.school_id, u.directorate_id,
             u.is_active, u.is_locked, u.token_version, u.username, r.key AS role_key
-     FROM users u JOIN roles r ON u.role_id = r.id WHERE u.id = ?`,
+     FROM users u JOIN roles r ON u.role_id = r.id WHERE u.id = ? AND u.deleted_at IS NULL`,
     [id]
   );
 }
@@ -281,8 +281,8 @@ export async function PATCH(
 
 /**
  * DELETE /api/users/[id]
- * حذف حساب مستخدم (تعطيل ناعم: is_active=0 مع تسجيل سبب الحذف).
- * SUPER_ADMIN فقط، ولا يمكن حذف الحساب الذاتي أو آخر مدير نظام نشط.
+ * حذف منطقي: يختفي الحساب من القوائم ويُمنع دخوله ويتحرر اسم دخوله وبريده لإعادة الاستخدام،
+ * وتبقى أعماله السابقة مرتبطة به. SUPER_ADMIN فقط، ولا يُحذف الحساب الذاتي ولا آخر مدير نظام نشط.
  */
 export async function DELETE(
   request: NextRequest,
@@ -316,9 +316,11 @@ export async function DELETE(
       }
     }
 
+    const now = nowISO();
     await exec(
-      `UPDATE users SET is_active = 0, token_version = token_version + 1, updated_at = ? WHERE id = ?`,
-      [nowISO(), id]
+      `UPDATE users SET is_active = 0, deleted_at = ?, username = NULL, email = ?,
+              token_version = token_version + 1, updated_at = ? WHERE id = ?`,
+      [now, `deleted-${id}@deleted.invalid`, now, id]
     );
 
     await auditLog({
@@ -326,12 +328,12 @@ export async function DELETE(
       action: "USER_DELETED",
       entityType: "user",
       entityId: id,
-      oldValues: { name: target.name, email: target.email, role: target.role_key, isActive: target.is_active },
+      oldValues: { name: target.name, email: target.email, username: target.username, role: target.role_key, isActive: target.is_active },
       ipAddress: clientIp(request),
       userAgent: request.headers.get("user-agent") ?? null,
     });
 
-    return NextResponse.json({ message: `تم حذف حساب "${target.name}" وتعطيله` });
+    return NextResponse.json({ message: `حُذف حساب «${target.name}»` });
   } catch (e: any) {
     return NextResponse.json(
       {

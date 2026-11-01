@@ -117,6 +117,34 @@ describe("إعادة التعيين والفتح", () => {
   });
 });
 
+describe("حذف الحسابات", () => {
+  it("يُخفي الحساب من القائمة ويمنع دخوله ويحرّر اسم الدخول، ويبقي سجله", async () => {
+    await as(EMAILS.admin);
+    const c = await json(await users.POST(req("/api/users", "POST", { name: "حساب للحذف", username: "delete.me", roleKey: "SCHOOL_PRINCIPAL", schoolId: schoolA })));
+    expect(c.status).toBe(201);
+    const d = await json(await userById.DELETE(req(`/api/users/${c.body.id}`, "DELETE"), idCtx(c.body.id)));
+    expect(d.status).toBe(200);
+    const list = await json(await users.GET(req("/api/users?limit=200&search=حساب للحذف")));
+    expect(list.body.users.some((u: any) => u.id === c.body.id)).toBe(false);
+    expect((await auth.authenticateUser("delete.me", c.body.credentials.password)).ok).toBe(false);
+    // اسم الدخول نفسه متاح لحساب جديد
+    const again = await json(await users.POST(req("/api/users", "POST", { name: "حساب بديل", username: "delete.me", roleKey: "SCHOOL_PRINCIPAL", schoolId: schoolA })));
+    expect(again.status).toBe(201);
+    // لا يمكن تعديل المحذوف أو حذفه مرة أخرى
+    expect((await userById.PATCH(req(`/api/users/${c.body.id}`, "PATCH", { isActive: true }), idCtx(c.body.id))).status).toBe(404);
+    expect((await userById.DELETE(req(`/api/users/${c.body.id}`, "DELETE"), idCtx(c.body.id))).status).toBe(404);
+    const log = await q.queryOne<any>("SELECT old_values FROM audit_logs WHERE action = 'USER_DELETED' AND entity_id = ?", [c.body.id]);
+    expect(log?.old_values).toContain("delete.me");
+  });
+  it("يمنع حذف الحساب الذاتي، وغير مدير النظام لا يحذف", async () => {
+    const admin = await sessionFor(EMAILS.admin);
+    await as(EMAILS.admin);
+    expect((await userById.DELETE(req(`/api/users/${admin.userId}`, "DELETE"), idCtx(admin.userId))).status).toBe(409);
+    await as(EMAILS.director);
+    expect((await userById.DELETE(req(`/api/users/${admin.userId}`, "DELETE"), idCtx(admin.userId))).status).toBe(403);
+  });
+});
+
 describe("إلزام تغيير كلمة المرور على الخادم", () => {
   it("authorize يمنع الجلسة التي يلزمها التغيير", async () => {
     const s = { ...(await sessionFor(EMAILS.admin)), mustChangePassword: true };

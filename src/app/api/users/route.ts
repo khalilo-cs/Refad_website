@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
     const offset = (page - 1) * limit;
     const search = (searchParams.get("search") ?? "").trim();
 
-    let where = "WHERE 1 = 1";
+    let where = "WHERE u.deleted_at IS NULL";
     const params: string[] = [];
     if (search) {
       where += " AND (u.name LIKE ? OR u.email LIKE ? OR u.username LIKE ? OR u.phone LIKE ? OR s.name LIKE ?)";

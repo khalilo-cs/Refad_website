@@ -382,6 +382,14 @@ export const MIGRATIONS: Migration[] = [
       UPDATE schools SET name = replace(name, 'مدرسة إتقان التجريبية', 'مدرسة رفاد التجريبية') WHERE code LIKE 'RIFAD-DEMO-%';
     `,
   },
+  {
+    id: 13,
+    name: "users-soft-delete",
+    sql: `
+      -- الحساب المحذوف يختفي من القوائم ويُمنع دخوله، وتبقى سجلاته السابقة مرتبطة به
+      ALTER TABLE users ADD COLUMN deleted_at TEXT;
+    `,
+  },
 ];
 
 /** واجهة تنفيذ مستقلة عن المحرّك (SQLite محلي أو libSQL). */

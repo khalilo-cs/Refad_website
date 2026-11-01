@@ -26,6 +26,7 @@ export async function GET(request: NextRequest) {
      LEFT JOIN schools s ON u.school_id = s.id
      LEFT JOIN directorates d ON u.directorate_id = d.id
      LEFT JOIN directorates sd ON s.directorate_id = sd.id
+     WHERE u.deleted_at IS NULL
      ORDER BY u.name`
   );
 
