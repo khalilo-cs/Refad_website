@@ -6,6 +6,7 @@ import { EmptyState, Modal } from "@/components/ui";
 import { ConfirmDialog } from "@/components/ui/extra";
 import { useSession, useToast } from "@/components/providers";
 import { fmtDate } from "@/lib/labels";
+import { uploadErrorMessage } from "@/lib/upload-errors";
 
 export default function MaterialsPanel() {
   const { user } = useSession();
@@ -64,16 +65,16 @@ function UploadModal({ open, onClose, onDone }: { open: boolean; onClose: () => 
       const fd = new FormData();
       fd.append("file", file); fd.append("title", f.title ?? ""); fd.append("schoolId", f.schoolId); fd.append("audience", f.audience); if (f.description) fd.append("description", f.description);
       const r = await fetch("/api/communication/materials", { method: "POST", credentials: "include", body: fd });
-      const d = await r.json();
-      if (!r.ok) throw new Error(d.message);
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(uploadErrorMessage(r.status, d));
       add({ type: "success", message: d.message }); onDone();
     } catch (e: any) { add({ type: "error", message: e.message }); } finally { setBusy(false); }
   };
   return (
     <Modal open={open} onClose={onClose} title="مشاركة مادة تعليمية" width="md">
       <div className="space-y-3">
-        <button type="button" onClick={() => input.current?.click()} className="flex w-full flex-col items-center gap-2 rounded-2xl border-2 border-dashed border-gray-300 p-5 transition hover:border-turquoise"><UploadCloud className="h-6 w-6 text-turquoise" /><span className="text-sm font-semibold text-navy">{file ? file.name : "اختر الملف (PDF، صورة، Word، Excel)"}</span></button>
-        <input ref={input} type="file" hidden accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx,.xls,.xlsx" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+        <button type="button" onClick={() => input.current?.click()} className="flex w-full flex-col items-center gap-2 rounded-2xl border-2 border-dashed border-gray-300 p-5 transition hover:border-turquoise"><UploadCloud className="h-6 w-6 text-turquoise" /><span className="text-sm font-semibold text-navy">{file ? file.name : "اختر الملف (أي نوع: صورة، فيديو، صوت، مستند…)"}</span></button>
+        <input ref={input} type="file" hidden onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
         <div><label className="label">العنوان</label><input className="input" value={f.title ?? ""} maxLength={200} onChange={(e) => setF({ ...f, title: e.target.value })} /></div>
         <div><label className="label">وصف</label><input className="input" value={f.description ?? ""} maxLength={500} onChange={(e) => setF({ ...f, description: e.target.value })} /></div>
         {!user?.schoolId && <div><label className="label">المدرسة</label><select className="input" value={f.schoolId} onChange={(e) => setF({ ...f, schoolId: e.target.value })}><option value="">اختر…</option>{schools.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</select></div>}

@@ -11,6 +11,7 @@ import { EmptyState, Modal, PageHeader } from "@/components/ui";
 import { ConfirmDialog, ScoreBar, StatusBadge, Tabs } from "@/components/ui/extra";
 import { useSession, useToast } from "@/components/providers";
 import { ACTION_STATUS, EVIDENCE_STATUS, PRIORITY, fmtDate } from "@/lib/labels";
+import { uploadErrorMessage } from "@/lib/upload-errors";
 
 type View = "board" | "plans";
 const COLS = [
@@ -353,7 +354,7 @@ function ActionDetail({ a, canVerify, meId, onClose, onChanged }: { a: any; canV
     const xhr = new XMLHttpRequest();
     xhr.open("POST", "/api/evidence"); xhr.withCredentials = true;
     xhr.upload.onprogress = (e) => { if (e.lengthComputable) setProgress(Math.round((e.loaded / e.total) * 100)); };
-    xhr.onload = () => { setProgress(null); let b: any = {}; try { b = JSON.parse(xhr.responseText); } catch { /* */ } if (xhr.status < 300) { add({ type: "success", message: b.message }); void loadEv(); onChanged(); } else add({ type: "error", message: b.message ?? "تعذّر الرفع" }); };
+    xhr.onload = () => { setProgress(null); let b: any = {}; try { b = JSON.parse(xhr.responseText); } catch { /* */ } if (xhr.status < 300) { add({ type: "success", message: b.message }); void loadEv(); onChanged(); } else add({ type: "error", message: uploadErrorMessage(xhr.status, b, "تعذّر الرفع") }); };
     xhr.onerror = () => { setProgress(null); add({ type: "error", message: "انقطع الاتصال" }); };
     setProgress(0); xhr.send(fd);
   };
@@ -375,7 +376,7 @@ function ActionDetail({ a, canVerify, meId, onClose, onChanged }: { a: any; canV
 
           <section>
             <div className="mb-2 flex items-center justify-between"><h4 className="font-heading font-bold text-navy">أدلة الإنجاز</h4>
-              {a.status !== "CLOSED_VERIFIED" && <><button className="btn btn-ghost btn-sm" disabled={progress !== null} onClick={() => input.current?.click()}>{progress !== null ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <UploadCloud className="h-3.5 w-3.5" />} رفع دليل</button><input ref={input} type="file" hidden accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx,.xls,.xlsx" onChange={(e) => { const f = e.target.files?.[0]; if (f) upload(f); e.target.value = ""; }} /></>}</div>
+              {a.status !== "CLOSED_VERIFIED" && <><button className="btn btn-ghost btn-sm" disabled={progress !== null} onClick={() => input.current?.click()}>{progress !== null ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <UploadCloud className="h-3.5 w-3.5" />} رفع دليل</button><input ref={input} type="file" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) upload(f); e.target.value = ""; }} /></>}</div>
             {progress !== null && <div className="mb-2 h-2 overflow-hidden rounded-full bg-gray-200"><div className="h-full bg-turquoise transition-all" style={{ width: `${progress}%` }} /></div>}
             {ev.length === 0 ? <p className="rounded-xl bg-gray-50 px-3 py-4 text-center text-[12.5px] text-gray-500">لم يُرفع دليل بعد. لا يُحدَّد الإجراء «مكتملاً» قبل رفع دليل، ولا يُغلق قبل قبوله.</p> : (
               <ul className="divide-y divide-gray-100">{ev.map((e) => <li key={e.id} className="flex items-center gap-3 py-2 text-[13px]"><Paperclip className="h-4 w-4 text-gray-400" /><span className="flex-1 truncate">{e.name}</span><StatusBadge map={EVIDENCE_STATUS} value={e.review_status} /><a href={`/api/evidence/${e.id}/file`} className="btn btn-ghost btn-sm !px-2" aria-label="تنزيل"><Download className="h-3.5 w-3.5" /></a></li>)}</ul>

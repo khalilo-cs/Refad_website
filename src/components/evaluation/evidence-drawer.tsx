@@ -6,6 +6,7 @@ import { Modal } from "@/components/ui";
 import { StatusBadge } from "@/components/ui/extra";
 import { useToast } from "@/components/providers";
 import { EVIDENCE_STATUS, fmtDate } from "@/lib/labels";
+import { uploadErrorMessage } from "@/lib/upload-errors";
 
 const TYPES = ["وثيقة رسمية", "خطة", "تقرير", "محضر", "سجل", "كشف", "صورة ميدانية", "نموذج", "شهادة", "أخرى"];
 
@@ -56,7 +57,7 @@ export function EvidenceDrawer({
       let body: any = {};
       try { body = JSON.parse(xhr.responseText); } catch { /* */ }
       if (xhr.status >= 200 && xhr.status < 300) { add({ type: "success", message: body.message ?? "تم الرفع" }); setDesc(""); void load(); onChanged(); }
-      else add({ type: "error", message: body.message ?? "تعذّر رفع الملف" });
+      else add({ type: "error", message: uploadErrorMessage(xhr.status, body) });
     };
     xhr.onerror = () => { setProgress(null); add({ type: "error", message: "انقطع الاتصال أثناء الرفع. أعد المحاولة." }); };
     setProgress(0);
@@ -73,9 +74,9 @@ export function EvidenceDrawer({
               <div><label className="label">وصف مختصر</label><input className="input" value={desc} maxLength={300} onChange={(e) => setDesc(e.target.value)} placeholder="اختياري" /></div>
             </div>
             <button className="btn btn-primary btn-sm mt-3" disabled={progress !== null} onClick={() => input.current?.click()}>
-              {progress !== null ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <UploadCloud className="h-3.5 w-3.5" />} رفع ملف (PDF، صورة، Word، Excel)
+              {progress !== null ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <UploadCloud className="h-3.5 w-3.5" />} رفع ملف (صورة، فيديو، PDF، مستند…)
             </button>
-            <input ref={input} type="file" hidden accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx,.xls,.xlsx,.csv" onChange={(e) => { const f = e.target.files?.[0]; if (f) upload(f); e.target.value = ""; }} />
+            <input ref={input} type="file" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) upload(f); e.target.value = ""; }} />
             {progress !== null && (
               <div className="mt-3"><div className="h-2 overflow-hidden rounded-full bg-gray-200"><div className="h-full rounded-full bg-turquoise transition-all" style={{ width: `${progress}%` }} /></div><p className="mt-1 text-[11.5px] text-gray-500">جارٍ الرفع… {progress}%</p></div>
             )}

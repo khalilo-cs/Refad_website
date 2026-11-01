@@ -16,6 +16,8 @@ async function maxBytes(): Promise<number> {
   try {
     if (row) mb = Number(JSON.parse(row.value)) || mb;
   } catch { /* القيمة الافتراضية */ }
+  // دوال Vercel ترفض جسم الطلب فوق 4.5 ميجابايت قبل وصوله؛ نعلن حداً واقعياً برسالة واضحة
+  if (process.env.VERCEL) mb = Math.min(mb, 4);
   return Math.min(Math.max(mb, 1), 100) * 1024 * 1024;
 }
 

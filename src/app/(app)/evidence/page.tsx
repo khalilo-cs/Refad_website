@@ -11,6 +11,7 @@ import { EmptyState, Modal, PageHeader } from "@/components/ui";
 import { ConfirmDialog, Pagination, StatusBadge, Tabs, useDebounced } from "@/components/ui/extra";
 import { useSession, useToast } from "@/components/providers";
 import { EVIDENCE_STATUS, VALIDITY, fmtDate } from "@/lib/labels";
+import { UPLOAD_TYPES_HINT, uploadErrorMessage } from "@/lib/upload-errors";
 
 type Tab = "files" | "library";
 const TYPES = ["وثيقة رسمية", "خطة", "تقرير", "محضر", "سجل", "كشف", "صورة ميدانية", "نموذج", "شهادة", "أخرى"];
@@ -141,7 +142,7 @@ function EvidenceInner() {
                         {e.review_notes && <p className="mt-1 rounded-lg bg-gray-50 px-2 py-1 text-[12px] text-gray-600">ملاحظة المراجعة: {e.review_notes}</p>}
                       </div>
                       <div className="flex flex-wrap items-center gap-1">
-                        {(e.mime_type === "application/pdf" || e.mime_type.startsWith("image/")) && <button className="btn btn-ghost btn-sm !px-2" title="معاينة" onClick={() => setPreviewFor(e)}><Eye className="h-3.5 w-3.5" /></button>}
+                        {canPreview(e.mime_type) && <button className="btn btn-ghost btn-sm !px-2" title="معاينة" onClick={() => setPreviewFor(e)}><Eye className="h-3.5 w-3.5" /></button>}
                         <a className="btn btn-ghost btn-sm !px-2" title="تنزيل" href={`/api/evidence/${e.id}/file`}><Download className="h-3.5 w-3.5" /></a>
                         <button className="btn btn-ghost btn-sm !px-2" title="نسخ رابط مؤقت" onClick={() => copyLink(e)}><Copy className="h-3.5 w-3.5" /></button>
                         <button className="btn btn-ghost btn-sm !px-2" title="سجل النسخ" onClick={() => setVersionsFor(e)}><History className="h-3.5 w-3.5" /></button>
@@ -166,13 +167,22 @@ function EvidenceInner() {
       <ReviewModal item={reviewFor} onClose={() => setReviewFor(null)} onDone={() => { setReviewFor(null); void load(); }} />
       <VersionsModal item={versionsFor} onClose={() => setVersionsFor(null)} />
       <Modal open={!!previewFor} onClose={() => setPreviewFor(null)} title={previewFor?.name ?? ""} width="lg">
-        {previewFor && (previewFor.mime_type === "application/pdf"
-          ? <iframe title="معاينة" src={`/api/evidence/${previewFor.id}/file?inline=1`} sandbox="" className="h-[70vh] w-full rounded-xl border border-gray-200" />
-          : <img alt={previewFor.name} src={`/api/evidence/${previewFor.id}/file?inline=1`} className="mx-auto max-h-[70vh] rounded-xl" />)}
+        {previewFor && <Preview id={previewFor.id} name={previewFor.name} mime={previewFor.mime_type} />}
       </Modal>
       <ConfirmDialog open={!!deleteFor} title="حذف الدليل" message={`سيُحذف «${deleteFor?.name}» مع نسخه نهائياً من الأرشيف. يُسجَّل الإجراء في سجل التدقيق.`} confirmLabel="حذف" onConfirm={doDelete} onClose={() => setDeleteFor(null)} />
     </div>
   );
+}
+
+const canPreview = (mime: string) =>
+  mime === "application/pdf" || mime === "text/plain" || /^(image|video|audio)\//.test(mime);
+
+function Preview({ id, name, mime }: { id: string; name: string; mime: string }) {
+  const src = `/api/evidence/${id}/file?inline=1`;
+  if (mime.startsWith("image/")) return <img alt={name} src={src} className="mx-auto max-h-[70vh] rounded-xl" />;
+  if (mime.startsWith("video/")) return <video src={src} controls preload="metadata" className="mx-auto max-h-[70vh] w-full rounded-xl bg-black" />;
+  if (mime.startsWith("audio/")) return <audio src={src} controls preload="metadata" className="w-full" />;
+  return <iframe title="معاينة" src={src} sandbox="" className="h-[70vh] w-full rounded-xl border border-gray-200 bg-white" />;
 }
 
 /* --------------------------------- المكتبة --------------------------------- */
@@ -284,7 +294,7 @@ function UploadModal({ open, preset, schools, onClose, onDone }: { open: boolean
       let body: any = {};
       try { body = JSON.parse(xhr.responseText); } catch { /* */ }
       if (xhr.status >= 200 && xhr.status < 300) { add({ type: "success", message: body.message }); onDone(); }
-      else add({ type: "error", message: body.message ?? "تعذّر رفع الملف" });
+      else add({ type: "error", message: uploadErrorMessage(xhr.status, body) });
     };
     xhr.onerror = () => { setProgress(null); add({ type: "error", message: "انقطع الاتصال أثناء الرفع. أعد المحاولة." }); };
     setProgress(0);
@@ -293,7 +303,7 @@ function UploadModal({ open, preset, schools, onClose, onDone }: { open: boolean
 
   const ready = !!file && (replace || !!f.schoolId);
   return (
-    <Modal open={open} onClose={onClose} title={replace ? `رفع نسخة جديدة: ${replace.name}` : "رفع دليل"} description={replace ? "تُحفظ النسخة السابقة في السجل وتعود الحالة إلى «بانتظار المراجعة»." : "الأنواع المسموحة: PDF، صور، Word، Excel، CSV — يُتحقق من محتوى الملف لا من امتداده فقط."} width="md">
+    <Modal open={open} onClose={onClose} title={replace ? `رفع نسخة جديدة: ${replace.name}` : "رفع دليل"} description={replace ? "تُحفظ النسخة السابقة في السجل وتعود الحالة إلى «بانتظار المراجعة»." : UPLOAD_TYPES_HINT} width="md">
       <div className="space-y-4">
         <div
           onDragOver={(e) => { e.preventDefault(); setDrag(true); }} onDragLeave={() => setDrag(false)}
@@ -304,7 +314,7 @@ function UploadModal({ open, preset, schools, onClose, onDone }: { open: boolean
           <UploadCloud className="h-7 w-7 text-turquoise" />
           <p className="text-sm font-semibold text-navy">{file ? file.name : "اسحب الملف هنا أو اضغط للاختيار"}</p>
           {file && <p className="text-[12px] text-gray-500">{human(file.size)}</p>}
-          <input ref={input} type="file" hidden accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx,.xls,.xlsx,.csv" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+          <input ref={input} type="file" hidden onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
         </div>
         {progress !== null && <div><div className="h-2 overflow-hidden rounded-full bg-gray-200"><div className="h-full rounded-full bg-turquoise transition-all" style={{ width: `${progress}%` }} /></div><p className="mt-1 text-[12px] text-gray-500">جارٍ الرفع… {progress}%</p></div>}
         {!replace && (
