@@ -129,6 +129,8 @@ function LoginForm() {
           </div>
 
           <div className="animate-fade-up">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/illustrations/school-quality.svg" alt="" aria-hidden="true" width={480} height={340} className="mb-6 hidden w-full max-w-[360px] sm:block" />
             <h2 className="font-heading text-[27px] font-bold text-navy">تسجيل الدخول</h2>
             <p className="mt-1.5 text-[13px] text-gray-600">
               أدخل بيانات حسابك للوصول إلى لوحة المتابعة.

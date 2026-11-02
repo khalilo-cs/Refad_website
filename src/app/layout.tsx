@@ -7,7 +7,10 @@ export const metadata: Metadata = {
   title: "منصة رفاد للاعتماد المدرسي وضمان جودة التعليم — تحت إشراف وزارة التربية والتعليم",
   description:
     "منصة رفاد — تحت إشراف وزارة التربية والتعليم: نظام إلكتروني متكامل لمتابعة وتقييم جودة المدارس وفق استمارة التقييم الذاتي للمدارس الصادرة عن مجلس الاعتماد الأكاديمي وضمان جودة التعليم، الجمهورية اليمنية.",
-  metadataBase: new URL(process.env.APP_URL ?? "http://localhost:3000"),
+  metadataBase: new URL(
+    process.env.APP_URL ??
+      (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : "http://localhost:3000")
+  ),
   manifest: "/manifest.webmanifest",
   applicationName: "منصة رفاد",
   appleWebApp: {

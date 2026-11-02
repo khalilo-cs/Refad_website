@@ -18,6 +18,7 @@ const PUBLIC_PATHS = [
   "/_next",
   "/fonts",
   "/brand",
+  "/illustrations",
   "/icons",
   "/manifest.webmanifest",
   "/sw.js",

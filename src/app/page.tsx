@@ -16,6 +16,8 @@ import {
   CheckCircle2,
   Lock,
   Sparkles,
+  Trophy,
+  Wrench,
 } from "lucide-react";
 
 export const dynamic = "force-dynamic";
@@ -61,7 +63,7 @@ const FEATURES = [
   {
     icon: Users,
     title: "صلاحيات محكمة",
-    text: "ثمانية أدوار، وكل صلاحية تُفحص في الخادم وقاعدة البيانات لا في الواجهة وحدها.",
+    text: "ستة أدوار، وكل صلاحية تُفحص في الخادم وقاعدة البيانات لا في الواجهة وحدها.",
   },
   {
     icon: MapPin,
@@ -73,6 +75,32 @@ const FEATURES = [
     title: "تتبّع كامل",
     text: "سجل تدقيق لكل إضافة وتعديل واعتماد، مع منع تعديل التقارير المعتمدة.",
   },
+];
+
+const TONES = [
+  "from-turquoise to-emerald",
+  "from-gold-bright to-gold",
+  "from-info to-navy-soft",
+  "from-navy-soft to-navy",
+  "from-emerald to-emerald-deep",
+  "from-warning to-gold",
+];
+
+const STEPS = [
+  { icon: ClipboardCheck, title: "التقييم الذاتي", text: "تجيب المدرسة عن مؤشرات الاستمارة الرسمية وترفق شواهدها.", tone: "bg-turquoise" },
+  { icon: MapPin, title: "الزيارة الميدانية", text: "يقيّم المفتش المسند إليه المدرسة المؤشرات في الميدان.", tone: "bg-info" },
+  { icon: FileText, title: "التقرير والاعتماد", text: "يُرفع التقرير ويعتمده مدير النظام برمز تحقق فريد.", tone: "bg-gold" },
+  { icon: Wrench, title: "خطة التحسين", text: "تتحول المؤشرات الضعيفة إلى إجراءات بمسؤول وموعد.", tone: "bg-emerald" },
+  { icon: Trophy, title: "التميّز والتكريم", text: "ترتيب المدارس وشهادات للمتميزة بعد التحقق.", tone: "bg-navy" },
+];
+
+const ROLES = [
+  { title: "مدير النظام", text: "رئاسة قسم الجودة والاعتماد المدرسي: الحسابات، واختيار المفتشين والمشرفين، والاعتماد.", tone: "border-t-gold" },
+  { title: "مشرف المحافظة", text: "اطلاع ومتابعة لكل المدارس والنتائج والتقارير دون تعديل.", tone: "border-t-info" },
+  { title: "المفتش / الموجّه", text: "الزيارات والتقييم الميداني للمدارس المسندة إليه فقط.", tone: "border-t-turquoise" },
+  { title: "مدير المدرسة", text: "مدرسته فقط: التقييم الذاتي والشواهد وخطط التحسين.", tone: "border-t-navy" },
+  { title: "منسق الجودة بالمدرسة", text: "مراجعة شواهد مدرسته ومتابعة مؤشراتها.", tone: "border-t-emerald" },
+  { title: "المعلم", text: "رفع ملفات إنجازه ومتابعة ملاحظاتها.", tone: "border-t-warning" },
 ];
 
 const CRITERIA = [
@@ -111,12 +139,6 @@ export default async function LandingPage() {
             >
               تسجيل الدخول
             </Link>
-            <Link
-              href="/setup"
-              className="hidden rounded-xl bg-gradient-to-br from-gold-bright to-gold px-4 py-2 text-[13px] font-bold text-[#2A1F00] shadow-md transition hover:brightness-105 sm:block"
-            >
-              التهيئة الأولى
-            </Link>
           </div>
         </nav>
 
@@ -149,16 +171,16 @@ export default async function LandingPage() {
                   الدخول إلى المنصة
                   <ArrowLeft className="h-4 w-4" />
                 </Link>
-                <Link
-                  href="/setup"
+                <a
+                  href="#how"
                   className="inline-flex items-center gap-2 rounded-xl border border-white/20 px-5 py-3 text-[13.5px] font-semibold text-white/85 transition hover:border-white/40 hover:bg-white/10"
                 >
-                  تهيئة حساب المسؤول
-                </Link>
+                  كيف تعمل المنصة؟
+                </a>
               </div>
 
               <div className="mt-9 flex flex-wrap items-center gap-x-6 gap-y-2 text-[12px] text-white/50">
-                {[`مستهدف ${BRAND.targetSchools} مدرسة`, "109 مؤشراً موثّقاً", "7 معايير بأوزان رسمية", "8 أدوار صلاحيات"].map((t) => (
+                {[`مستهدف ${BRAND.targetSchools} مدرسة`, "109 مؤشراً موثّقاً", "7 معايير بأوزان رسمية", "6 أدوار بصلاحيات محددة"].map((t) => (
                   <span key={t} className="inline-flex items-center gap-1.5">
                     <CheckCircle2 className="h-3.5 w-3.5 text-turquoise" />
                     {t}
@@ -246,7 +268,7 @@ export default async function LandingPage() {
                 className="card-elevated animate-fade-up p-6"
                 style={{ animationDelay: `${i * 60}ms` }}
               >
-                <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-navy to-navy-soft text-gold-bright shadow-sm">
+                <span className={`flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br ${TONES[i % TONES.length]} text-white shadow-sm`}>
                   <Icon className="h-5 w-5" />
                 </span>
                 <h3 className="mt-4 font-heading text-[16.5px] font-bold text-navy">{f.title}</h3>
@@ -254,6 +276,60 @@ export default async function LandingPage() {
               </div>
             );
           })}
+        </div>
+      </section>
+
+      {/* ======================= كيف تعمل ======================= */}
+      <section id="how" className="bg-white py-16 md:py-20">
+        <div className="mx-auto grid max-w-6xl items-center gap-12 px-5 lg:grid-cols-2">
+          <div>
+            <p className="text-[12px] font-semibold tracking-widest text-gold">كيف تعمل المنصة</p>
+            <h2 className="mt-2 font-heading text-[28px] font-bold text-navy md:text-[34px]">خمس خطوات من الاستمارة إلى التميّز</h2>
+            <ol className="mt-8 space-y-4">
+              {STEPS.map((st, i) => {
+                const Icon = st.icon;
+                return (
+                  <li key={st.title} className="flex items-start gap-4">
+                    <span className={`relative flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ${st.tone} text-white shadow-md`}>
+                      <Icon className="h-5 w-5" />
+                      <span className="absolute -top-1.5 -start-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-white text-[10.5px] font-bold text-navy shadow">{i + 1}</span>
+                    </span>
+                    <div>
+                      <h3 className="font-heading text-[16px] font-bold text-navy">{st.title}</h3>
+                      <p className="mt-0.5 text-[13px] leading-[1.8] text-gray-600">{st.text}</p>
+                    </div>
+                  </li>
+                );
+              })}
+            </ol>
+          </div>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/illustrations/school-quality.svg"
+            alt="رسم توضيحي لمدرسة ولوحة متابعة الجودة"
+            width={480}
+            height={340}
+            className="mx-auto w-full max-w-[520px]"
+          />
+        </div>
+      </section>
+
+      {/* ======================= الأدوار ======================= */}
+      <section className="mx-auto max-w-6xl px-5 py-16 md:py-20">
+        <div className="mx-auto max-w-2xl text-center">
+          <p className="text-[12px] font-semibold tracking-widest text-turquoise">لكل مستخدم ما يخصه</p>
+          <h2 className="mt-2 font-heading text-[28px] font-bold text-navy md:text-[34px]">ستة أدوار بصلاحيات واضحة</h2>
+          <p className="mt-3 text-[14px] leading-relaxed text-gray-600">
+            لا يرى أي مستخدم إلا نطاقه، ويُفحص ذلك في الخادم مع كل طلب. ينشئ الحسابات ويختار المفتشين مدير النظام وحده.
+          </p>
+        </div>
+        <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {ROLES.map((r) => (
+            <div key={r.title} className={`card-elevated border-t-4 ${r.tone} p-6`}>
+              <h3 className="font-heading text-[16.5px] font-bold text-navy">{r.title}</h3>
+              <p className="mt-1.5 text-[13px] leading-[1.85] text-gray-600">{r.text}</p>
+            </div>
+          ))}
         </div>
       </section>
 
