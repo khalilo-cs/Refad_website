@@ -22,13 +22,12 @@ export async function allowedRecipients(actor: Actor, schoolId: string): Promise
   const admin = async () =>
     await query<any>(
       `SELECT DISTINCT u.id, u.name, r.name AS role, r.key AS roleKey FROM users u JOIN roles r ON r.id = u.role_id
-       WHERE u.is_active = 1 AND ((r.key = 'EDUCATION_DIRECTOR' AND u.directorate_id = ?) OR r.key = 'SUPER_ADMIN'
+       WHERE u.is_active = 1 AND (r.key = 'SUPER_ADMIN'
          OR (r.key = 'INSPECTOR' AND (u.id IN (SELECT user_id FROM school_assignments WHERE school_id = ?) OR u.id IN (SELECT inspector_id FROM visits WHERE school_id = ?))))
-       ORDER BY u.name`, [school.directorate_id, schoolId, schoolId]);
+       ORDER BY u.name`, [schoolId, schoolId]);
 
   switch (actor.roleKey) {
     case "SUPER_ADMIN":
-    case "EDUCATION_DIRECTOR":
     case "INSPECTOR":
       return staff(["SCHOOL_PRINCIPAL", "QUALITY_COORDINATOR", "TEACHER"]);
     case "SCHOOL_PRINCIPAL":

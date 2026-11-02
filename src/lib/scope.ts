@@ -21,9 +21,6 @@ export async function schoolScope(user: ScopeUser, alias = "s"): Promise<Clause>
   switch (user.roleKey) {
     case "SUPER_ADMIN":
       return { sql: "1 = 1", params: [] };
-    case "EDUCATION_DIRECTOR":
-      if (!user.directorateId) return NONE;
-      return { sql: `${alias}.directorate_id = ?`, params: [user.directorateId] };
     case "INSPECTOR": {
       const assigned = (await queryOne<{ n: number }>(
         "SELECT COUNT(*) n FROM school_assignments WHERE user_id = ?",
@@ -83,6 +80,6 @@ export async function canAccessVisit(user: ScopeUser, visitId: string): Promise<
 }
 
 /** الأدوار التي تنفّذ التقييم الميداني. */
-export const EVALUATOR_ROLES = ["SUPER_ADMIN", "EDUCATION_DIRECTOR", "INSPECTOR"];
+export const EVALUATOR_ROLES = ["SUPER_ADMIN", "INSPECTOR"];
 /** الأدوار التي ترى كل شيء ضمن مدرستها (مدرسة). */
 export const SCHOOL_STAFF_ROLES = ["SCHOOL_PRINCIPAL", "QUALITY_COORDINATOR"];

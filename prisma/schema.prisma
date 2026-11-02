@@ -46,7 +46,7 @@ model Directorate {
 // -------------------------------------------------------
 model Role {
   id          String   @id @default(uuid())
-  key         String   @unique // SUPER_ADMIN, EDUCATION_DIRECTOR, INSPECTOR, SCHOOL_PRINCIPAL, QUALITY_COORDINATOR, TEACHER, PARENT, GUEST
+  key         String   @unique // SUPER_ADMIN, INSPECTOR, SCHOOL_PRINCIPAL, QUALITY_COORDINATOR, TEACHER, PARENT, GUEST
   name        String
   description String?
   scope       String   @default("system") // system | directorate | school | personal

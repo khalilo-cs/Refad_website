@@ -41,27 +41,11 @@ export async function seedDatabase(opts: SeedOptions = {}): Promise<{ demoPasswo
   const roles = [
     {
       key: "SUPER_ADMIN",
-      name: "مدير المنصة",
+      name: "مدير النظام",
       description:
         "إدارة الحسابات والأدوار والمديريات والمدارس والمعايير والأوزان والإعدادات وسجلات التدقيق",
       scope: "system",
       permissions: { all: true },
-    },
-    {
-      key: "EDUCATION_DIRECTOR",
-      name: "مدير الإدارة التعليمية / المديرية",
-      description:
-        "الاطلاع على المدارس التابعة لنطاقه، وتوزيع الزيارات، ومراجعة التقارير، والاعتماد، ومتابعة خطط التحسين",
-      scope: "directorate",
-      permissions: {
-        viewSchools: true,
-        manageVisits: true,
-        reviewReports: true,
-        approveReports: true,
-        viewReports: true,
-        manageImprovementPlans: true,
-        viewAnalytics: true,
-      },
     },
     {
       key: "INSPECTOR",
@@ -94,7 +78,7 @@ export async function seedDatabase(opts: SeedOptions = {}): Promise<{ demoPasswo
     },
     {
       key: "QUALITY_COORDINATOR",
-      name: "منسق الجودة",
+      name: "مديرة قسم الجودة",
       description:
         "إدارة أدلة الجودة ومراجعتها ومتابعة المؤشرات وخطط التطوير ونسب اكتمال الشواهد",
       scope: "own_school",
@@ -338,13 +322,6 @@ export async function seedDatabase(opts: SeedOptions = {}): Promise<{ demoPasswo
       schoolId: null,
     },
     {
-      key: "EDUCATION_DIRECTOR",
-      name: "مدير المديرية التجريبي",
-      email: "director@rifad.demo",
-      directorateId,
-      schoolId: null,
-    },
-    {
       key: "INSPECTOR",
       name: "مفتش تربوي تجريبي",
       email: "inspector@rifad.demo",
@@ -412,7 +389,7 @@ export async function seedDatabase(opts: SeedOptions = {}): Promise<{ demoPasswo
   // 7. بيانات توضيحية للزيارات والتقييم وخطط التحسين (للعرض الأول فقط)
   // ----------------------------------------------------------
   const inspectorId = createdUserIds["INSPECTOR"];
-  const directorId = createdUserIds["EDUCATION_DIRECTOR"];
+  const directorId: string | undefined = undefined;
   const principalId = createdUserIds["SCHOOL_PRINCIPAL"];
   const dayMs = 86400000;
   const iso = (offsetDays: number) => new Date(Date.now() + offsetDays * dayMs).toISOString();

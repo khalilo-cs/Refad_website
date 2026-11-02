@@ -99,7 +99,7 @@ export async function POST(request: NextRequest) {
     if (!session) return NextResponse.json({ message: "غير مصادق" }, { status: 401 });
 
     const canCreate =
-      ["SUPER_ADMIN", "EDUCATION_DIRECTOR", "INSPECTOR"].includes(session.roleKey) ||
+      ["SUPER_ADMIN", "INSPECTOR"].includes(session.roleKey) ||
       authorize(session, { permission: "createVisits" }).allowed;
     if (!canCreate) {
       return NextResponse.json({ message: "إنشاء الزيارات مقصور على المفتشين ومديري التعليم" }, { status: 403 });
@@ -129,7 +129,7 @@ export async function POST(request: NextRequest) {
       `SELECT u.id, r.key AS role_key FROM users u JOIN roles r ON u.role_id = r.id WHERE u.id = ? AND u.is_active = 1`,
       [inspectorId]
     );
-    if (!inspector || !["INSPECTOR", "SUPER_ADMIN", "EDUCATION_DIRECTOR"].includes(inspector.role_key)) {
+    if (!inspector || !["INSPECTOR", "SUPER_ADMIN"].includes(inspector.role_key)) {
       return NextResponse.json({ message: "المفتش المعيَّن غير موجود أو ليس مفتشاً" }, { status: 400 });
     }
 

@@ -52,7 +52,7 @@ describe("authorize — الحقل allowed هو الفيصل", () => {
   it("يرفض المعلم وولي الأمر من اعتماد التقارير", () => {
     for (const roleKey of ["TEACHER", "PARENT", "GUEST"]) {
       const u = makeUser({ roleKey });
-      expect(authorize(u, { roles: ["SUPER_ADMIN", "EDUCATION_DIRECTOR"] }).allowed).toBe(false);
+      expect(authorize(u, { roles: ["SUPER_ADMIN"] }).allowed).toBe(false);
     }
   });
 

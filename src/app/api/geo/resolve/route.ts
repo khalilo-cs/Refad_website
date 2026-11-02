@@ -13,7 +13,7 @@ const bad = (message: string, status = 400) => NextResponse.json({ message }, { 
 export async function POST(request: NextRequest) {
   const session = await getServerSession();
   if (!session) return bad("غير مصدق", 401);
-  if (!["SUPER_ADMIN", "EDUCATION_DIRECTOR"].includes(session.roleKey)) return bad("غير مصرح", 403);
+  if (!session.roleKey === "SUPER_ADMIN") return bad("غير مصرح", 403);
   if (!rateLimit(`geo:${session.userId}`, 30, 60_000).ok) return bad("محاولات كثيرة. حاول بعد قليل.", 429);
 
   const body = await request.json().catch(() => null);

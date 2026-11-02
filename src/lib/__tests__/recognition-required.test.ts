@@ -34,7 +34,7 @@ beforeAll(async () => {
 
 describe("التميّز والتكريم", () => {
   it("يرتّب المدارس المكتملة التقييم فقط ويمنحها فئة، ويعرض غير المكتملة منفصلة", async () => {
-    await as(EMAILS.director);
+    await as(EMAILS.inspector);
     const r = await json(await rankings.GET(req("/api/rankings")));
     expect(r.status).toBe(200);
     const { ranked, partial, notEvaluated, minCompletion } = r.body;
@@ -53,7 +53,7 @@ describe("التميّز والتكريم", () => {
   });
 
   it("مدرسة لها زيارتان مكتملتان يُحسب لها مقدار التحسّن", async () => {
-    await as(EMAILS.director);
+    await as(EMAILS.inspector);
     const r = await json(await rankings.GET(req("/api/rankings")));
     const a = r.body.ranked.find((x: any) => x.code === "RIFAD-DEMO-001");
     expect(a).toBeTruthy();
@@ -108,7 +108,7 @@ describe("المؤشرات التي تستوجب خطة تحسين", () => {
     // نربط منسق الجودة بالمدرسة صاحبة الزيارة ليكون مستلماً للإشعار
     await q.exec("UPDATE users SET school_id = ? WHERE email = ?", [submitted!.school_id, EMAILS.quality]);
     const coordinator = await q.queryOne<{ id: string }>("SELECT id FROM users WHERE email = ?", [EMAILS.quality]);
-    await as(EMAILS.director);
+    await as(EMAILS.admin);
     const r = await json(await visitRoute.PATCH(req("/x", "PATCH", { action: "approve" }), { params: Promise.resolve({ id: submitted!.id }) }));
     expect(r.status).toBe(200);
     const weak = await q.queryOne<{ n: number }>("SELECT COUNT(*) n FROM evaluations WHERE visit_id = ? AND status = 'EVALUATED' AND score <= 1", [submitted!.id]);

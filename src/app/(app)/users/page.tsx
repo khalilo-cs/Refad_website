@@ -20,7 +20,7 @@ const STATUS = [
   ["", "كل الحالات"], ["active", "نشط"], ["inactive", "معطّل"], ["locked", "مقفل"], ["never", "لم يدخل بعد"], ["mustchange", "ينتظر تغيير كلمة المرور"],
 ] as const;
 const SCHOOL_ROLES = ["SCHOOL_PRINCIPAL", "QUALITY_COORDINATOR"];
-const DIR_ROLES = ["INSPECTOR", "EDUCATION_DIRECTOR"];
+const DIR_ROLES = ["INSPECTOR"];
 
 export default function UsersPage() {
   const { user } = useSession();

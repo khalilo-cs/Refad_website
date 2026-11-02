@@ -53,7 +53,7 @@ export default function ReportDetailPage() {
   if (error) return <Alert tone="danger" title="تعذّر عرض التقرير">{error}</Alert>;
   if (!data) return <div className="skeleton mx-auto h-[600px] max-w-[820px] rounded-2xl" />;
   const { report, content } = data;
-  const canReview = ["SUPER_ADMIN", "EDUCATION_DIRECTOR"].includes(user?.roleKey ?? "");
+  const canReview = user?.roleKey === "SUPER_ADMIN";
   const isOwner = report.generated_by_id === user?.userId;
   const st = report.status;
 

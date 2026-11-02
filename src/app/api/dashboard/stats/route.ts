@@ -20,7 +20,7 @@ export async function GET(request: Request) {
   const session = await getServerSession();
   if (!session) return NextResponse.json({ message: "غير مصدق" }, { status: 401 });
   const { allowed } = authorize(session, {
-    roles: ["SUPER_ADMIN", "EDUCATION_DIRECTOR", "INSPECTOR", "SCHOOL_PRINCIPAL", "QUALITY_COORDINATOR"],
+    roles: ["SUPER_ADMIN", "INSPECTOR", "SCHOOL_PRINCIPAL", "QUALITY_COORDINATOR"],
   });
   if (!allowed) return NextResponse.json({ message: "غير مصرح لك بعرض اللوحة" }, { status: 403 });
 

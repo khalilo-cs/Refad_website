@@ -215,7 +215,7 @@ export async function PATCH(
     {
       const finalRole = roleKey ?? target.role_key;
       const finalDir = directorateId !== undefined ? directorateId : target.directorate_id;
-      if (["INSPECTOR", "EDUCATION_DIRECTOR"].includes(finalRole) && !finalDir) {
+      if (finalRole === "INSPECTOR" && !finalDir) {
         return NextResponse.json({ message: "المديرية مطلوبة لهذا الدور" }, { status: 400 });
       }
       const finalSchool = schoolId !== undefined ? schoolId : target.school_id;

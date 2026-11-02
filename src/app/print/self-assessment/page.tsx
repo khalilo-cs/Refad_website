@@ -83,7 +83,7 @@ function Inner() {
       ))}
       <div className="mt-6 grid grid-cols-3 gap-10 text-center">
         <div><div className="mx-auto h-10 w-40 border-b border-gray-500" />مدير المدرسة</div>
-        <div><div className="mx-auto h-10 w-40 border-b border-gray-500" />منسق الجودة</div>
+        <div><div className="mx-auto h-10 w-40 border-b border-gray-500" />مديرة قسم الجودة</div>
         <div><div className="mx-auto h-10 w-40 border-b border-gray-500" />التاريخ</div>
       </div>
       <p className="mt-4 text-center text-[9px] text-gray-500">مستخرجة من منصة رفاد (تحت إشراف وزارة التربية والتعليم) — نسبة التحقق الكلية {d.summary.percent ?? "—"}% · مقيَّم {d.summary.rated}/{d.summary.total}</p>

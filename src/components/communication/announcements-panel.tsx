@@ -7,7 +7,7 @@ import { ConfirmDialog } from "@/components/ui/extra";
 import { useSession, useToast } from "@/components/providers";
 import { fmtDate } from "@/lib/labels";
 
-const ROLE_LABELS: Record<string, string> = { EDUCATION_DIRECTOR: "مدير التعليم", INSPECTOR: "مفتش", SCHOOL_PRINCIPAL: "مدير مدرسة", QUALITY_COORDINATOR: "منسق جودة", TEACHER: "معلم", PARENT: "ولي أمر" };
+const ROLE_LABELS: Record<string, string> = { INSPECTOR: "مفتش", SCHOOL_PRINCIPAL: "مدير مدرسة", QUALITY_COORDINATOR: "مديرة قسم الجودة", TEACHER: "معلم", PARENT: "ولي أمر" };
 
 export default function AnnouncementsPanel() {
   const { user } = useSession();

@@ -143,7 +143,7 @@ export async function POST(request: NextRequest) {
     if (["SCHOOL_PRINCIPAL", "QUALITY_COORDINATOR"].includes(roleKey) && !schoolId) {
       return NextResponse.json({ message: "المدرسة مطلوبة لهذا الدور" }, { status: 400 });
     }
-    if (["INSPECTOR", "EDUCATION_DIRECTOR"].includes(roleKey) && !directorateId) {
+    if (roleKey === "INSPECTOR" && !directorateId) {
       return NextResponse.json({ message: "المديرية مطلوبة لهذا الدور" }, { status: 400 });
     }
     if (schoolId && !(await queryOne("SELECT id FROM schools WHERE id = ?", [schoolId]))) {

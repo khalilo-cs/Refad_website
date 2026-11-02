@@ -16,7 +16,7 @@ function user(roleKey: string, overrides: Partial<UserSession> = {}): UserSessio
     role: roleKey,
     roleKey,
     schoolId: roleKey === "SCHOOL_PRINCIPAL" ? "school-1" : null,
-    directorateId: roleKey === "EDUCATION_DIRECTOR" ? "dir-1" : null,
+    directorateId: null,
     tokenVersion: 1,
     isActive: true,
     isLocked: false,
@@ -26,7 +26,6 @@ function user(roleKey: string, overrides: Partial<UserSession> = {}): UserSessio
 }
 
 const NON_ADMIN_ROLES = [
-  "EDUCATION_DIRECTOR",
   "INSPECTOR",
   "SCHOOL_PRINCIPAL",
   "QUALITY_COORDINATOR",
@@ -73,7 +72,7 @@ describe("نطاق المدرسة والمديرية", () => {
 });
 
 describe("مراجعة الأدلة والاعتماد", () => {
-  const REVIEW_ROLES = ["SUPER_ADMIN", "EDUCATION_DIRECTOR", "INSPECTOR"];
+  const REVIEW_ROLES = ["SUPER_ADMIN", "INSPECTOR"];
 
   it.each(REVIEW_ROLES)("%s يملك مراجعة الأدلة", (role) => {
     expect(authorize(user(role), { roles: REVIEW_ROLES }).allowed).toBe(true);
@@ -86,17 +85,16 @@ describe("مراجعة الأدلة والاعتماد", () => {
     }
   );
 
-  it("حذف الأدلة محصور بمدير النظام ومدير التعليم", () => {
-    const del = ["SUPER_ADMIN", "EDUCATION_DIRECTOR"];
+  it("حذف الأدلة محصور بمدير النظام", () => {
+    const del = ["SUPER_ADMIN"];
     expect(authorize(user("SUPER_ADMIN"), { roles: del }).allowed).toBe(true);
-    expect(authorize(user("EDUCATION_DIRECTOR"), { roles: del }).allowed).toBe(true);
     expect(authorize(user("INSPECTOR"), { roles: del }).allowed).toBe(false);
     expect(authorize(user("SCHOOL_PRINCIPAL"), { roles: del }).allowed).toBe(false);
   });
 });
 
 describe("التحقق من إنجاز الإجراءات التصحيحية", () => {
-  const VERIFY = ["SUPER_ADMIN", "EDUCATION_DIRECTOR", "INSPECTOR"];
+  const VERIFY = ["SUPER_ADMIN", "INSPECTOR"];
 
   it("مدير المدرسة لا يستطيع التحقق من إنجاز إجراء", () => {
     expect(authorize(user("SCHOOL_PRINCIPAL"), { roles: VERIFY }).allowed).toBe(false);
@@ -108,14 +106,14 @@ describe("التحقق من إنجاز الإجراءات التصحيحية", (
 });
 
 describe("نشر الإعلانات", () => {
-  const PUBLISH = ["SUPER_ADMIN", "EDUCATION_DIRECTOR"];
+  const PUBLISH = ["SUPER_ADMIN", "SCHOOL_PRINCIPAL"];
 
   it("المعلم لا ينشر إعلاناً عاماً", () => {
     expect(authorize(user("TEACHER"), { roles: PUBLISH }).allowed).toBe(false);
   });
 
-  it("مدير التعليم ينشر إعلاناً", () => {
-    expect(authorize(user("EDUCATION_DIRECTOR"), { roles: PUBLISH }).allowed).toBe(true);
+  it("مدير المدرسة ينشر إعلاناً", () => {
+    expect(authorize(user("SCHOOL_PRINCIPAL"), { roles: PUBLISH }).allowed).toBe(true);
   });
 });
 
@@ -124,9 +122,8 @@ describe("إدارة المستخدمين", () => {
     expect(authorize(user("INSPECTOR"), { roles: ["SUPER_ADMIN"] }).allowed).toBe(false);
   });
 
-  it("لا يُسمح لمدير التعليم بترقية نفسه إلى مدير نظام", () => {
-    const director = user("EDUCATION_DIRECTOR");
-    // حتى لو أراد تغيير دوره، مسار PATCH /api/users محصور بمدير النظام
-    expect(authorize(director, { roles: ["SUPER_ADMIN"] }).allowed).toBe(false);
+  it("لا يُسمح للمفتش بترقية نفسه إلى مدير نظام", () => {
+    const inspector = user("INSPECTOR");
+    expect(authorize(inspector, { roles: ["SUPER_ADMIN"] }).allowed).toBe(false);
   });
 });

@@ -18,7 +18,7 @@ async function ensureSeeded() {
   }
 }
 
-const MANAGERS = ["SUPER_ADMIN", "EDUCATION_DIRECTOR", "QUALITY_COORDINATOR"];
+const MANAGERS = ["SUPER_ADMIN", "QUALITY_COORDINATOR"];
 
 /** GET /api/evidence/library?schoolId= — عناصر المكتبة مع حالة تغطية المدرسة لكل عنصر. */
 export async function GET(request: NextRequest) {

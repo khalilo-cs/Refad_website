@@ -13892,25 +13892,10 @@ async function seedDatabase(opts = {}) {
   const roles = [
     {
       key: "SUPER_ADMIN",
-      name: "\u0645\u062F\u064A\u0631 \u0627\u0644\u0645\u0646\u0635\u0629",
+      name: "\u0645\u062F\u064A\u0631 \u0627\u0644\u0646\u0638\u0627\u0645",
       description: "\u0625\u062F\u0627\u0631\u0629 \u0627\u0644\u062D\u0633\u0627\u0628\u0627\u062A \u0648\u0627\u0644\u0623\u062F\u0648\u0627\u0631 \u0648\u0627\u0644\u0645\u062F\u064A\u0631\u064A\u0627\u062A \u0648\u0627\u0644\u0645\u062F\u0627\u0631\u0633 \u0648\u0627\u0644\u0645\u0639\u0627\u064A\u064A\u0631 \u0648\u0627\u0644\u0623\u0648\u0632\u0627\u0646 \u0648\u0627\u0644\u0625\u0639\u062F\u0627\u062F\u0627\u062A \u0648\u0633\u062C\u0644\u0627\u062A \u0627\u0644\u062A\u062F\u0642\u064A\u0642",
       scope: "system",
       permissions: { all: true }
-    },
-    {
-      key: "EDUCATION_DIRECTOR",
-      name: "\u0645\u062F\u064A\u0631 \u0627\u0644\u0625\u062F\u0627\u0631\u0629 \u0627\u0644\u062A\u0639\u0644\u064A\u0645\u064A\u0629 / \u0627\u0644\u0645\u062F\u064A\u0631\u064A\u0629",
-      description: "\u0627\u0644\u0627\u0637\u0644\u0627\u0639 \u0639\u0644\u0649 \u0627\u0644\u0645\u062F\u0627\u0631\u0633 \u0627\u0644\u062A\u0627\u0628\u0639\u0629 \u0644\u0646\u0637\u0627\u0642\u0647\u060C \u0648\u062A\u0648\u0632\u064A\u0639 \u0627\u0644\u0632\u064A\u0627\u0631\u0627\u062A\u060C \u0648\u0645\u0631\u0627\u062C\u0639\u0629 \u0627\u0644\u062A\u0642\u0627\u0631\u064A\u0631\u060C \u0648\u0627\u0644\u0627\u0639\u062A\u0645\u0627\u062F\u060C \u0648\u0645\u062A\u0627\u0628\u0639\u0629 \u062E\u0637\u0637 \u0627\u0644\u062A\u062D\u0633\u064A\u0646",
-      scope: "directorate",
-      permissions: {
-        viewSchools: true,
-        manageVisits: true,
-        reviewReports: true,
-        approveReports: true,
-        viewReports: true,
-        manageImprovementPlans: true,
-        viewAnalytics: true
-      }
     },
     {
       key: "INSPECTOR",
@@ -13941,7 +13926,7 @@ async function seedDatabase(opts = {}) {
     },
     {
       key: "QUALITY_COORDINATOR",
-      name: "\u0645\u0646\u0633\u0642 \u0627\u0644\u062C\u0648\u062F\u0629",
+      name: "\u0645\u062F\u064A\u0631\u0629 \u0642\u0633\u0645 \u0627\u0644\u062C\u0648\u062F\u0629",
       description: "\u0625\u062F\u0627\u0631\u0629 \u0623\u062F\u0644\u0629 \u0627\u0644\u062C\u0648\u062F\u0629 \u0648\u0645\u0631\u0627\u062C\u0639\u062A\u0647\u0627 \u0648\u0645\u062A\u0627\u0628\u0639\u0629 \u0627\u0644\u0645\u0624\u0634\u0631\u0627\u062A \u0648\u062E\u0637\u0637 \u0627\u0644\u062A\u0637\u0648\u064A\u0631 \u0648\u0646\u0633\u0628 \u0627\u0643\u062A\u0645\u0627\u0644 \u0627\u0644\u0634\u0648\u0627\u0647\u062F",
       scope: "own_school",
       permissions: {
@@ -14166,13 +14151,6 @@ async function seedDatabase(opts = {}) {
       schoolId: null
     },
     {
-      key: "EDUCATION_DIRECTOR",
-      name: "\u0645\u062F\u064A\u0631 \u0627\u0644\u0645\u062F\u064A\u0631\u064A\u0629 \u0627\u0644\u062A\u062C\u0631\u064A\u0628\u064A",
-      email: "director@rifad.demo",
-      directorateId,
-      schoolId: null
-    },
-    {
       key: "INSPECTOR",
       name: "\u0645\u0641\u062A\u0634 \u062A\u0631\u0628\u0648\u064A \u062A\u062C\u0631\u064A\u0628\u064A",
       email: "inspector@rifad.demo",
@@ -14235,7 +14213,7 @@ async function seedDatabase(opts = {}) {
   await insert(rows);
   rows.length = 0;
   const inspectorId = createdUserIds["INSPECTOR"];
-  const directorId = createdUserIds["EDUCATION_DIRECTOR"];
+  const directorId = void 0;
   const principalId = createdUserIds["SCHOOL_PRINCIPAL"];
   const dayMs = 864e5;
   const iso = (offsetDays) => new Date(Date.now() + offsetDays * dayMs).toISOString();

@@ -36,14 +36,14 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
   if (!await canAccessSchool(session, id)) return NextResponse.json({ message: "خارج نطاق صلاحيتك" }, { status: 403 });
 
   const canEdit =
-    ["SUPER_ADMIN", "EDUCATION_DIRECTOR", "INSPECTOR"].includes(session.roleKey) ||
+    ["SUPER_ADMIN", "INSPECTOR"].includes(session.roleKey) ||
     (session.roleKey === "SCHOOL_PRINCIPAL" && (session.permissions?.manageSchoolProfile === true || session.permissions?.all === true));
   if (!canEdit) return NextResponse.json({ message: "لا تملك صلاحية تعديل ملف المدرسة" }, { status: 403 });
 
   const parsed = schema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ message: "بيانات غير صحيحة", errors: parsed.error.flatten().fieldErrors }, { status: 400 });
 
-  const canVerify = ["SUPER_ADMIN", "EDUCATION_DIRECTOR", "INSPECTOR"].includes(session.roleKey);
+  const canVerify = ["SUPER_ADMIN", "INSPECTOR"].includes(session.roleKey);
   await exec("INSERT OR IGNORE INTO school_profiles (school_id) VALUES (?)", [id]);
   const sets: string[] = [];
   const vals: unknown[] = [];

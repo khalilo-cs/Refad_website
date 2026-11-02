@@ -37,7 +37,7 @@ export default function MaterialsPanel() {
                 <div className="min-w-0"><h3 className="truncate font-heading font-bold text-navy">{m.title}</h3><p className="text-[11.5px] text-gray-500">{m.school_name} · {m.created_by_name} · {fmtDate(m.created_at)}</p>{m.description && <p className="mt-1 text-[12.5px] text-gray-600">{m.description}</p>}</div></div>
               <div className="mt-3 flex items-center justify-between border-t border-gray-100 pt-3">
                 <span className={`badge ${m.audience === "PARENTS" ? "badge-success" : "badge-info"}`}>{m.audience === "PARENTS" ? "لأولياء الأمور" : "لمجتمع المدرسة"}</span>
-                <span className="flex gap-1"><a className="btn btn-ghost btn-sm" href={`/api/evidence/${m.evidence_id}/file`}><Download className="h-3.5 w-3.5" /> تنزيل</a>{(m.created_by_name && (user?.roleKey === "SUPER_ADMIN" || user?.roleKey === "SCHOOL_PRINCIPAL" || user?.roleKey === "EDUCATION_DIRECTOR" || m.created_by_id === user?.userId)) && <button className="btn btn-ghost btn-sm !px-2 text-danger" aria-label="حذف" onClick={() => setDel(m)}><Trash2 className="h-3.5 w-3.5" /></button>}</span>
+                <span className="flex gap-1"><a className="btn btn-ghost btn-sm" href={`/api/evidence/${m.evidence_id}/file`}><Download className="h-3.5 w-3.5" /> تنزيل</a>{(m.created_by_name && (user?.roleKey === "SUPER_ADMIN" || user?.roleKey === "SCHOOL_PRINCIPAL" || m.created_by_id === user?.userId)) && <button className="btn btn-ghost btn-sm !px-2 text-danger" aria-label="حذف" onClick={() => setDel(m)}><Trash2 className="h-3.5 w-3.5" /></button>}</span>
               </div>
             </article>
           ))}

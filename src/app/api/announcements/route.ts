@@ -8,8 +8,8 @@ import { arr, targets, userTargets } from "@/lib/announcements";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const READ_ROLES = ["SUPER_ADMIN", "EDUCATION_DIRECTOR", "INSPECTOR", "SCHOOL_PRINCIPAL", "QUALITY_COORDINATOR", "TEACHER", "PARENT"];
-const WRITE_ROLES = ["SUPER_ADMIN", "EDUCATION_DIRECTOR", "SCHOOL_PRINCIPAL"];
+const READ_ROLES = ["SUPER_ADMIN", "INSPECTOR", "SCHOOL_PRINCIPAL", "QUALITY_COORDINATOR", "TEACHER", "PARENT"];
+const WRITE_ROLES = ["SUPER_ADMIN", "SCHOOL_PRINCIPAL"];
 const SCHOOL_AUDIENCE = ["TEACHER", "PARENT", "QUALITY_COORDINATOR"];
 
 const bad = (message: string, status = 400) => NextResponse.json({ message }, { status });
@@ -48,7 +48,7 @@ export async function GET() {
 export async function POST(request: Request) {
   const session = await getServerSession();
   if (!session) return bad("غير مصدق", 401);
-  if (!WRITE_ROLES.includes(session.roleKey)) return bad("نشر الإعلانات لمدير النظام ومدير الإدارة التعليمية ومدير المدرسة", 403);
+  if (!WRITE_ROLES.includes(session.roleKey)) return bad("نشر الإعلانات لمدير النظام ومدير المدرسة فقط", 403);
   const body: any = await request.json().catch(() => null);
   if (!body) return bad("صيغة الطلب غير صحيحة");
 
@@ -63,11 +63,6 @@ export async function POST(request: Request) {
     if (!session.schoolId) return bad("حسابك غير مرتبط بمدرسة");
     schools = [session.schoolId]; dirs = [];
     roles = roles.filter((r) => SCHOOL_AUDIENCE.includes(r));
-  } else if (session.roleKey === "EDUCATION_DIRECTOR") {
-    if (!session.directorateId) return bad("حسابك غير مرتبط بمديرية");
-    dirs = [session.directorateId];
-    const own = (await query<{ id: string }>("SELECT id FROM schools WHERE directorate_id = ?", [session.directorateId])).map((s) => s.id);
-    schools = schools.filter((s) => own.includes(s));
   }
   const publish = body.publish === true;
   let expires: string | null = null;

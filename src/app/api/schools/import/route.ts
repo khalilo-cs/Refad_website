@@ -25,7 +25,7 @@ type ParsedRow = {
 export async function POST(request: NextRequest) {
   const session = await getServerSession();
   if (!session) return NextResponse.json({ message: "غير مصدق" }, { status: 401 });
-  const { allowed } = authorize(session, { roles: ["SUPER_ADMIN", "EDUCATION_DIRECTOR"] });
+  const { allowed } = authorize(session, { roles: ["SUPER_ADMIN"] });
   if (!allowed) return NextResponse.json({ message: "غير مصرح بالاستيراد" }, { status: 403 });
 
   const { searchParams } = new URL(request.url);
@@ -92,11 +92,7 @@ export async function POST(request: NextRequest) {
       const match = (!p.tempCode && existingCodes.find((e) => e.code === p.code))
         || (dir && existingCodes.find((e) => e.name.trim() === p.name.trim() && e.directorate_id === dir.id));
       if (match) {
-        if (session.roleKey === "EDUCATION_DIRECTOR" && session.directorateId && match.directorate_id !== session.directorateId) {
-          errors.push({ row: r, field: "directorate", message: "لا يمكنك تعديل مدارس خارج مديريتك" });
-        } else {
           updates.push({ id: match.id, code: match.code, name: match.name, principal_name: p.principal, contact_phone: p.phone, address: p.address, type: p.type, stage: p.stage });
-        }
         continue;
       }
     }
@@ -128,11 +124,6 @@ export async function POST(request: NextRequest) {
     if ((lat == null) !== (lng == null)) errors.push({ row: r, field: "coordinates", message: "يجب إدخال خطي العرض والطول معاً" });
     else if (lat != null && lng != null && !Number.isNaN(lat) && !Number.isNaN(lng) && !inYemen(lat, lng))
       errors.push({ row: r, field: "coordinates", message: "الإحداثيات خارج اليمن — تحقق من عدم قلب خطّي العرض والطول" });
-    if (session.roleKey === "EDUCATION_DIRECTOR" && directorateName) {
-      const own = session.directorateId && directorates.find((x) => x.id === session.directorateId)?.name;
-      if (own !== directorateName) errors.push({ row: r, field: "directorate", message: "لا يمكنك إضافة مدارس خارج مديريتك" });
-    }
-
     if (errors.filter((e) => e.row === r).length === 0) {
       valid.push({ code, name: p.name, governorate: governorateName, directorate: directorateName, type: p.type, stage: p.stage, address: p.address || "", contact_phone: p.phone, contact_email: p.email, principal_name: p.principal, latitude: lat, longitude: lng });
     }

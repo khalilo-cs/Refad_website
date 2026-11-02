@@ -185,7 +185,7 @@ export default function QualityTrackingPage() {
           </ul>
         </Modal>
       )}
-      {cert && data && <CertificateModal school={cert} year={data.year} canIssueRole={!!user && ["SUPER_ADMIN", "EDUCATION_DIRECTOR"].includes(user.roleKey)} onClose={() => setCert(null)} />}
+      {cert && data && <CertificateModal school={cert} year={data.year} canIssueRole={!!user && user.roleKey === "SUPER_ADMIN"} onClose={() => setCert(null)} />}
     </div>
   );
 }

@@ -105,8 +105,8 @@ describe("التقييم الميداني: سجل التعديلات وكشف ا
     expect(locked.status).toBe(423);
     // الاعتماد لا يملكه المفتش
     expect((await visitRoute.PATCH(req("/x", "PATCH", { action: "approve" }), { params: Promise.resolve({ id: inProgressVisit }) })).status).toBe(403);
-    // المدير يعيدها بسبب
-    await as(EMAILS.director);
+    // مدير النظام يعيدها بسبب
+    await as(EMAILS.admin);
     expect((await visitRoute.PATCH(req("/x", "PATCH", { action: "return" }), { params: Promise.resolve({ id: inProgressVisit }) })).status).toBe(400);
     expect((await visitRoute.PATCH(req("/x", "PATCH", { action: "return", reason: "استكمال المؤشرات" }), { params: Promise.resolve({ id: inProgressVisit }) })).status).toBe(200);
   });
@@ -135,7 +135,7 @@ describe("التقارير: مسار الاعتماد وفصل المهام", ()
     // المفتش لا يعتمد ولا صاحب التقرير
     expect((await reportStatus.PATCH(req("/x", "PATCH", { status: "APPROVED" }), ctx)).status).toBe(403);
     // الرفض يتطلب سبباً
-    await as(EMAILS.director);
+    await as(EMAILS.admin);
     expect((await reportStatus.PATCH(req("/x", "PATCH", { status: "REJECTED" }), ctx)).status).toBe(400);
     const ok = await json(await reportStatus.PATCH(req("/x", "PATCH", { status: "APPROVED" }), ctx));
     expect(ok.status).toBe(200);
@@ -197,7 +197,7 @@ describe("خطط التحسين: لا إغلاق دون دليل مقبول وت
   });
 
   it("لا يرى مدير مدرسة (أ) خطط مدرسة (ب) ولا يعدلها", async () => {
-    const other = (await q.queryOne<any>("SELECT id FROM users WHERE email = ?", [EMAILS.director]))!.id;
+    const other = (await q.queryOne<any>("SELECT id FROM users WHERE email = ?", [EMAILS.inspector]))!.id;
     await q.exec("INSERT INTO improvement_plans (id, school_id, title, status, created_by_id) VALUES ('p-b', ?, 'خطة مدرسة ب', 'ACTIVE', ?)", [schoolB, other]);
     await as(EMAILS.principal);
     const list = await json(await improvement.GET(req("/api/improvement")));

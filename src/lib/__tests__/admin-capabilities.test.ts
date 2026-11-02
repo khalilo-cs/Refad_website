@@ -105,7 +105,7 @@ describe("تنقية الصلاحيات", () => {
 describe("تفويض الأدوار المخصّصة", () => {
   it("الدور المخصّص يمرّ بالصلاحية ولو لم يكن في قائمة الأدوار", () => {
     const r = authorize(custom({ createVisits: true }), {
-      roles: ["SUPER_ADMIN", "EDUCATION_DIRECTOR", "INSPECTOR"],
+      roles: ["SUPER_ADMIN", "INSPECTOR"],
       permission: "createVisits",
     });
     expect(r.allowed).toBe(true);

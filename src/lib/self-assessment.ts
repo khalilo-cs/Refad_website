@@ -34,7 +34,7 @@ export const EVENT_LABEL: Record<string, string> = {
 
 /** الأدوار التي تعبّئ استمارة مدرستها، والأدوار التي تتابع وتعتمد. */
 export const SCHOOL_ROLES = ["SCHOOL_PRINCIPAL", "QUALITY_COORDINATOR"];
-export const REVIEWER_ROLES = ["SUPER_ADMIN", "EDUCATION_DIRECTOR", "INSPECTOR"];
+export const REVIEWER_ROLES = ["SUPER_ADMIN", "INSPECTOR"];
 
 /** درجة الضعف: «غير متحقق» و«متحقق بدرجة ضعيفة» في المقياس الافتراضي (0–1 من 3). */
 export const WEAK_MAX_SCORE = 1;
@@ -107,10 +107,9 @@ export async function reviewersOf(schoolId: string): Promise<string[]> {
     `SELECT u.id FROM users u JOIN roles r ON r.id = u.role_id
      WHERE u.is_active = 1 AND (
        r.key = 'SUPER_ADMIN'
-       OR (r.key = 'EDUCATION_DIRECTOR' AND u.directorate_id = (SELECT directorate_id FROM schools WHERE id = ?))
        OR (r.key = 'INSPECTOR' AND u.id IN (SELECT user_id FROM school_assignments WHERE school_id = ?))
      )`,
-    [schoolId, schoolId]
+    [schoolId]
   );
   return rows.map((r) => r.id);
 }

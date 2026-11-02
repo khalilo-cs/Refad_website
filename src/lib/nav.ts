@@ -22,7 +22,6 @@ export const NAV_ITEMS: NavItem[] = [
 const ALL = NAV_ITEMS.map((n) => n.key);
 const ROLE_NAV: Record<string, string[]> = {
   SUPER_ADMIN: ALL,
-  EDUCATION_DIRECTOR: ["dashboard", "quality-tracking", "self-assessment", "schools", "map", "visits", "evaluation", "evidence", "reports", "improvement", "rankings", "directory", "communication", "settings"],
   INSPECTOR: ["dashboard", "quality-tracking", "self-assessment", "schools", "map", "visits", "evaluation", "evidence", "reports", "improvement", "rankings", "directory", "communication", "settings"],
   SCHOOL_PRINCIPAL: ["dashboard", "self-assessment", "schools", "visits", "evaluation", "evidence", "reports", "improvement", "communication", "settings"],
   QUALITY_COORDINATOR: ["dashboard", "self-assessment", "schools", "visits", "evaluation", "evidence", "reports", "improvement", "communication", "settings"],

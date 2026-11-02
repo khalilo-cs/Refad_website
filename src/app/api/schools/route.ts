@@ -35,7 +35,7 @@ export async function GET(request: NextRequest) {
   const session = await getServerSession();
   if (!session) return NextResponse.json({ message: "غير مصدق" }, { status: 401 });
   const { allowed } = authorize(session, {
-    roles: ["SUPER_ADMIN", "EDUCATION_DIRECTOR", "INSPECTOR", "SCHOOL_PRINCIPAL", "QUALITY_COORDINATOR", "TEACHER", "PARENT"],
+    roles: ["SUPER_ADMIN", "INSPECTOR", "SCHOOL_PRINCIPAL", "QUALITY_COORDINATOR", "TEACHER", "PARENT"],
   });
   if (!allowed) return NextResponse.json({ message: "غير مصرح" }, { status: 403 });
 
@@ -106,7 +106,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const session = await getServerSession();
   if (!session) return NextResponse.json({ message: "غير مصدق" }, { status: 401 });
-  const { allowed } = authorize(session, { roles: ["SUPER_ADMIN", "EDUCATION_DIRECTOR"] });
+  const { allowed } = authorize(session, { roles: ["SUPER_ADMIN"] });
   if (!allowed) return NextResponse.json({ message: "غير مصرح بإنشاء مدارس" }, { status: 403 });
 
   let body: unknown;
@@ -126,9 +126,6 @@ export async function POST(request: NextRequest) {
   if (exists) return NextResponse.json({ message: "الكود المدرسي مستخدم مسبقاً" }, { status: 409 });
   const dup = await queryOne<{ code: string }>("SELECT code FROM schools WHERE directorate_id = ? AND name = ?", [directorateId, name.trim()]);
   if (dup) return NextResponse.json({ message: `توجد مدرسة بالاسم نفسه في هذه المديرية (الرمز ${dup.code})` }, { status: 409 });
-  if (session.roleKey === "EDUCATION_DIRECTOR" && session.directorateId !== directorateId) {
-    return NextResponse.json({ message: "لا يمكنك إضافة مدارس خارج مديريتك" }, { status: 403 });
-  }
 
   const id = uuid();
   const now = nowISO();

@@ -51,9 +51,9 @@ function EvidenceInner() {
   const dq = useDebounced(q, 300);
 
   const role = user?.roleKey ?? "";
-  const canUpload = ["SUPER_ADMIN", "EDUCATION_DIRECTOR", "INSPECTOR", "SCHOOL_PRINCIPAL", "QUALITY_COORDINATOR", "TEACHER"].includes(role);
-  const canReview = ["SUPER_ADMIN", "EDUCATION_DIRECTOR", "INSPECTOR", "QUALITY_COORDINATOR"].includes(role);
-  const canDelete = ["SUPER_ADMIN", "EDUCATION_DIRECTOR"].includes(role);
+  const canUpload = ["SUPER_ADMIN", "INSPECTOR", "SCHOOL_PRINCIPAL", "QUALITY_COORDINATOR", "TEACHER"].includes(role);
+  const canReview = ["SUPER_ADMIN", "INSPECTOR", "QUALITY_COORDINATOR"].includes(role);
+  const canDelete = role === "SUPER_ADMIN";
 
   const load = useCallback(async () => {
     setLoading(true);

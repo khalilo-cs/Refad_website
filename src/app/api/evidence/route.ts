@@ -21,8 +21,8 @@ async function maxBytes(): Promise<number> {
   return Math.min(Math.max(mb, 1), 100) * 1024 * 1024;
 }
 
-const UPLOAD_ROLES = ["SUPER_ADMIN", "EDUCATION_DIRECTOR", "INSPECTOR", "SCHOOL_PRINCIPAL", "QUALITY_COORDINATOR", "TEACHER"];
-const REVIEW_ROLES = ["SUPER_ADMIN", "EDUCATION_DIRECTOR", "INSPECTOR", "QUALITY_COORDINATOR"];
+const UPLOAD_ROLES = ["SUPER_ADMIN", "INSPECTOR", "SCHOOL_PRINCIPAL", "QUALITY_COORDINATOR", "TEACHER"];
+const REVIEW_ROLES = ["SUPER_ADMIN", "INSPECTOR", "QUALITY_COORDINATOR"];
 
 export const DOCUMENT_TYPES = [
   "وثيقة رسمية", "خطة", "تقرير", "محضر", "سجل", "كشف", "صورة ميدانية", "نموذج", "شهادة", "أخرى",
@@ -194,9 +194,8 @@ export async function POST(request: Request) {
     // إشعار المراجعين
     if (session.roleKey === "SCHOOL_PRINCIPAL" || session.roleKey === "TEACHER") {
       const reviewers = await query(`SELECT DISTINCT u.id FROM users u JOIN roles r ON r.id = u.role_id
-         JOIN schools s ON s.id = ? WHERE u.is_active = 1 AND (
-           (r.key = 'EDUCATION_DIRECTOR' AND u.directorate_id = s.directorate_id) OR
-           (r.key = 'QUALITY_COORDINATOR' AND u.school_id = s.id))`, [schoolId]) as { id: string }[];
+         JOIN schools s ON s.id = ? WHERE u.is_active = 1 AND
+           (r.key = 'QUALITY_COORDINATOR' AND u.school_id = s.id)`, [schoolId]) as { id: string }[];
       await notify(reviewers.map((r) => r.id), "دليل جديد بانتظار المراجعة", displayName, { link: "/evidence", type: "INFO" });
     } else if (session.roleKey === "INSPECTOR") {
       await notify(await schoolUsers(schoolId, ["SCHOOL_PRINCIPAL"]), "أُرفق دليل جديد لمدرستكم", displayName, { link: "/evidence", type: "INFO" });
@@ -214,7 +213,7 @@ export async function PATCH(request: Request) {
   const session = await getServerSession();
   if (!session) return bad("غير مصدق", 401);
   const { allowed } = authorize(session, { roles: REVIEW_ROLES, permission: "reviewEvidence" });
-  if (!allowed) return bad("مراجعة الأدلة متاحة للمفتش ومدير التعليم ومنسق الجودة", 403);
+  if (!allowed) return bad("مراجعة الأدلة متاحة للمفتش ومديرة قسم الجودة", 403);
 
   let body: any;
   try { body = await request.json(); } catch { return bad("صيغة الطلب غير صحيحة"); }
@@ -250,8 +249,8 @@ export async function PATCH(request: Request) {
 export async function DELETE(request: Request) {
   const session = await getServerSession();
   if (!session) return bad("غير مصدق", 401);
-  const { allowed } = authorize(session, { roles: ["SUPER_ADMIN", "EDUCATION_DIRECTOR"] });
-  if (!allowed) return bad("حذف الأدلة متاح لمدير النظام ومدير التعليم", 403);
+  const { allowed } = authorize(session, { roles: ["SUPER_ADMIN"] });
+  if (!allowed) return bad("حذف الأدلة متاح لمدير النظام", 403);
 
   const id = new URL(request.url).searchParams.get("id") ?? "";
   const row = await queryOne<any>("SELECT * FROM evidence WHERE id = ?", [id]);

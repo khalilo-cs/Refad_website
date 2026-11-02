@@ -8,8 +8,8 @@ import { notify, schoolUsers } from "@/lib/notify";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const ROLES = ["SUPER_ADMIN", "EDUCATION_DIRECTOR", "INSPECTOR", "SCHOOL_PRINCIPAL", "QUALITY_COORDINATOR"];
-const VERIFIERS = ["SUPER_ADMIN", "EDUCATION_DIRECTOR", "INSPECTOR"];
+const ROLES = ["SUPER_ADMIN", "INSPECTOR", "SCHOOL_PRINCIPAL", "QUALITY_COORDINATOR"];
+const VERIFIERS = ["SUPER_ADMIN", "INSPECTOR"];
 const PLAN_STATUS = ["ACTIVE", "COMPLETED", "ON_HOLD", "CANCELLED"];
 const PRIORITIES = ["LOW", "MEDIUM", "HIGH", "CRITICAL"];
 const OPEN = "('COMPLETED','CLOSED_VERIFIED','CLOSED_REJECTED')";
@@ -63,8 +63,8 @@ export async function GET(request: Request) {
   // مسؤولون محتملون لإسناد الإجراءات داخل نطاق المستخدم
   const people = await query<any>(
     `SELECT DISTINCT u.id, u.name, r.name AS role FROM users u JOIN roles r ON r.id = u.role_id
-     WHERE u.is_active = 1 AND r.key IN ('SCHOOL_PRINCIPAL','QUALITY_COORDINATOR','TEACHER','INSPECTOR','EDUCATION_DIRECTOR')
-       AND (u.school_id IN (SELECT s.id FROM schools s WHERE ${sc.sql}) OR r.key IN ('INSPECTOR','EDUCATION_DIRECTOR'))
+     WHERE u.is_active = 1 AND r.key IN ('SCHOOL_PRINCIPAL','QUALITY_COORDINATOR','TEACHER','INSPECTOR')
+       AND (u.school_id IN (SELECT s.id FROM schools s WHERE ${sc.sql}) OR r.key = 'INSPECTOR')
      ORDER BY u.name LIMIT 100`, sc.params);
 
   return NextResponse.json({
@@ -194,7 +194,7 @@ export async function PATCH(request: Request) {
   await auditLog({ userId: session.userId, action: "UPDATE_CORRECTIVE_ACTION", entityType: "corrective_action", entityId: row.id, oldValues: { status: row.status }, newValues: { status, notes }, ipAddress: clientIp(request) });
 
   if (status === "COMPLETED") {
-    const verifiers = await query<{ id: string }>(`SELECT DISTINCT u.id FROM users u JOIN roles r ON r.id = u.role_id JOIN schools s ON s.id = ? WHERE u.is_active = 1 AND (r.key = 'INSPECTOR' OR (r.key = 'EDUCATION_DIRECTOR' AND u.directorate_id = s.directorate_id))`, [row.school_id]);
+    const verifiers = await query<{ id: string }>(`SELECT DISTINCT u.id FROM users u JOIN roles r ON r.id = u.role_id WHERE u.is_active = 1 AND r.key = 'INSPECTOR' AND u.id IN (SELECT user_id FROM school_assignments WHERE school_id = ?)`, [row.school_id]);
     await notify(verifiers.map((v) => v.id), "إجراء بانتظار التحقق", row.proposed_action.slice(0, 90), { link: `/improvement?planId=${row.plan_id}`, type: "WARNING" });
   } else if (verifying) {
     await notify([row.responsible_id, ...(await schoolUsers(row.school_id, ["SCHOOL_PRINCIPAL"]))], status === "CLOSED_VERIFIED" ? "أُغلق الإجراء بعد التحقق" : "لم يُقبل إنجاز الإجراء", `${row.proposed_action.slice(0, 80)}${notes ? " — " + notes.slice(0, 80) : ""}`, { link: `/improvement?planId=${row.plan_id}`, type: status === "CLOSED_VERIFIED" ? "SUCCESS" : "DANGER" });
@@ -206,7 +206,7 @@ export async function PATCH(request: Request) {
 export async function DELETE(request: Request) {
   const session = await getServerSession();
   if (!session) return bad("غير مصدق", 401);
-  if (!["SUPER_ADMIN", "EDUCATION_DIRECTOR", "SCHOOL_PRINCIPAL"].includes(session.roleKey)) return bad("غير مصرح", 403);
+  if (!["SUPER_ADMIN", "SCHOOL_PRINCIPAL"].includes(session.roleKey)) return bad("غير مصرح", 403);
   const sp = new URL(request.url).searchParams;
 
   if (sp.get("planId")) {

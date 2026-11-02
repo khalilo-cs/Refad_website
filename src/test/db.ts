@@ -37,6 +37,6 @@ export async function sessionFor(email: string): Promise<UserSession> {
 }
 
 export const EMAILS = {
-  admin: "admin@rifad.demo", director: "director@rifad.demo", inspector: "inspector@rifad.demo",
+  admin: "admin@rifad.demo", inspector: "inspector@rifad.demo",
   principal: "principal@rifad.demo", quality: "quality@rifad.demo", teacher: "teacher@rifad.demo", parent: "parent@rifad.demo",
 };

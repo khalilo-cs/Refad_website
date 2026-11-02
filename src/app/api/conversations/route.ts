@@ -53,17 +53,17 @@ export async function POST(request: NextRequest) {
   const allowedIds = new Set(allowed.map((u) => u.id));
   let recipients: string[] = Array.isArray(b.recipientIds) ? b.recipientIds.map(String).filter((id: string) => allowedIds.has(id)) : [];
   // الأدوار الإدارية: ما لم يُحدَّد مستلمون يُراسَل مدير المدرسة ومنسق الجودة
-  if (recipients.length === 0 && ["SUPER_ADMIN", "EDUCATION_DIRECTOR", "INSPECTOR"].includes(session.roleKey))
+  if (recipients.length === 0 && ["SUPER_ADMIN", "INSPECTOR"].includes(session.roleKey))
     recipients = allowed.filter((u) => ["SCHOOL_PRINCIPAL", "QUALITY_COORDINATOR"].includes(u.roleKey)).map((u) => u.id);
-  // الأدوار المدرسية: ما لم يُحدَّد مستلمون تُوجَّه المراسلة إلى الإدارة التعليمية (استفسار)، وولي الأمر إلى مدير المدرسة
-  if (recipients.length === 0 && session.roleKey !== "PARENT") recipients = allowed.filter((u) => ["EDUCATION_DIRECTOR", "INSPECTOR"].includes(u.roleKey)).map((u) => u.id);
+  // الأدوار المدرسية: ما لم يُحدَّد مستلمون تُوجَّه المراسلة إلى الإدارة (استفسار)، وولي الأمر إلى مدير المدرسة
+  if (recipients.length === 0 && session.roleKey !== "PARENT") recipients = allowed.filter((u) => u.roleKey === "INSPECTOR").map((u) => u.id);
   if (session.roleKey === "PARENT") recipients = allowed.map((u) => u.id);
   if (recipients.length === 0) return bad("لا يوجد مستلمون مسموحون لهذه المراسلة", 403);
 
   const hasParent = recipients.some((id) => allowed.find((u) => u.id === id)?.roleKey === "PARENT");
   let kind = String(b.kind ?? "");
-  if (!KINDS[kind]) kind = session.roleKey === "PARENT" || hasParent ? "PARENT_CHANNEL" : ["SUPER_ADMIN", "EDUCATION_DIRECTOR", "INSPECTOR"].includes(session.roleKey) ? "OFFICIAL" : "INQUIRY";
-  if (kind === "OFFICIAL" && !["SUPER_ADMIN", "EDUCATION_DIRECTOR", "INSPECTOR"].includes(session.roleKey)) kind = "INQUIRY";
+  if (!KINDS[kind]) kind = session.roleKey === "PARENT" || hasParent ? "PARENT_CHANNEL" : ["SUPER_ADMIN", "INSPECTOR"].includes(session.roleKey) ? "OFFICIAL" : "INQUIRY";
+  if (kind === "OFFICIAL" && !["SUPER_ADMIN", "INSPECTOR"].includes(session.roleKey)) kind = "INQUIRY";
   const id = uuid();
   const now = nowISO();
   await transaction(async () => {

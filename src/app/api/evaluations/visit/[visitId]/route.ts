@@ -274,7 +274,7 @@ export async function PATCH(
     if (!session) return NextResponse.json({ message: "غير مصادق" }, { status: 401 });
     const { visitId } = await params;
 
-    if (!["SUPER_ADMIN", "EDUCATION_DIRECTOR", "INSPECTOR"].includes(session.roleKey)) {
+    if (!["SUPER_ADMIN", "INSPECTOR"].includes(session.roleKey)) {
       return NextResponse.json({ message: "التقييم الميداني مقصور على المفتش والإدارة" }, { status: 403 });
     }
     if (!await canAccessVisit(session, visitId)) {

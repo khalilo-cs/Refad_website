@@ -11,7 +11,7 @@ export async function GET() {
   if (!session) {
     return NextResponse.json({ message: "غير مصدق" }, { status: 401 });
   }
-  const { allowed } = authorize(session, { roles: ["SUPER_ADMIN", "EDUCATION_DIRECTOR"] });
+  const { allowed } = authorize(session, { roles: ["SUPER_ADMIN"] });
   if (!allowed) {
     return NextResponse.json({ message: "غير مصرح" }, { status: 403 });
   }

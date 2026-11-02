@@ -13,11 +13,11 @@ import { REPORT_STATUS, VISIT_STATUS, fmtDate } from "@/lib/labels";
 type Tab = "" | "DRAFT" | "UNDER_REVIEW" | "APPROVED" | "REJECTED";
 
 const TYPE_CARDS = [
-  { type: "VISIT_DAILY", icon: ClipboardCheck, title: "تقرير الزيارة الميدانية", desc: "ملخص الزيارة: المعايير والمؤشرات والملاحظات والأدلة والفجوات والإجراءات", roles: ["SUPER_ADMIN", "EDUCATION_DIRECTOR", "INSPECTOR"] },
-  { type: "DIRECTORATE_DAILY", icon: CalendarClock, title: "التقرير اليومي للإدارة", desc: "إنجاز اليوم: الزيارات المخططة والمنفَّذة والمشكلات والاحتياجات العاجلة", roles: ["SUPER_ADMIN", "EDUCATION_DIRECTOR"] },
-  { type: "PERIODIC", icon: BarChart3, title: "التقرير الدوري", desc: "أسبوعي/شهري/فصلي/سنوي مع مقارنة بالفترة السابقة وتتبع التحسن", roles: ["SUPER_ADMIN", "EDUCATION_DIRECTOR", "INSPECTOR"] },
-  { type: "QUALITY_DETAILED", icon: ShieldCheck, title: "تقرير الجودة التفصيلي", desc: "المعايير والمؤشرات والشواهد المقبولة والناقصة وخطة التحسين", roles: ["SUPER_ADMIN", "EDUCATION_DIRECTOR", "INSPECTOR", "SCHOOL_PRINCIPAL", "QUALITY_COORDINATOR"] },
-  { type: "SPECIAL", icon: Layers, title: "تقرير إداري خاص", desc: "الحضور، النتائج، التدريب، المرافق، الصيانة، السلامة، أولياء الأمور، الأنشطة، الشراكة", roles: ["SUPER_ADMIN", "EDUCATION_DIRECTOR", "INSPECTOR", "SCHOOL_PRINCIPAL", "QUALITY_COORDINATOR"] },
+  { type: "VISIT_DAILY", icon: ClipboardCheck, title: "تقرير الزيارة الميدانية", desc: "ملخص الزيارة: المعايير والمؤشرات والملاحظات والأدلة والفجوات والإجراءات", roles: ["SUPER_ADMIN", "INSPECTOR"] },
+  { type: "DIRECTORATE_DAILY", icon: CalendarClock, title: "التقرير اليومي للإدارة", desc: "إنجاز اليوم: الزيارات المخططة والمنفَّذة والمشكلات والاحتياجات العاجلة", roles: ["SUPER_ADMIN"] },
+  { type: "PERIODIC", icon: BarChart3, title: "التقرير الدوري", desc: "أسبوعي/شهري/فصلي/سنوي مع مقارنة بالفترة السابقة وتتبع التحسن", roles: ["SUPER_ADMIN", "INSPECTOR"] },
+  { type: "QUALITY_DETAILED", icon: ShieldCheck, title: "تقرير الجودة التفصيلي", desc: "المعايير والمؤشرات والشواهد المقبولة والناقصة وخطة التحسين", roles: ["SUPER_ADMIN", "INSPECTOR", "SCHOOL_PRINCIPAL", "QUALITY_COORDINATOR"] },
+  { type: "SPECIAL", icon: Layers, title: "تقرير إداري خاص", desc: "الحضور، النتائج، التدريب، المرافق، الصيانة، السلامة، أولياء الأمور، الأنشطة، الشراكة", roles: ["SUPER_ADMIN", "INSPECTOR", "SCHOOL_PRINCIPAL", "QUALITY_COORDINATOR"] },
 ];
 
 export default function ReportsPage() {
@@ -54,7 +54,7 @@ function ReportsInner() {
   useEffect(() => { void load(); }, [load]);
 
   const counts = data?.counts ?? {};
-  const canCreate = !!user && ["SUPER_ADMIN", "EDUCATION_DIRECTOR", "INSPECTOR", "SCHOOL_PRINCIPAL", "QUALITY_COORDINATOR"].includes(user.roleKey);
+  const canCreate = !!user && ["SUPER_ADMIN", "INSPECTOR", "SCHOOL_PRINCIPAL", "QUALITY_COORDINATOR"].includes(user.roleKey);
   const allCount = Object.values(counts).reduce((a: number, b: any) => a + Number(b), 0);
 
   return (

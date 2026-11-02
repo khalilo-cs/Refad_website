@@ -6,7 +6,7 @@ import { schoolScope } from "@/lib/scope";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const ROLES = ["SUPER_ADMIN", "EDUCATION_DIRECTOR", "INSPECTOR"];
+const ROLES = ["SUPER_ADMIN", "INSPECTOR"];
 
 /** دليل الاتصال: المدارس ضمن نطاق المستخدم مع المدير وجهات الاتصال الإضافية والموقع. */
 export async function GET() {

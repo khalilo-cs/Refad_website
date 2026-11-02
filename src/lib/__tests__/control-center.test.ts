@@ -39,9 +39,9 @@ describe("مركز التحكم ودليل الاتصال", () => {
     await as(EMAILS.admin);
     const all = await (await dir.GET()).json();
     expect(all.schools.length).toBeGreaterThan(0);
-    await as(EMAILS.director);
+    await as(EMAILS.inspector);
     const scoped = await (await dir.GET()).json();
-    const dirId = (await q.queryOne<any>("SELECT directorate_id FROM users WHERE email = ?", [EMAILS.director]))!.directorate_id;
+    const dirId = (await q.queryOne<any>("SELECT directorate_id FROM users WHERE email = ?", [EMAILS.inspector]))!.directorate_id;
     const ids = new Set((await q.query<any>("SELECT id FROM schools WHERE directorate_id = ?", [dirId])).map((r) => r.id));
     expect(scoped.schools.every((s: any) => ids.has(s.id))).toBe(true);
   });

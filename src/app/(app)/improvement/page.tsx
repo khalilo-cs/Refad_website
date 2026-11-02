@@ -43,8 +43,8 @@ function ImprovementInner() {
   const [showRequired, setShowRequired] = useState(sp.get("required") === "1");
 
   const role = user?.roleKey ?? "";
-  const canCreate = ["SUPER_ADMIN", "EDUCATION_DIRECTOR", "INSPECTOR", "SCHOOL_PRINCIPAL", "QUALITY_COORDINATOR"].includes(role);
-  const canDeletePlan = ["SUPER_ADMIN", "EDUCATION_DIRECTOR", "SCHOOL_PRINCIPAL"].includes(role);
+  const canCreate = ["SUPER_ADMIN", "INSPECTOR", "SCHOOL_PRINCIPAL", "QUALITY_COORDINATOR"].includes(role);
+  const canDeletePlan = ["SUPER_ADMIN", "SCHOOL_PRINCIPAL"].includes(role);
 
   const load = useCallback(async () => {
     try {

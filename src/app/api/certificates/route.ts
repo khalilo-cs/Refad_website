@@ -9,7 +9,7 @@ import { clientIp } from "@/lib/security";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const ISSUERS = ["SUPER_ADMIN", "EDUCATION_DIRECTOR"];
+const ISSUERS = ["SUPER_ADMIN"];
 const bad = (message: string, status = 400) => NextResponse.json({ message }, { status });
 
 /** GET ?schoolId=&year= — مسودة الشهادة المقترحة من البيانات + الشهادات الصادرة سابقاً. */
@@ -35,7 +35,7 @@ export async function POST(request: NextRequest) {
   if (!session) return bad("غير مصادق", 401);
   const b = await request.json().catch(() => null);
   const schoolId = typeof b?.schoolId === "string" ? b.schoolId : "";
-  if (!ISSUERS.includes(session.roleKey) || session.mustChangePassword || !(await canReview(session, schoolId))) return bad("إصدار الشهادات لمدير النظام ومدير الإدارة", 403);
+  if (!ISSUERS.includes(session.roleKey) || session.mustChangePassword || !(await canReview(session, schoolId))) return bad("إصدار الشهادات لمدير النظام فقط", 403);
   const year = normalizeYear(b?.year);
   const draft = await draftCertificate(schoolId, year);
   if (!draft.eligible) return bad(draft.reason ?? "غير مستحقة", 409);

@@ -17,11 +17,11 @@ export function newVerificationCode(): string {
 }
 
 const CAN_CREATE: Record<ReportType, string[]> = {
-  VISIT_DAILY: ["SUPER_ADMIN", "EDUCATION_DIRECTOR", "INSPECTOR"],
-  DIRECTORATE_DAILY: ["SUPER_ADMIN", "EDUCATION_DIRECTOR"],
-  PERIODIC: ["SUPER_ADMIN", "EDUCATION_DIRECTOR", "INSPECTOR"],
-  QUALITY_DETAILED: ["SUPER_ADMIN", "EDUCATION_DIRECTOR", "INSPECTOR", "SCHOOL_PRINCIPAL", "QUALITY_COORDINATOR"],
-  SPECIAL: ["SUPER_ADMIN", "EDUCATION_DIRECTOR", "INSPECTOR", "SCHOOL_PRINCIPAL", "QUALITY_COORDINATOR"],
+  VISIT_DAILY: ["SUPER_ADMIN", "INSPECTOR"],
+  DIRECTORATE_DAILY: ["SUPER_ADMIN"],
+  PERIODIC: ["SUPER_ADMIN", "INSPECTOR"],
+  QUALITY_DETAILED: ["SUPER_ADMIN", "INSPECTOR", "SCHOOL_PRINCIPAL", "QUALITY_COORDINATOR"],
+  SPECIAL: ["SUPER_ADMIN", "INSPECTOR", "SCHOOL_PRINCIPAL", "QUALITY_COORDINATOR"],
 };
 
 export type CreateParams = {
@@ -47,9 +47,6 @@ export async function createReport(actor: Actor, p: CreateParams): Promise<{ id:
   let directorateId: string | null = p.directorateId ?? null;
   let visitId: string | null = null;
   let from = p.from ?? null, to = p.to ?? null;
-
-  // مدير المديرية مقيَّد بمديريته
-  if (actor.roleKey === "EDUCATION_DIRECTOR") directorateId = actor.directorateId;
 
   switch (p.type) {
     case "VISIT_DAILY": {
@@ -121,7 +118,6 @@ export async function reportScope(actor: Actor): Promise<{ sql: string; params: 
   let sql = `(r.generated_by_id = ? OR (r.school_id IS NOT NULL AND r.school_id IN (SELECT rs.id FROM schools rs WHERE ${sc.sql}`;
   const params: unknown[] = [actor.userId, ...sc.params];
   sql += "))";
-  if (actor.roleKey === "EDUCATION_DIRECTOR" && actor.directorateId) { sql += " OR (r.school_id IS NULL AND r.directorate_id = ?)"; params.push(actor.directorateId); }
   sql += ")";
   // مدير المدرسة ومنسق الجودة لا يريان إلا المعتمد أو ما أنشآه
   if (["SCHOOL_PRINCIPAL", "QUALITY_COORDINATOR"].includes(actor.roleKey)) {

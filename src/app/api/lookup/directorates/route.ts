@@ -12,10 +12,6 @@ export async function GET(request: Request) {
   let sql = "SELECT id, name, code, governorate_id FROM directorates";
   const params: unknown[] = [];
   if (governorateId) { sql += " WHERE governorate_id = ?"; params.push(governorateId); }
-  if (session.roleKey === "EDUCATION_DIRECTOR") {
-    sql += params.length ? " AND id = ?" : " WHERE id = ?";
-    params.push(session.directorateId);
-  }
   sql += " ORDER BY name";
   const rows = await query<any>(sql, params);
   return NextResponse.json(rows);

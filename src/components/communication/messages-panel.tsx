@@ -178,7 +178,7 @@ function ComposeModal({ open, onClose, onSent }: { open: boolean; onClose: () =>
     } catch (e: any) { add({ type: "error", message: e.message }); } finally { setBusy(false); }
   };
   const isParent = user?.roleKey === "PARENT";
-  const adminRole = ["SUPER_ADMIN", "EDUCATION_DIRECTOR", "INSPECTOR"].includes(user?.roleKey ?? "");
+  const adminRole = ["SUPER_ADMIN", "INSPECTOR"].includes(user?.roleKey ?? "");
 
   return (
     <Modal open={open} onClose={onClose} title="رسالة جديدة" description="المراسلات خاصة بين المشاركين فقط ومسجَّلة بحالة القراءة والرد" width="lg">
@@ -188,7 +188,7 @@ function ComposeModal({ open, onClose, onSent }: { open: boolean; onClose: () =>
           <div><label className="label">نوع المراسلة</label><select className="input" value={f.kind ?? ""} onChange={(e) => setF({ ...f, kind: e.target.value })}><option value="">تلقائي</option>{adminRole && <option value="OFFICIAL">مراسلة رسمية</option>}<option value="INQUIRY">استفسار / رد</option><option value="PARENT_CHANNEL">قناة أولياء الأمور</option><option value="GENERAL">عام</option></select></div>
         </div>
         {f.schoolId && !isParent && (
-          <div><label className="label">المستلمون {adminRole ? "(الافتراضي: مدير المدرسة ومنسق الجودة)" : "(الافتراضي: الإدارة التعليمية)"}</label>
+          <div><label className="label">المستلمون {adminRole ? "(الافتراضي: مدير المدرسة ومديرة قسم الجودة)" : "(الافتراضي: الإدارة التعليمية)"}</label>
             <div className="max-h-40 space-y-1 overflow-y-auto rounded-xl border border-gray-200 p-2">
               {recipients.length === 0 && <p className="p-2 text-[12.5px] text-gray-400">لا مستلمين متاحين.</p>}
               {recipients.map((u) => (

@@ -64,14 +64,14 @@ describe("إنشاء مستخدم باسم مستخدم", () => {
     const bad = await auth.authenticateUser("login.test1", "كلمة-خاطئة-123");
     expect(bad.ok).toBe(false);
   });
-  it("يرفض اسم مستخدم مكرراً أو غير صالح، ويشترط مديرية لمدير التعليم", async () => {
+  it("يرفض اسم مستخدم مكرراً أو غير صالح، ويشترط مديرية للمفتش", async () => {
     await as(EMAILS.admin);
     const base = { name: "مستخدم مكرر", roleKey: "SCHOOL_PRINCIPAL", schoolId: schoolA };
     expect((await json(await users.POST(req("/api/users", "POST", { ...base, username: "dup.user1" })))).status).toBe(201);
     expect((await json(await users.POST(req("/api/users", "POST", { ...base, username: "DUP.user1" })))).status).toBe(409);
     expect((await json(await users.POST(req("/api/users", "POST", { ...base, username: "a@b" })))).status).toBe(400);
-    expect((await json(await users.POST(req("/api/users", "POST", { name: "مدير تعليم", username: "edu.dir1", roleKey: "EDUCATION_DIRECTOR" })))).status).toBe(400);
-    expect((await json(await users.POST(req("/api/users", "POST", { name: "مدير تعليم", username: "edu.dir2", roleKey: "EDUCATION_DIRECTOR", directorateId: dirId })))).status).toBe(201);
+    expect((await json(await users.POST(req("/api/users", "POST", { name: "مفتش", username: "insp.dir1", roleKey: "INSPECTOR" })))).status).toBe(400);
+    expect((await json(await users.POST(req("/api/users", "POST", { name: "مفتش", username: "insp.dir2", roleKey: "INSPECTOR", directorateId: dirId })))).status).toBe(201);
   });
   it("يرفض هاتفاً غير صالح ما لم يُسمح به", async () => {
     await as(EMAILS.admin);
@@ -140,7 +140,7 @@ describe("حذف الحسابات", () => {
     const admin = await sessionFor(EMAILS.admin);
     await as(EMAILS.admin);
     expect((await userById.DELETE(req(`/api/users/${admin.userId}`, "DELETE"), idCtx(admin.userId))).status).toBe(409);
-    await as(EMAILS.director);
+    await as(EMAILS.inspector);
     expect((await userById.DELETE(req(`/api/users/${admin.userId}`, "DELETE"), idCtx(admin.userId))).status).toBe(403);
   });
 });

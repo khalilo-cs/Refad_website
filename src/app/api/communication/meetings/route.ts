@@ -7,7 +7,7 @@ import { clientIp } from "@/lib/security";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const WRITE = ["SUPER_ADMIN", "EDUCATION_DIRECTOR", "INSPECTOR", "SCHOOL_PRINCIPAL", "QUALITY_COORDINATOR"];
+const WRITE = ["SUPER_ADMIN", "INSPECTOR", "SCHOOL_PRINCIPAL", "QUALITY_COORDINATOR"];
 const bad = (message: string, status = 400) => NextResponse.json({ message }, { status });
 
 /** GET — سجل الاجتماعات والمتابعات ضمن نطاق المستخدم. */

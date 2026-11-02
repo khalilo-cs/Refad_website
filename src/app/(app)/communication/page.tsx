@@ -19,7 +19,7 @@ export default function CommunicationPage() {
 function Inner() {
   const { user } = useSession();
   const [tab, setTab] = useState<Tab>("messages");
-  const staff = !!user && ["SUPER_ADMIN", "EDUCATION_DIRECTOR", "INSPECTOR", "SCHOOL_PRINCIPAL", "QUALITY_COORDINATOR"].includes(user.roleKey);
+  const staff = !!user && ["SUPER_ADMIN", "INSPECTOR", "SCHOOL_PRINCIPAL", "QUALITY_COORDINATOR"].includes(user.roleKey);
   const tabs: { key: Tab; label: string }[] = [
     { key: "messages", label: "المراسلات" },
     { key: "announcements", label: "الإعلانات والتعميمات" },

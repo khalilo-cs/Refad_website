@@ -13,13 +13,13 @@ type Action = "start" | "submit" | "approve" | "return" | "postpone" | "cancel" 
 
 /** انتقالات حالة الزيارة المسموحة. */
 const TRANSITIONS: Record<Action, { from: string[]; to: string; roles: string[] }> = {
-  start: { from: ["SCHEDULED", "POSTPONED"], to: "IN_PROGRESS", roles: ["INSPECTOR", "SUPER_ADMIN", "EDUCATION_DIRECTOR"] },
-  submit: { from: ["IN_PROGRESS"], to: "SUBMITTED", roles: ["INSPECTOR", "SUPER_ADMIN", "EDUCATION_DIRECTOR"] },
-  approve: { from: ["SUBMITTED"], to: "COMPLETED", roles: ["EDUCATION_DIRECTOR", "SUPER_ADMIN"] },
-  return: { from: ["SUBMITTED", "COMPLETED"], to: "IN_PROGRESS", roles: ["EDUCATION_DIRECTOR", "SUPER_ADMIN"] },
-  postpone: { from: ["SCHEDULED"], to: "POSTPONED", roles: ["INSPECTOR", "SUPER_ADMIN", "EDUCATION_DIRECTOR"] },
-  reschedule: { from: ["SCHEDULED", "POSTPONED"], to: "SCHEDULED", roles: ["INSPECTOR", "SUPER_ADMIN", "EDUCATION_DIRECTOR"] },
-  cancel: { from: ["SCHEDULED", "POSTPONED", "IN_PROGRESS"], to: "CANCELLED", roles: ["SUPER_ADMIN", "EDUCATION_DIRECTOR"] },
+  start: { from: ["SCHEDULED", "POSTPONED"], to: "IN_PROGRESS", roles: ["INSPECTOR", "SUPER_ADMIN"] },
+  submit: { from: ["IN_PROGRESS"], to: "SUBMITTED", roles: ["INSPECTOR", "SUPER_ADMIN"] },
+  approve: { from: ["SUBMITTED"], to: "COMPLETED", roles: ["SUPER_ADMIN"] },
+  return: { from: ["SUBMITTED", "COMPLETED"], to: "IN_PROGRESS", roles: ["SUPER_ADMIN"] },
+  postpone: { from: ["SCHEDULED"], to: "POSTPONED", roles: ["INSPECTOR", "SUPER_ADMIN"] },
+  reschedule: { from: ["SCHEDULED", "POSTPONED"], to: "SCHEDULED", roles: ["INSPECTOR", "SUPER_ADMIN"] },
+  cancel: { from: ["SCHEDULED", "POSTPONED", "IN_PROGRESS"], to: "CANCELLED", roles: ["SUPER_ADMIN"] },
 };
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -89,9 +89,8 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       return: "أُعيدت الزيارة للتعديل", postpone: "أُجِّلت الزيارة", cancel: "أُلغيت الزيارة", reschedule: "عُدِّل موعد الزيارة",
     };
     if (action === "submit") {
-      const directors = await query(`SELECT u.id FROM users u JOIN roles r ON r.id = u.role_id JOIN schools s ON s.id = ?
-         WHERE r.key = 'EDUCATION_DIRECTOR' AND u.directorate_id = s.directorate_id AND u.is_active = 1`, [visit.school_id]) as { id: string }[];
-      await notify(directors.map((d) => d.id), "زيارة بانتظار المراجعة", `${school?.name}: ${labels[action]}`, { link: "/visits", type: "WARNING" });
+      const admins = await query<{ id: string }>(`SELECT u.id FROM users u JOIN roles r ON r.id = u.role_id WHERE r.key = 'SUPER_ADMIN' AND u.is_active = 1`, []);
+      await notify(admins.map((d) => d.id), "زيارة بانتظار المراجعة", `${school?.name}: ${labels[action]}`, { link: "/visits", type: "WARNING" });
     } else if (action === "return") {
       await notify([visit.inspector_id], "أُعيدت الزيارة للتعديل", String(body.reason), { link: "/evaluation", type: "WARNING" });
     } else if (action === "approve") {

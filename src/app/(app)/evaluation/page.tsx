@@ -64,8 +64,8 @@ function EvaluationInner() {
   const dataRef = useRef<Payload | null>(null);
   dataRef.current = data;
 
-  const canEvaluate = !!user && ["SUPER_ADMIN", "EDUCATION_DIRECTOR", "INSPECTOR"].includes(user.roleKey);
-  const canReview = !!user && ["SUPER_ADMIN", "EDUCATION_DIRECTOR"].includes(user.roleKey);
+  const canEvaluate = !!user && ["SUPER_ADMIN", "INSPECTOR"].includes(user.roleKey);
+  const canReview = !!user && user.roleKey === "SUPER_ADMIN";
 
   /* ---------- الزيارات ---------- */
   useEffect(() => {

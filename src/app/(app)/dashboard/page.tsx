@@ -97,7 +97,7 @@ export default function DashboardPage() {
               <Filter className="h-3.5 w-3.5" /> تصفية {activeCount > 0 && <span className="rounded-full bg-gold px-1.5 text-[10px] font-bold text-white">{activeCount}</span>}
             </button>
             <button onClick={() => load(filters)} className="btn btn-ghost btn-sm" aria-label="تحديث"><RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} /></button>
-            {["SUPER_ADMIN", "EDUCATION_DIRECTOR", "INSPECTOR"].includes(user.roleKey) && (
+            {["SUPER_ADMIN", "INSPECTOR"].includes(user.roleKey) && (
               <Link href="/visits?new=1" className="btn btn-primary btn-sm"><Plus className="h-3.5 w-3.5" /> زيارة جديدة</Link>
             )}
           </>
@@ -162,7 +162,7 @@ export default function DashboardPage() {
 
       {loading && !stats ? <DashSkeleton /> : stats && (
         <Stagger className="space-y-6">
-          {["SUPER_ADMIN", "EDUCATION_DIRECTOR"].includes(user.roleKey) && (
+          {user.roleKey === "SUPER_ADMIN" && (
             <Rise>
               <section className="card p-5">
                 <div className="flex flex-wrap items-center justify-between gap-2">

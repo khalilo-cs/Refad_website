@@ -30,7 +30,7 @@ const STATUS_AR: Record<string, string> = { ACTIVE: "نشطة", INACTIVE: "غي�
 export default function SchoolsPage() {
   const { user } = useSession();
   const { add } = useToast();
-  const canManage = user?.roleKey === "SUPER_ADMIN" || user?.roleKey === "EDUCATION_DIRECTOR";
+  const canManage = user?.roleKey === "SUPER_ADMIN";
 
   const [rows, setRows] = useState<School[]>([]);
   const [total, setTotal] = useState(0);

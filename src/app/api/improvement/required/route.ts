@@ -5,7 +5,7 @@ import { requiredActions } from "@/lib/required-actions";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const ROLES = ["SUPER_ADMIN", "EDUCATION_DIRECTOR", "INSPECTOR", "SCHOOL_PRINCIPAL", "QUALITY_COORDINATOR"];
+const ROLES = ["SUPER_ADMIN", "INSPECTOR", "SCHOOL_PRINCIPAL", "QUALITY_COORDINATOR"];
 
 /** GET /api/improvement/required[?schoolId=] — مؤشرات ضعيفة بلا إجراء تصحيحي ضمن نطاق المستخدم. */
 export async function GET(request: NextRequest) {

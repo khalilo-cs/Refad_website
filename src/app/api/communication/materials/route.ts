@@ -9,7 +9,7 @@ import { putObject, StorageNotConfiguredError } from "@/lib/storage";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const WRITE = ["SUPER_ADMIN", "EDUCATION_DIRECTOR", "SCHOOL_PRINCIPAL", "QUALITY_COORDINATOR", "TEACHER"];
+const WRITE = ["SUPER_ADMIN", "SCHOOL_PRINCIPAL", "QUALITY_COORDINATOR", "TEACHER"];
 const bad = (message: string, status = 400) => NextResponse.json({ message }, { status });
 
 /** GET — المواد التعليمية المشتركة المتاحة للمستخدم (معلمو المدرسة وأولياء أمورها يقرؤون). */
@@ -76,7 +76,7 @@ export async function DELETE(request: NextRequest) {
   if (!session) return bad("غير مصدق", 401);
   const m = await queryOne<any>("SELECT * FROM shared_materials WHERE id = ?", [request.nextUrl.searchParams.get("id") ?? ""]);
   if (!m) return bad("المادة غير موجودة", 404);
-  const privileged = ["SUPER_ADMIN", "EDUCATION_DIRECTOR", "SCHOOL_PRINCIPAL"].includes(session.roleKey) && await canAccessSchool(session, m.school_id);
+  const privileged = ["SUPER_ADMIN", "SCHOOL_PRINCIPAL"].includes(session.roleKey) && await canAccessSchool(session, m.school_id);
   if (m.created_by_id !== session.userId && !privileged) return bad("لا تملك صلاحية الحذف", 403);
   await exec("DELETE FROM shared_materials WHERE id = ?", [m.id]);
   if (m.evidence_id) await exec("DELETE FROM evidence WHERE id = ?", [m.evidence_id]);

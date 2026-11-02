@@ -28,7 +28,7 @@ export async function GET() {
       if (r.k === "soon") await gen("soon", "مواعيد قريبة", `${r.n} إجراء تنتهي مهلته خلال 3 أيام`, "/improvement", "WARNING");
       if (r.k === "visits") await gen("visits", "زيارات اليوم", `لديك ${r.n} زيارة مجدولة اليوم`, "/visits", "INFO");
     }
-    if (["EDUCATION_DIRECTOR", "SUPER_ADMIN"].includes(session.roleKey)) {
+    if (session.roleKey === "SUPER_ADMIN") {
       const p = (await queryOne<{ n: number }>("SELECT COUNT(*) n FROM reports WHERE status = 'UNDER_REVIEW'"))?.n ?? 0;
       if (p) await gen("reports", "تقارير بانتظار الاعتماد", `${p} تقرير قيد المراجعة`, "/reports", "WARNING");
     }

@@ -12,7 +12,7 @@ export async function GET(request: NextRequest) {
   const session = await getServerSession();
   if (!session) return NextResponse.json({ message: "غير مصدق" }, { status: 401 });
   let schools = await messagingSchools(session);
-  if (["SUPER_ADMIN", "EDUCATION_DIRECTOR", "INSPECTOR"].includes(session.roleKey)) {
+  if (["SUPER_ADMIN", "INSPECTOR"].includes(session.roleKey)) {
     const sc = await schoolScope(session, "s");
     schools = await query<any>(`SELECT s.id, s.name FROM schools s WHERE s.status = 'ACTIVE' AND ${sc.sql} ORDER BY s.name LIMIT 200`, sc.params);
   }

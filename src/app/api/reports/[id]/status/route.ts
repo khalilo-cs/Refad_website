@@ -26,7 +26,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     if (!report) return NextResponse.json({ message: "التقرير غير موجود" }, { status: 404 });
     if (report.status === "APPROVED") return NextResponse.json({ message: "التقرير معتمد ولا يمكن تعديل حالته" }, { status: 409 });
 
-    const canReview = ["SUPER_ADMIN", "EDUCATION_DIRECTOR"].includes(session.roleKey);
+    const canReview = session.roleKey === "SUPER_ADMIN";
     const isOwner = report.generated_by_id === session.userId;
     const content = parseContent(report);
 
@@ -36,7 +36,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       if (content?.state === "INCOMPLETE") return NextResponse.json({ message: "لا يمكن رفع تقرير غير مكتمل للمراجعة. أكمل تقييم المؤشرات ثم ولّد التقرير من جديد." }, { status: 400 });
     }
     if (status === "APPROVED" || status === "REJECTED") {
-      if (!canReview) return NextResponse.json({ message: "الاعتماد والرفض مقصوران على مدير النظام ومدير الإدارة التعليمية" }, { status: 403 });
+      if (!canReview) return NextResponse.json({ message: "الاعتماد والرفض مقصوران على مدير النظام" }, { status: 403 });
       if (report.status !== "UNDER_REVIEW") return NextResponse.json({ message: "لا يُعتمد أو يُرفض إلا تقرير قيد المراجعة" }, { status: 409 });
       if (isOwner && session.roleKey !== "SUPER_ADMIN") return NextResponse.json({ message: "لا يمكن اعتماد تقرير أنشأته بنفسك" }, { status: 403 });
       if (status === "REJECTED" && String(rejectionReason ?? "").trim().length < 5) return NextResponse.json({ message: "سبب الرفض مطلوب (5 أحرف على الأقل)" }, { status: 400 });
@@ -52,8 +52,8 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
     if (status === "UNDER_REVIEW") {
       const reviewers = await query<{ id: string }>(
-        `SELECT u.id FROM users u JOIN roles r ON r.id = u.role_id WHERE u.is_active = 1 AND (r.key = 'SUPER_ADMIN' OR (r.key = 'EDUCATION_DIRECTOR' AND u.directorate_id = ?))`,
-        [report.directorate_id ?? (report.school_id ? (await query<any>("SELECT directorate_id FROM schools WHERE id = ?", [report.school_id]))[0]?.directorate_id : null) ?? ""]);
+        `SELECT u.id FROM users u JOIN roles r ON r.id = u.role_id WHERE u.is_active = 1 AND r.key = 'SUPER_ADMIN'`,
+        []);
       await notify(reviewers.map((r) => r.id).filter((x) => x !== session.userId), "تقرير بانتظار الاعتماد", report.title, { link: `/reports/${id}`, type: "WARNING" });
     } else {
       await notify([report.generated_by_id], status === "APPROVED" ? "اعتُمد تقريرك" : "رُفض تقريرك", `${report.title}${status === "REJECTED" ? " — " + String(rejectionReason).slice(0, 100) : ""}`, { link: `/reports/${id}`, type: status === "APPROVED" ? "SUCCESS" : "DANGER" });

@@ -70,7 +70,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   if (!await canAccessSchool(session, id)) {
     return NextResponse.json({ message: "لا يمكنك تعديل هذه المدرسة" }, { status: 403 });
   }
-  const isManager = ["SUPER_ADMIN", "EDUCATION_DIRECTOR"].includes(session.roleKey);
+  const isManager = session.roleKey === "SUPER_ADMIN";
   const isPrincipal =
     session.roleKey === "SCHOOL_PRINCIPAL" && (session.permissions?.manageSchoolProfile === true || session.permissions?.all === true);
   if (!isManager && !isPrincipal) {
@@ -164,10 +164,9 @@ export async function DELETE(
 
     const { id } = await params;
     const isAdmin = authorize(session, { roles: ["SUPER_ADMIN"] }).allowed;
-    const isDirector = authorize(session, { roles: ["EDUCATION_DIRECTOR"] }).allowed;
 
-    if (!isAdmin && !isDirector) {
-      return NextResponse.json({ message: "حذف المدارس مقصور على المدير" }, { status: 403 });
+    if (!isAdmin) {
+      return NextResponse.json({ message: "حذف المدارس مقصور على مدير النظام" }, { status: 403 });
     }
     if (!await canAccessSchool(session, id) && !isAdmin) {
       return NextResponse.json({ message: "المدرسة خارج نطاق صلاحيتك" }, { status: 403 });

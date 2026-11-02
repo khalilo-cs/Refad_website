@@ -65,8 +65,8 @@ export default function SchoolDetailPage() {
   if (!data) return <div className="space-y-4"><div className="skeleton h-40 rounded-3xl" /><div className="skeleton h-72 rounded-2xl" /></div>;
 
   const s = data.school;
-  const canManage = ["SUPER_ADMIN", "EDUCATION_DIRECTOR"].includes(user?.roleKey ?? "");
-  const canVisit = ["SUPER_ADMIN", "EDUCATION_DIRECTOR", "INSPECTOR"].includes(user?.roleKey ?? "");
+  const canManage = user?.roleKey === "SUPER_ADMIN";
+  const canVisit = ["SUPER_ADMIN", "INSPECTOR"].includes(user?.roleKey ?? "");
 
   if (data.restricted) {
     return (
@@ -137,7 +137,7 @@ export default function SchoolDetailPage() {
         onChange={setTab}
         tabs={[
           { key: "overview", label: "نظرة عامة" },
-          ...(["SUPER_ADMIN", "EDUCATION_DIRECTOR", "INSPECTOR", "SCHOOL_PRINCIPAL", "QUALITY_COORDINATOR"].includes(user?.roleKey ?? "") ? [{ key: "self" as Tab, label: "التقييم الذاتي ونقاط الضعف" }] : []),
+          ...(["SUPER_ADMIN", "INSPECTOR", "SCHOOL_PRINCIPAL", "QUALITY_COORDINATOR"].includes(user?.roleKey ?? "") ? [{ key: "self" as Tab, label: "التقييم الذاتي ونقاط الضعف" }] : []),
           { key: "visits", label: "الزيارات", count: data.visits.length },
           { key: "profile", label: "الملف والمرافق" },
           { key: "contacts", label: "جهات الاتصال والموقع" },
@@ -223,7 +223,7 @@ export default function SchoolDetailPage() {
                       <p className="flex-1 text-[13px] leading-relaxed text-gray-700">{w.title}{w.notes && <span className="mt-1 block text-[12px] text-gray-500">ملاحظة: {w.notes}</span>}</p>
                       <span className={`badge ${w.score === 0 ? "badge-danger" : "badge-warning"}`}>{w.score === 0 ? "غير متحقق" : "ضعيف"}</span>
                       <span className={`badge ${w.accepted_evidence ? "badge-success" : "badge-neutral"}`}>{w.accepted_evidence ? `${w.accepted_evidence} دليل مقبول` : "بلا دليل مقبول"}</span>
-                      {["SUPER_ADMIN", "EDUCATION_DIRECTOR", "INSPECTOR", "SCHOOL_PRINCIPAL", "QUALITY_COORDINATOR"].includes(user?.roleKey ?? "") && <Link href={`/improvement?new=action&schoolId=${id}&indicatorId=${w.id}`} className="btn btn-ghost btn-sm">إجراء تصحيحي</Link>}
+                      {["SUPER_ADMIN", "INSPECTOR", "SCHOOL_PRINCIPAL", "QUALITY_COORDINATOR"].includes(user?.roleKey ?? "") && <Link href={`/improvement?new=action&schoolId=${id}&indicatorId=${w.id}`} className="btn btn-ghost btn-sm">إجراء تصحيحي</Link>}
                     </li>
                   ))}
                 </ul>
@@ -253,7 +253,7 @@ export default function SchoolDetailPage() {
         </div>
       )}
 
-      {tab === "profile" && <ProfileTab id={id} data={data} onSaved={load} canEdit={canManage || user?.roleKey === "INSPECTOR" || (user?.roleKey === "SCHOOL_PRINCIPAL" && (user as any)?.permissions?.manageSchoolProfile === true)} canVerify={["SUPER_ADMIN", "EDUCATION_DIRECTOR", "INSPECTOR"].includes(user?.roleKey ?? "")} />}
+      {tab === "profile" && <ProfileTab id={id} data={data} onSaved={load} canEdit={canManage || user?.roleKey === "INSPECTOR" || (user?.roleKey === "SCHOOL_PRINCIPAL" && (user as any)?.permissions?.manageSchoolProfile === true)} canVerify={["SUPER_ADMIN", "INSPECTOR"].includes(user?.roleKey ?? "")} />}
 
       {tab === "self" && <div className="card p-5"><SchoolWeaknessCard schoolId={id} /></div>}
 

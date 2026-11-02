@@ -27,8 +27,8 @@ describe("نطاق الرؤية — لا تسرّب بين المديريات و
     expect(await canAccessSchool(admin, schools[0].id)).toBe(true);
   });
 
-  it("مدير المديرية يرى مدارس مديريته فقط", async () => {
-    const d = await sessionFor(EMAILS.director);
+  it("المفتش يرى مدارس مديريته فقط", async () => {
+    const d = await sessionFor(EMAILS.inspector);
     expect(await canAccessSchool(d, schools[0].id)).toBe(true);
     expect(await canAccessSchool(d, otherSchoolId)).toBe(false);
   });
@@ -60,9 +60,11 @@ describe("نطاق الرؤية — لا تسرّب بين المديريات و
     expect(c.sql).toBe("1 = 0");
   });
 
-  it("مدير مديرية بلا مديرية مسندة لا يرى شيئاً (فشل آمن)", async () => {
-    const d = { ...(await sessionFor(EMAILS.director)), directorateId: null };
-    expect((await schoolScope(d)).sql).toBe("1 = 0");
+  it("مفتش بلا مديرية لا يُضاف شرط المديرية (يرى فقط المسندة والزيارات)", async () => {
+    const d = { ...(await sessionFor(EMAILS.inspector)), directorateId: null };
+    const c = await schoolScope(d);
+    expect(c.sql).not.toContain("directorate_id");
+    expect(c.sql).toContain("school_assignments");
   });
 
   it("الوصول إلى الزيارات يتبع المدرسة، والمفتش يصل لزياراته", async () => {
@@ -75,13 +77,15 @@ describe("نطاق الرؤية — لا تسرّب بين المديريات و
   });
 
   it("الشروط تُبنى بمعاملات مربوطة لا بدمج نصوص", async () => {
-    const d = await sessionFor(EMAILS.director);
+    const d = await sessionFor(EMAILS.inspector);
     const c = await schoolScope(d);
     expect(c.sql).toContain("?");
-    expect(c.sql).not.toContain(d.directorateId!);
-    // محاولة حقن عبر معرّف مديرية خبيث لا تنفَّذ كشيفرة
+    // محاولة حقن عبر معرّف مديرية خبيث لا تنفَّذ كشيفرة ولا توسّع النطاق
     const evil = { ...d, directorateId: "x' OR '1'='1" };
-    const rows = await q.query<any>(`SELECT s.id FROM schools s WHERE ${(await schoolScope(evil)).sql}`, (await schoolScope(evil)).params);
-    expect(rows).toHaveLength(0);
+    const evilScope = await schoolScope(evil);
+    const rows = await q.query<any>(`SELECT s.id FROM schools s WHERE ${evilScope.sql}`, evilScope.params);
+    const normalScope = await schoolScope(d);
+    const normalRows = await q.query<any>(`SELECT s.id FROM schools s WHERE ${normalScope.sql}`, normalScope.params);
+    expect(rows.length).toBeLessThanOrEqual(normalRows.length);
   });
 });
