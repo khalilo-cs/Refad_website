@@ -59,7 +59,7 @@ export default function RankingsPage() {
   }, [certFor]);
 
   if (!user) return null;
-  if (!["SUPER_ADMIN", "INSPECTOR"].includes(user.roleKey)) {
+  if (!["SUPER_ADMIN", "GOVERNORATE_SUPERVISOR", "INSPECTOR"].includes(user.roleKey)) {
     return <EmptyState icon={Trophy} title="هذه الصفحة لقيادات الجودة والمفتشين" description="ترتيب المدارس متاح لقسم الجودة والمفتشين ضمن نطاقهم." />;
   }
 

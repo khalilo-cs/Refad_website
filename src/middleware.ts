@@ -33,6 +33,9 @@ const MCP_ALLOWED = ["/change-password", "/api/account", "/api/auth", "/api/heal
 
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 
+const READ_ONLY_ROLES = ["GOVERNORATE_SUPERVISOR"];
+const READ_ONLY_WRITABLE = ["/api/auth", "/api/account", "/api/notifications"];
+
 /** رابط الدليل المؤقت الموقَّع: يُقبل بلا جلسة (التحقق من التوقيع والانتهاء يتم في المسار نفسه). */
 function isSignedEvidenceLink(request: NextRequest): boolean {
   return /^\/api\/evidence\/[^/]+\/file$/.test(request.nextUrl.pathname) && !!request.nextUrl.searchParams.get("token");
@@ -69,13 +72,13 @@ export function middleware(request: NextRequest) {
   }
 
   const token = request.cookies.get("access_token")?.value;
-  let payload: { userId?: string; mustChangePassword?: boolean } | null = null;
+  let payload: { userId?: string; mustChangePassword?: boolean; roleKey?: string } | null = null;
   if (token) {
     try {
       payload = jwt.verify(token, ACCESS_SECRET, {
         issuer: "rifad",
         audience: "rifad-app",
-      }) as { userId?: string; mustChangePassword?: boolean };
+      }) as { userId?: string; mustChangePassword?: boolean; roleKey?: string };
     } catch {
       payload = null;
     }
@@ -95,6 +98,17 @@ export function middleware(request: NextRequest) {
   if (authenticated && payload?.mustChangePassword && !MCP_ALLOWED.some((p) => pathname === p || pathname.startsWith(p + "/")) && !isPublic(pathname)) {
     if (isApi) return NextResponse.json({ message: "يجب تغيير كلمة المرور أولاً", mustChangePassword: true }, { status: 403 });
     return NextResponse.redirect(new URL("/change-password", request.url));
+  }
+
+  // أدوار الاطلاع فقط (مشرف المحافظة): لا طلب مغيِّر إلا الدخول والخروج وكلمة المرور وقراءة الإشعارات.
+  if (
+    authenticated &&
+    isApi &&
+    !SAFE_METHODS.has(request.method) &&
+    READ_ONLY_ROLES.includes(payload?.roleKey ?? "") &&
+    !READ_ONLY_WRITABLE.some((p) => pathname === p || pathname.startsWith(p + "/"))
+  ) {
+    return json(403, "حسابك للاطلاع والمتابعة فقط ولا يملك صلاحية التعديل");
   }
 
   if (authenticated && (pathname === "/login" || pathname === "/setup")) {

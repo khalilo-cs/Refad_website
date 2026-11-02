@@ -232,8 +232,8 @@ describe("الأدلة: رفع آمن ونطاق صلاحيات", () => {
     expect((await upload(EMAILS.principal, schoolB, "plan.pdf", pdf)).status).toBe(403);
   });
 
-  it("ولي الأمر والزائر لا يرفعان، والمعلم يرى ما رفعه فقط", async () => {
-    expect((await upload(EMAILS.parent, schoolA, "p.pdf", pdf)).status).toBe(403);
+  it("مشرف المحافظة والزائر لا يرفعان، والمعلم يرى ما رفعه فقط", async () => {
+    expect((await upload(EMAILS.supervisor, schoolA, "p.pdf", pdf)).status).toBe(403);
     await as(EMAILS.teacher);
     const list = await json(await evidenceRoute.GET(req("/api/evidence")));
     expect(list.status).toBe(200);

@@ -7,7 +7,7 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import dynamic from "next/dynamic";
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import {
-  ArrowRight, Building2, CalendarPlus, CheckCircle2, ChevronDown, FileText, Loader2, MapPin, Pencil, Phone, ShieldCheck, Users, Wrench, XCircle,
+  ArrowRight, Building2, CalendarPlus, CheckCircle2, ChevronDown, FileText, Loader2, MapPin, Pencil, ShieldCheck, Users, Wrench, XCircle,
 } from "lucide-react";
 import { Alert, EmptyState } from "@/components/ui";
 import { ConfirmDialog, Rise, ScoreBar, ScoreRing, Stagger, StatusBadge, Tabs } from "@/components/ui/extra";
@@ -68,15 +68,6 @@ export default function SchoolDetailPage() {
   const canManage = user?.roleKey === "SUPER_ADMIN";
   const canVisit = ["SUPER_ADMIN", "INSPECTOR"].includes(user?.roleKey ?? "");
 
-  if (data.restricted) {
-    return (
-      <div className="space-y-5">
-        <div className="card p-6"><h1 className="font-heading text-2xl font-bold text-navy">{s.name}</h1><p className="mt-2 text-sm text-gray-600">{s.stage} — {s.directorate_name}، {s.governorate_name}</p>{s.contact_phone && <p className="mt-2 flex items-center gap-1 text-sm text-gray-600"><Phone className="h-4 w-4" />{s.contact_phone}</p>}</div>
-        <Alert tone="info">تظهر هنا المعلومات العامة للمدرسة فقط. لمتابعة أبنائك استخدم الصفحة الرئيسية.</Alert>
-      </div>
-    );
-  }
-
   const openEdit = async () => {
     const r = await fetch(`/api/schools/${id}`, { credentials: "include" });
     const d = await r.json();
@@ -125,7 +116,7 @@ export default function SchoolDetailPage() {
             </div>
             <div className="flex flex-wrap gap-2 md:flex-col">
               {canVisit && <Link href={`/visits?new=1&schoolId=${id}`} className="btn btn-gold btn-sm justify-center"><CalendarPlus className="h-3.5 w-3.5" /> زيارة جديدة</Link>}
-              {(canManage || user?.roleKey === "SCHOOL_PRINCIPAL") && <button onClick={openEdit} className="btn btn-sm justify-center border border-white/20 bg-white/10 text-white hover:bg-white/20"><Pencil className="h-3.5 w-3.5" /> تعديل</button>}
+              {canManage && <button onClick={openEdit} className="btn btn-sm justify-center border border-white/20 bg-white/10 text-white hover:bg-white/20"><Pencil className="h-3.5 w-3.5" /> تعديل</button>}
               {canManage && <button onClick={() => setArchiveOpen(true)} className="btn btn-sm justify-center border border-white/20 bg-white/10 text-white hover:bg-danger/60">أرشفة</button>}
             </div>
           </div>
@@ -137,7 +128,7 @@ export default function SchoolDetailPage() {
         onChange={setTab}
         tabs={[
           { key: "overview", label: "نظرة عامة" },
-          ...(["SUPER_ADMIN", "INSPECTOR", "SCHOOL_PRINCIPAL", "QUALITY_COORDINATOR"].includes(user?.roleKey ?? "") ? [{ key: "self" as Tab, label: "التقييم الذاتي ونقاط الضعف" }] : []),
+          ...(["SUPER_ADMIN", "GOVERNORATE_SUPERVISOR", "INSPECTOR", "SCHOOL_PRINCIPAL", "QUALITY_COORDINATOR"].includes(user?.roleKey ?? "") ? [{ key: "self" as Tab, label: "التقييم الذاتي ونقاط الضعف" }] : []),
           { key: "visits", label: "الزيارات", count: data.visits.length },
           { key: "profile", label: "الملف والمرافق" },
           { key: "contacts", label: "جهات الاتصال والموقع" },

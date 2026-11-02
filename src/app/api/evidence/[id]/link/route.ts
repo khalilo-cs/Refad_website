@@ -13,7 +13,7 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
   const { id } = await params;
   const row = await queryOne<any>("SELECT school_id, uploaded_by_id FROM evidence WHERE id = ?", [id]);
   if (!row) return NextResponse.json({ message: "الدليل غير موجود" }, { status: 404 });
-  if (!await canAccessSchool(session, row.school_id) || (session.roleKey === "TEACHER" && row.uploaded_by_id !== session.userId) || session.roleKey === "PARENT") {
+  if (!await canAccessSchool(session, row.school_id) || (session.roleKey === "TEACHER" && row.uploaded_by_id !== session.userId)) {
     return NextResponse.json({ message: "لا تملك صلاحية" }, { status: 403 });
   }
   const token = signResourceToken(`evidence:${id}`, session.userId, 300);

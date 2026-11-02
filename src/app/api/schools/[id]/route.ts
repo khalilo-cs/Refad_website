@@ -70,11 +70,10 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   if (!await canAccessSchool(session, id)) {
     return NextResponse.json({ message: "لا يمكنك تعديل هذه المدرسة" }, { status: 403 });
   }
-  const isManager = session.roleKey === "SUPER_ADMIN";
-  const isPrincipal =
-    session.roleKey === "SCHOOL_PRINCIPAL" && (session.permissions?.manageSchoolProfile === true || session.permissions?.all === true);
-  if (!isManager && !isPrincipal) {
-    return NextResponse.json({ message: "لا تملك صلاحية تعديل بيانات المدرسة" }, { status: 403 });
+  // السجل الأساسي للمدرسة (الاسم والرمز والتبعية والموقع والاتصال والحالة) يعدّله مدير النظام وحده.
+  const isManager = session.roleKey === "SUPER_ADMIN" || session.permissions?.all === true;
+  if (!isManager) {
+    return NextResponse.json({ message: "تعديل السجل الأساسي للمدرسة من صلاحيات مدير النظام فقط" }, { status: 403 });
   }
 
   const old = await queryOne("SELECT * FROM schools WHERE id = ?", [id]);
@@ -91,15 +90,11 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   if (phone.error) return NextResponse.json({ message: phone.error, errors: { contactPhone: [phone.error] }, invalidPhone: true }, { status: 400 });
   const loc = checkLocation(parsed.data.latitude, parsed.data.longitude, parsed.data.locationSource);
   if (!loc.ok) return NextResponse.json({ message: loc.message, errors: { latitude: [loc.message] } }, { status: 400 });
-  if (loc.lat !== undefined && !isManager) return NextResponse.json({ message: "تحديد موقع المدرسة من صلاحيات الإدارة" }, { status: 403 });
 
   const fields: string[] = [];
   const values: unknown[] = [];
-  // مدير المدرسة يعدّل بيانات الاتصال والعنوان فقط؛ الرمز والحالة والتبعية الإدارية للإدارة.
-  const PRINCIPAL_COLS = new Set(["address", "contact_phone", "contact_email", "principal_name", "has_whatsapp"]);
   const setField = (col: string, val: unknown) => {
     if (val === undefined) return;
-    if (!isManager && !PRINCIPAL_COLS.has(col)) return;
     fields.push(`${col} = ?`);
     values.push(val);
   };

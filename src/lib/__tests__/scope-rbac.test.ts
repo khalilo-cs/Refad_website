@@ -48,10 +48,10 @@ describe("نطاق الرؤية — لا تسرّب بين المديريات و
     expect(await canAccessSchool(i, otherSchoolId)).toBe(false);
   });
 
-  it("ولي الأمر يصل إلى مدرسة أبنائه فقط", async () => {
-    const p = await sessionFor(EMAILS.parent);
-    expect(await canAccessSchool(p, schools[0].id)).toBe(true);
-    expect(await canAccessSchool(p, schools[1].id)).toBe(false);
+  it("مشرف المحافظة يطّلع على كل المدارس، ومنها مدارس المديريات الأخرى", async () => {
+    const sup = await sessionFor(EMAILS.supervisor);
+    for (const sc of schools) expect(await canAccessSchool(sup, sc.id)).toBe(true);
+    expect(await canAccessSchool(sup, otherSchoolId)).toBe(true);
   });
 
   it("الزائر لا يرى أي مدرسة", async () => {
@@ -73,7 +73,7 @@ describe("نطاق الرؤية — لا تسرّب بين المديريات و
     expect(await canAccessVisit(await sessionFor(EMAILS.inspector), visit.id)).toBe(true);
     const otherVisit = (await q.queryOne<any>("SELECT id FROM visits WHERE school_id = ? LIMIT 1", [schools[1].id]))!;
     expect(await canAccessVisit(await sessionFor(EMAILS.principal), otherVisit.id)).toBe(false);
-    expect(await canAccessVisit(await sessionFor(EMAILS.parent), visit.id)).toBe(true); // مدرسة ابنه (قراءة نطاق فقط؛ الواجهات تقيّد المحتوى)
+    expect(await canAccessVisit(await sessionFor(EMAILS.supervisor), visit.id)).toBe(true);
   });
 
   it("الشروط تُبنى بمعاملات مربوطة لا بدمج نصوص", async () => {

@@ -29,6 +29,7 @@ export default function QualityTrackingPage() {
   const [focus, setFocus] = useState<Focus>("");
   const [cert, setCert] = useState<Row | null>(null);
   const [view, setView] = useState<"schools" | "insights">("schools");
+  const readOnly = user?.roleKey === "GOVERNORATE_SUPERVISOR";
   const [remind, setRemind] = useState<{ message: string; text: string; schools: { schoolId: string; name: string; phone: string | null; hasWhatsapp: boolean; notified: number }[] } | null>(null);
   const [reminding, setReminding] = useState(false);
 
@@ -111,7 +112,7 @@ export default function QualityTrackingPage() {
           <button role="tab" aria-selected={view === "schools"} onClick={() => setView("schools")} className={`rounded-lg px-3 py-1.5 ${view === "schools" ? "bg-white font-semibold text-navy shadow-sm" : "text-gray-600"}`}>المدارس</button>
           <button role="tab" aria-selected={view === "insights"} onClick={() => setView("insights")} className={`inline-flex items-center gap-1 rounded-lg px-3 py-1.5 ${view === "insights" ? "bg-white font-semibold text-navy shadow-sm" : "text-gray-600"}`}><BarChart3 className="h-3.5 w-3.5" /> نقاط الضعف الشائعة</button>
         </div>
-        {view === "schools" && data && (
+        {view === "schools" && data && !readOnly && (
           <div className="ms-auto flex flex-wrap gap-2">
             <button className="btn btn-ghost btn-sm" disabled={reminding} onClick={() => sendReminder("quiz", data.schools.filter((x) => x.status !== "SUBMITTED" && x.rated < x.total))}><Bell className="h-3.5 w-3.5" /> ذكّر من لم يكمل الاختبار</button>
             <button className="btn btn-ghost btn-sm" disabled={reminding} onClick={() => sendReminder("plans", data.schools.filter((x) => x.needsPlan > 0 || x.overdue > 0))}><Bell className="h-3.5 w-3.5" /> ذكّر بالخطط الناقصة والمتأخرة</button>
@@ -156,7 +157,7 @@ export default function QualityTrackingPage() {
                       <td className="px-3 py-2.5">
                         <div className="flex gap-1">
                           <Link className="btn btn-ghost btn-sm" href={`/self-assessment?schoolId=${s.id}&year=${data.year}`}>فتح</Link>
-                          {s.status !== "SUBMITTED" && <button className="btn btn-ghost btn-sm" disabled={reminding} onClick={() => sendReminder(s.rated < s.total ? "quiz" : s.needsPlan ? "plans" : "submit", [s])} title="تذكير المدرسة"><Bell className="h-3.5 w-3.5" /></button>}
+                          {s.status !== "SUBMITTED" && !readOnly && <button className="btn btn-ghost btn-sm" disabled={reminding} onClick={() => sendReminder(s.rated < s.total ? "quiz" : s.needsPlan ? "plans" : "submit", [s])} title="تذكير المدرسة"><Bell className="h-3.5 w-3.5" /></button>}
                           {s.status === "SUBMITTED" && <button className="btn btn-ghost btn-sm" onClick={() => setCert(s)} title="شهادة تقدير مبنية على البيانات"><Award className="h-3.5 w-3.5" /></button>}
                         </div>
                       </td>

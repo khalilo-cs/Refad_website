@@ -1,11 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { CheckCircle2, Download, FileSpreadsheet, KeyRound, Loader2, Lock, LockOpen, LogOut, Pencil, Power, Search, ShieldCheck, Trash2, UserPlus, Users } from "lucide-react";
+import { CheckCircle2, Download, FileSpreadsheet, KeyRound, Loader2, Lock, LockOpen, LogOut, Pencil, Power, School, Search, ShieldCheck, Trash2, UserPlus, Users } from "lucide-react";
 import { Modal, PageHeader } from "@/components/ui";
 import { ConfirmDialog, Pagination, useDebounced } from "@/components/ui/extra";
 import { PhoneActions } from "@/components/ui/contact";
 import { BulkPrincipalsModal } from "@/components/users/bulk-principals-modal";
+import { AssignSchoolsModal } from "@/components/users/assign-schools-modal";
 import { CredentialsModal, type Credentials } from "@/components/users/credentials-card";
 import { useSession, useToast } from "@/components/providers";
 
@@ -40,6 +41,7 @@ export default function UsersPage() {
   const [creds, setCreds] = useState<{ name: string; phone: string | null; hasWhatsapp: boolean; credentials: Credentials } | null>(null);
   const [confirm, setConfirm] = useState<{ u: U; kind: "reset" | "lock" | "unlock" | "disable" | "enable" | "revoke" | "delete" } | null>(null);
   const [bulk, setBulk] = useState(false);
+  const [assign, setAssign] = useState<U | null>(null);
   const limit = 25;
 
   const load = useCallback(async () => {
@@ -124,7 +126,9 @@ export default function UsersPage() {
         icon={Users}
         actions={
           <div className="flex flex-wrap gap-2">
+            {/* eslint-disable-next-line @next/next/no-html-link-for-pages -- تنزيل ملف من واجهة برمجية لا صفحة */}
             <a href="/api/users/export?format=xlsx" className="btn btn-ghost btn-sm"><FileSpreadsheet className="h-4 w-4" /> تصدير Excel</a>
+            {/* eslint-disable-next-line @next/next/no-html-link-for-pages -- تنزيل ملف من واجهة برمجية لا صفحة */}
             <a href="/api/users/export?format=csv" className="btn btn-ghost btn-sm"><Download className="h-4 w-4" /> تصدير CSV</a>
             <button onClick={() => setBulk(true)} className="btn btn-ghost btn-sm"><Users className="h-4 w-4" /> حسابات مدراء المدارس</button>
             <button onClick={() => setForm({ user: null })} className="btn btn-primary btn-sm"><UserPlus className="h-4 w-4" /> مستخدم جديد</button>
@@ -182,6 +186,7 @@ export default function UsersPage() {
                   <td className="py-3 pe-3 ps-1">
                     <div className="flex gap-0.5">
                       <IconBtn label="تعديل" onClick={() => setForm({ user: u })}><Pencil className="h-3.5 w-3.5" /></IconBtn>
+                      {u.role_key === "INSPECTOR" && <IconBtn label="المدارس المسندة" onClick={() => setAssign(u)}><School className="h-3.5 w-3.5" /></IconBtn>}
                       <IconBtn label="إعادة تعيين كلمة المرور" onClick={() => setConfirm({ u, kind: "reset" })}><KeyRound className="h-3.5 w-3.5" /></IconBtn>
                       {u.is_locked === 1
                         ? <IconBtn label="فتح الحساب" onClick={() => setConfirm({ u, kind: "unlock" })}><LockOpen className="h-3.5 w-3.5" /></IconBtn>
@@ -207,6 +212,7 @@ export default function UsersPage() {
         />
       )}
       {bulk && <BulkPrincipalsModal onClose={() => setBulk(false)} onDone={load} />}
+      {assign && <AssignSchoolsModal inspector={assign} schools={schools} dirs={dirs} onClose={() => setAssign(null)} />}
       {creds && <CredentialsModal name={creds.name} phone={creds.phone} hasWhatsapp={creds.hasWhatsapp} credentials={creds.credentials} onClose={() => setCreds(null)} />}
       <ConfirmDialog
         open={!!confirm} tone={confirm && ["lock", "disable", "delete"].includes(confirm.kind) ? "danger" : "primary"}

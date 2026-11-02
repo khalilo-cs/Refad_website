@@ -381,21 +381,29 @@ async function sessionFromPayload(payload: AccessTokenPayload): Promise<UserSess
     token_version: number;
     must_change_password: number;
     permissions: unknown;
+    role_key: string;
+    role_name: string;
+    school_id: string | null;
+    directorate_id: string | null;
+    deleted_at: string | null;
   }>(
-    "SELECT u.id, u.is_active, u.is_locked, u.token_version, u.must_change_password, r.permissions FROM users u JOIN roles r ON u.role_id = r.id WHERE u.id = ?",
+    `SELECT u.id, u.is_active, u.is_locked, u.token_version, u.must_change_password, u.school_id, u.directorate_id, u.deleted_at,
+            r.permissions, r.key AS role_key, r.name AS role_name
+     FROM users u JOIN roles r ON u.role_id = r.id WHERE u.id = ?`,
     [payload.userId]
   );
-  if (!user || user.is_locked === 1 || !user.is_active || user.token_version !== payload.tokenVersion) {
+  if (!user || user.deleted_at || user.is_locked === 1 || !user.is_active || user.token_version !== payload.tokenVersion) {
     return null;
   }
+  // الدور والمدرسة والمديرية من قاعدة البيانات لا من الرمز، فيسري أي تغيير فوراً.
   return {
     userId: payload.userId,
     email: payload.email,
     name: payload.name,
-    role: payload.role,
-    roleKey: payload.roleKey,
-    schoolId: payload.schoolId,
-    directorateId: payload.directorateId,
+    role: user.role_name,
+    roleKey: user.role_key,
+    schoolId: user.school_id,
+    directorateId: user.directorate_id,
     tokenVersion: payload.tokenVersion,
     mustChangePassword: user.must_change_password === 1,
     isActive: user.is_active === 1,

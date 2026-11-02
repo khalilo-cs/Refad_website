@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession();
     if (!session) return NextResponse.json({ message: "غير مصادق" }, { status: 401 });
-    if (["PARENT", "GUEST", "TEACHER"].includes(session.roleKey)) return NextResponse.json({ message: "غير مصرح" }, { status: 403 });
+    if (["GUEST", "TEACHER"].includes(session.roleKey)) return NextResponse.json({ message: "غير مصرح" }, { status: 403 });
 
     const sp = request.nextUrl.searchParams;
     const limit = Math.min(Number(sp.get("limit") ?? 20) || 20, 100);

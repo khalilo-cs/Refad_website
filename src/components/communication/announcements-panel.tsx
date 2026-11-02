@@ -7,7 +7,7 @@ import { ConfirmDialog } from "@/components/ui/extra";
 import { useSession, useToast } from "@/components/providers";
 import { fmtDate } from "@/lib/labels";
 
-const ROLE_LABELS: Record<string, string> = { INSPECTOR: "مفتش", SCHOOL_PRINCIPAL: "مدير مدرسة", QUALITY_COORDINATOR: "مديرة قسم الجودة", TEACHER: "معلم", PARENT: "ولي أمر" };
+const ROLE_LABELS: Record<string, string> = { GOVERNORATE_SUPERVISOR: "مشرف المحافظة", INSPECTOR: "مفتش", SCHOOL_PRINCIPAL: "مدير مدرسة", QUALITY_COORDINATOR: "منسق الجودة بالمدرسة", TEACHER: "معلم" };
 
 export default function AnnouncementsPanel() {
   const { user } = useSession();
@@ -82,7 +82,7 @@ function EditModal({ row, onClose, onDone }: { row: any | null; onClose: () => v
   const [f, setF] = useState<any>({ title: row?.title ?? "", content: row?.content ?? "", audienceRoles: row?.audience_roles ?? [], expiresAt: row?.expires_at?.slice(0, 10) ?? "" });
   const [busy, setBusy] = useState(false);
   const principal = user?.roleKey === "SCHOOL_PRINCIPAL";
-  const roles = principal ? ["TEACHER", "PARENT", "QUALITY_COORDINATOR"] : Object.keys(ROLE_LABELS);
+  const roles = principal ? ["TEACHER", "QUALITY_COORDINATOR"] : Object.keys(ROLE_LABELS);
   const toggle = (k: string) => setF((x: any) => ({ ...x, audienceRoles: x.audienceRoles.includes(k) ? x.audienceRoles.filter((y: string) => y !== k) : [...x.audienceRoles, k] }));
 
   const save = async (publish: boolean) => {

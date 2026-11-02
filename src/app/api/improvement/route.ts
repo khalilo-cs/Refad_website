@@ -9,6 +9,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const ROLES = ["SUPER_ADMIN", "INSPECTOR", "SCHOOL_PRINCIPAL", "QUALITY_COORDINATOR"];
+const READ_ROLES = [...ROLES, "GOVERNORATE_SUPERVISOR"];
 const VERIFIERS = ["SUPER_ADMIN", "INSPECTOR"];
 const PLAN_STATUS = ["ACTIVE", "COMPLETED", "ON_HOLD", "CANCELLED"];
 const PRIORITIES = ["LOW", "MEDIUM", "HIGH", "CRITICAL"];
@@ -20,7 +21,7 @@ const bad = (message: string, status = 400) => NextResponse.json({ message }, { 
 export async function GET(request: Request) {
   const session = await getServerSession();
   if (!session) return bad("غير مصدق", 401);
-  if (!ROLES.includes(session.roleKey)) return bad("غير مصرح", 403);
+  if (!READ_ROLES.includes(session.roleKey)) return bad("غير مصرح", 403);
 
   const sp = new URL(request.url).searchParams;
   const sc = await schoolScope(session, "s");
@@ -116,6 +117,8 @@ export async function POST(request: Request) {
   const resp = await queryOne<any>("SELECT u.id, u.school_id, r.key FROM users u JOIN roles r ON r.id = u.role_id WHERE u.id = ? AND u.is_active = 1", [responsibleId]);
   if (!resp) return bad("المسؤول غير موجود");
   if (resp.school_id && resp.school_id !== plan.school_id) return bad("المسؤول من مدرسة أخرى");
+  // الأدوار المدرسية تسند الإجراء لمنسوبي المدرسة نفسها فقط
+  if (["SCHOOL_PRINCIPAL", "QUALITY_COORDINATOR"].includes(session.roleKey) && resp.school_id !== plan.school_id) return bad("المسؤول يجب أن يكون من منسوبي المدرسة");
   const indicatorId = String(body.indicatorId ?? "") || null;
   if (indicatorId && !await queryOne("SELECT id FROM indicators WHERE id = ?", [indicatorId])) return bad("المؤشر غير موجود", 404);
   const evaluationId = String(body.evaluationId ?? "") || null;

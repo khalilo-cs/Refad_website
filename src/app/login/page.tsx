@@ -12,7 +12,9 @@ function LoginForm() {
   const { reload } = useSession();
   const router = useRouter();
   const params = useSearchParams();
-  const callbackUrl = params.get("callbackUrl") || "/dashboard";
+  const requested = params.get("callbackUrl") ?? "";
+  // مسار داخلي فقط؛ يمنع إعادة التوجيه إلى موقع خارجي بعد الدخول
+  const callbackUrl = /^\/(?![\/\\])/.test(requested) ? requested : "/dashboard";
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");

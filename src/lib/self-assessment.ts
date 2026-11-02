@@ -35,6 +35,8 @@ export const EVENT_LABEL: Record<string, string> = {
 /** الأدوار التي تعبّئ استمارة مدرستها، والأدوار التي تتابع وتعتمد. */
 export const SCHOOL_ROLES = ["SCHOOL_PRINCIPAL", "QUALITY_COORDINATOR"];
 export const REVIEWER_ROLES = ["SUPER_ADMIN", "INSPECTOR"];
+/** من يطّلع على متابعة الاستمارات دون مراجعتها: المراجعون ومشرفو المحافظة. */
+export const VIEWER_ROLES = [...REVIEWER_ROLES, "GOVERNORATE_SUPERVISOR"];
 
 /** درجة الضعف: «غير متحقق» و«متحقق بدرجة ضعيفة» في المقياس الافتراضي (0–1 من 3). */
 export const WEAK_MAX_SCORE = 1;
@@ -63,7 +65,7 @@ export async function canReview(s: Session, schoolId: string): Promise<boolean> 
   return REVIEWER_ROLES.includes(s.roleKey) && (await canAccessSchool(s as any, schoolId));
 }
 export async function canView(s: Session, schoolId: string): Promise<boolean> {
-  return canFill(s, schoolId) || (await canReview(s, schoolId));
+  return canFill(s, schoolId) || (await canReview(s, schoolId)) || (s.roleKey === "GOVERNORATE_SUPERVISOR" && (await canAccessSchool(s as any, schoolId)));
 }
 
 export async function getAssessment(schoolId: string, year: string) {

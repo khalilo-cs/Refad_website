@@ -140,7 +140,7 @@ describe("جهات اتصال المدرسة", () => {
   });
 
   it("المعلم وولي الأمر لا يصلان إلى جهات الاتصال", async () => {
-    for (const e of [EMAILS.teacher, EMAILS.parent]) {
+    for (const e of [EMAILS.teacher, EMAILS.supervisor]) {
       await as(e);
       expect((await contacts.GET(req("/x"), idCtx(schoolA))).status).toBe(403);
     }

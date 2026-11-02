@@ -4,7 +4,6 @@ import { canAccessSchool, type ScopeUser } from "./scope";
 export const KINDS: Record<string, string> = {
   OFFICIAL: "مراسلة رسمية",
   INQUIRY: "استفسار / رد",
-  PARENT_CHANNEL: "قناة أولياء الأمور",
   GENERAL: "عام",
 };
 
@@ -12,7 +11,7 @@ type Actor = ScopeUser & { userId: string };
 
 /** المستخدمون الذين يستطيع الفاعل مراسلتهم داخل مدرسة معيّنة (بحسب علاقته بها). */
 export async function allowedRecipients(actor: Actor, schoolId: string): Promise<{ id: string; name: string; role: string; roleKey: string }[]> {
-  if (!await canAccessSchool(actor, schoolId) && actor.roleKey !== "PARENT") return [];
+  if (!await canAccessSchool(actor, schoolId)) return [];
   const school = await queryOne<{ directorate_id: string }>("SELECT directorate_id FROM schools WHERE id = ?", [schoolId]);
   if (!school) return [];
   const staff = async (keys: string[]) =>
@@ -35,17 +34,9 @@ export async function allowedRecipients(actor: Actor, schoolId: string): Promise
       return [
         ...(await admin()),
         ...(await staff(["TEACHER", "SCHOOL_PRINCIPAL", "QUALITY_COORDINATOR"])),
-        ...await query<any>(
-          `SELECT DISTINCT u.id, u.name || ' (ولي أمر)' AS name, 'ولي أمر' AS role, 'PARENT' AS roleKey FROM users u JOIN parents p ON p.user_id = u.id
-           JOIN parent_student ps ON ps.parent_id = p.id JOIN students st ON st.id = ps.student_id WHERE st.school_id = ? AND u.is_active = 1`, [schoolId]),
       ].filter((u) => u.id !== actor.userId);
     case "TEACHER":
       return staff(["SCHOOL_PRINCIPAL", "QUALITY_COORDINATOR"]);
-    case "PARENT": {
-      const mine = (await queryOne<{ n: number }>(
-        `SELECT COUNT(*) n FROM students st JOIN parent_student ps ON ps.student_id = st.id JOIN parents p ON p.id = ps.parent_id WHERE p.user_id = ? AND st.school_id = ?`, [actor.userId, schoolId]))?.n ?? 0;
-      return mine ? await staff(["SCHOOL_PRINCIPAL"]) : [];
-    }
     default:
       return [];
   }
@@ -53,8 +44,6 @@ export async function allowedRecipients(actor: Actor, schoolId: string): Promise
 
 /** مدارس يستطيع الفاعل إنشاء مراسلات بشأنها. */
 export async function messagingSchools(actor: Actor): Promise<{ id: string; name: string }[]> {
-  if (actor.roleKey === "PARENT")
-    return await query<any>(`SELECT DISTINCT s.id, s.name FROM schools s JOIN students st ON st.school_id = s.id JOIN parent_student ps ON ps.student_id = st.id JOIN parents p ON p.id = ps.parent_id WHERE p.user_id = ?`, [actor.userId]);
   if (["SCHOOL_PRINCIPAL", "QUALITY_COORDINATOR", "TEACHER"].includes(actor.roleKey) && actor.schoolId)
     return await query<any>("SELECT id, name FROM schools WHERE id = ?", [actor.schoolId]);
   return [];

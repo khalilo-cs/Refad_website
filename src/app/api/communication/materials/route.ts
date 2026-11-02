@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 const WRITE = ["SUPER_ADMIN", "SCHOOL_PRINCIPAL", "QUALITY_COORDINATOR", "TEACHER"];
 const bad = (message: string, status = 400) => NextResponse.json({ message }, { status });
 
-/** GET — المواد التعليمية المشتركة المتاحة للمستخدم (معلمو المدرسة وأولياء أمورها يقرؤون). */
+/** GET — المواد التعليمية المشتركة المتاحة للمستخدم ضمن نطاق مدارسه. */
 export async function GET() {
   const session = await getServerSession();
   if (!session) return bad("غير مصدق", 401);
@@ -23,11 +23,10 @@ export async function GET() {
             e.original_name, e.mime_type, e.size
      FROM shared_materials m JOIN schools s ON s.id = m.school_id JOIN users u ON u.id = m.created_by_id LEFT JOIN evidence e ON e.id = m.evidence_id
      WHERE ${sc.sql} AND (m.audience = 'SCHOOL' OR m.created_by_id = ?) ORDER BY m.created_at DESC LIMIT 200`, [...sc.params, session.userId]);
-  const filtered = session.roleKey === "PARENT" ? rows.filter((r: any) => r.audience === "PARENTS" || r.audience === "SCHOOL") : rows;
-  return NextResponse.json({ materials: filtered, canWrite: WRITE.includes(session.roleKey) });
+  return NextResponse.json({ materials: rows, canWrite: WRITE.includes(session.roleKey) });
 }
 
-/** POST (multipart) — رفع مادة تعليمية: file, title, description, schoolId, audience. تُخزَّن في التخزين الخاص نفسه. */
+/** POST (multipart) — رفع مادة تعليمية: file, title, description, schoolId. تُخزَّن في التخزين الخاص نفسه. */
 export async function POST(request: NextRequest) {
   const session = await getServerSession();
   if (!session) return bad("غير مصدق", 401);
@@ -38,7 +37,7 @@ export async function POST(request: NextRequest) {
   const file = form.get("file");
   const title = String(form.get("title") ?? "").trim();
   const schoolId = String(form.get("schoolId") ?? session.schoolId ?? "");
-  const audience = form.get("audience") === "PARENTS" ? "PARENTS" : "SCHOOL";
+  const audience = "SCHOOL";
   if (!(file instanceof File) || file.size === 0) return bad("لم يُرفق ملف");
   if (file.size > 20 * 1024 * 1024) return bad("حجم الملف يتجاوز 20 ميجابايت");
   if (title.length < 3) return bad("عنوان المادة مطلوب");
@@ -62,10 +61,7 @@ export async function POST(request: NextRequest) {
     await exec("INSERT INTO shared_materials (id, school_id, title, description, evidence_id, created_by_id, audience) VALUES (?,?,?,?,?,?,?)", [matId, schoolId, title.slice(0, 200), String(form.get("description") ?? "").slice(0, 500) || null, evId, session.userId, audience]);
   });
   await auditLog({ userId: session.userId, action: "MATERIAL_SHARED", entityType: "shared_material", entityId: matId, newValues: { title, schoolId, audience }, ipAddress: clientIp(request) });
-  const audienceUsers = await query<{ id: string }>(
-    audience === "PARENTS"
-      ? `SELECT DISTINCT u.id FROM users u JOIN parents p ON p.user_id = u.id JOIN parent_student ps ON ps.parent_id = p.id JOIN students st ON st.id = ps.student_id WHERE st.school_id = ? AND u.is_active = 1`
-      : `SELECT u.id FROM users u WHERE u.school_id = ? AND u.is_active = 1`, [schoolId]);
+  const audienceUsers = await query<{ id: string }>("SELECT u.id FROM users u WHERE u.school_id = ? AND u.is_active = 1", [schoolId]);
   await notify(audienceUsers.map((u) => u.id).filter((id) => id !== session.userId), "مادة تعليمية جديدة", title, { link: "/communication", type: "INFO" });
   return NextResponse.json({ id: matId, message: "نُشرت المادة" }, { status: 201 });
 }

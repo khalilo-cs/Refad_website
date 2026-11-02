@@ -25,18 +25,8 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   );
   if (!school) return NextResponse.json({ message: "المدرسة غير موجودة" }, { status: 404 });
 
-  const isParent = session.roleKey === "PARENT";
   const profile = await queryOne<any>("SELECT * FROM school_profiles WHERE school_id = ?", [id]);
   const tree = await loadTree();
-
-  // أولياء الأمور يرون المعلومات العامة فقط
-  if (isParent) {
-    return NextResponse.json({
-      school: { id: school.id, name: school.name, code: school.code, stage: school.stage, type: school.type,
-        directorate_name: school.directorate_name, governorate_name: school.governorate_name, contact_phone: school.contact_phone },
-      restricted: true,
-    });
-  }
 
   const visits = await query<any>(
     `SELECT v.id, v.type, v.status, v.completion, v.scheduled_at, v.started_at, v.ended_at, v.submitted_at,

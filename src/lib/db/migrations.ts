@@ -390,6 +390,69 @@ export const MIGRATIONS: Migration[] = [
       ALTER TABLE users ADD COLUMN deleted_at TEXT;
     `,
   },
+  {
+    id: 14,
+    name: "roles-governorate-supervisor-remove-parent-director",
+    sql: `
+      -- مسميات الأدوار المعتمدة
+      UPDATE roles SET name = 'مدير النظام' WHERE key = 'SUPER_ADMIN';
+      UPDATE roles SET name = 'منسق الجودة بالمدرسة',
+        description = 'إدارة أدلة الجودة في مدرسته ومراجعتها ومتابعة المؤشرات وخطط التطوير ونسب اكتمال الشواهد'
+        WHERE key = 'QUALITY_COORDINATOR';
+
+      -- مشرف المحافظة: اطلاع ومتابعة على كل المدارس بلا تعديل
+      INSERT INTO roles (id, key, name, description, scope, permissions, is_system, created_at)
+      SELECT lower(hex(randomblob(16))), 'GOVERNORATE_SUPERVISOR', 'مشرف المحافظة',
+        'الاطلاع والمتابعة على مستوى المحافظة: يرى المدارس ونتائجها والزيارات والتقارير وخطط التحسين والترتيب دون أي تعديل',
+        'governorate_read_only', '{"viewSchools":true,"trackIndicators":true,"viewAnalytics":true,"viewReports":true}', 1, datetime('now')
+      WHERE NOT EXISTS (SELECT 1 FROM roles WHERE key = 'GOVERNORATE_SUPERVISOR');
+
+      -- حسابات «مدير الإدارة» السابقة تتحول إلى مشرفي محافظة (اطلاع فقط) وتُبطل جلساتها
+      UPDATE users SET role_id = (SELECT id FROM roles WHERE key = 'GOVERNORATE_SUPERVISOR'),
+        token_version = token_version + 1, updated_at = datetime('now')
+        WHERE role_id IN (SELECT id FROM roles WHERE key = 'EDUCATION_DIRECTOR');
+
+      -- حسابات أولياء الأمور تُحذف حذفاً منطقياً: تختفي ويُمنع دخولها وتبقى سجلاتها
+      UPDATE users SET is_active = 0, deleted_at = COALESCE(deleted_at, datetime('now')), username = NULL,
+        email = 'deleted-' || id || '@deleted.invalid', token_version = token_version + 1,
+        role_id = COALESCE((SELECT id FROM roles WHERE key = 'GUEST'), role_id), updated_at = datetime('now')
+        WHERE role_id IN (SELECT id FROM roles WHERE key = 'PARENT');
+      UPDATE parents SET user_id = NULL WHERE user_id IS NOT NULL;
+
+      DELETE FROM roles WHERE key IN ('EDUCATION_DIRECTOR', 'PARENT') AND id NOT IN (SELECT role_id FROM users);
+
+      -- المفتش صار يرى المسند إليه فقط: من لا إسناد له يُسند إليه ما كان يراه (مدارس مديريته) ليعدّله مدير النظام لاحقاً
+      INSERT OR IGNORE INTO school_assignments (id, user_id, school_id, assigned_by_id)
+      SELECT lower(hex(randomblob(16))), u.id, s.id, NULL
+        FROM users u JOIN roles r ON r.id = u.role_id JOIN schools s ON s.directorate_id = u.directorate_id
+       WHERE r.key = 'INSPECTOR' AND u.deleted_at IS NULL AND u.directorate_id IS NOT NULL
+         AND NOT EXISTS (SELECT 1 FROM school_assignments a WHERE a.user_id = u.id);
+    `,
+  },
+  {
+    id: 15,
+    name: "purge-demo-data",
+    sql: `
+      -- النسخة النهائية: حذف المدارس التوضيحية وكل ما يتبعها (الزيارات والتقييمات والشواهد والخطط تُحذف تتابعياً)
+      DELETE FROM reports WHERE school_id IN (SELECT id FROM schools WHERE code LIKE 'RIFAD-DEMO-%')
+        OR visit_id IN (SELECT v.id FROM visits v JOIN schools s ON s.id = v.school_id WHERE s.code LIKE 'RIFAD-DEMO-%');
+      DELETE FROM conversations WHERE school_id IN (SELECT id FROM schools WHERE code LIKE 'RIFAD-DEMO-%');
+      DELETE FROM schools WHERE code LIKE 'RIFAD-DEMO-%';
+
+      -- الحسابات التوضيحية تُحذف حذفاً منطقياً، ويبقى حساب مدير النظام التوضيحي إن كان المدير الوحيد حتى لا يُغلق النظام
+      UPDATE users SET is_active = 0, deleted_at = COALESCE(deleted_at, datetime('now')), username = NULL,
+        email = 'deleted-' || id || '@deleted.invalid', token_version = token_version + 1, school_id = NULL, updated_at = datetime('now')
+      WHERE lower(email) LIKE '%@rifad.demo' AND deleted_at IS NULL
+        AND NOT (
+          role_id IN (SELECT id FROM roles WHERE key = 'SUPER_ADMIN')
+          AND NOT EXISTS (
+            SELECT 1 FROM users u2 JOIN roles r2 ON r2.id = u2.role_id
+             WHERE r2.key = 'SUPER_ADMIN' AND u2.is_active = 1 AND u2.deleted_at IS NULL AND lower(u2.email) NOT LIKE '%@rifad.demo'
+          )
+        );
+      DELETE FROM settings WHERE key = 'seeded.demo';
+    `,
+  },
 ];
 
 /** واجهة تنفيذ مستقلة عن المحرّك (SQLite محلي أو libSQL). */

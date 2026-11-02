@@ -3,7 +3,7 @@ import { getServerSession, auditLog } from "@/lib/auth";
 import { query, queryOne, uuid, nowISO, transaction , exec } from "@/lib/db/sqlite";
 import { clientIp, rateLimit } from "@/lib/security";
 import { notify } from "@/lib/notify";
-import { schoolScope } from "@/lib/scope";
+import { READ_ONLY_ROLES } from "@/lib/scope";
 import { allowedRecipients, KINDS } from "@/lib/conversations";
 
 export const runtime = "nodejs";
@@ -36,7 +36,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const session = await getServerSession();
   if (!session) return bad("غير مصدق", 401);
-  if (session.roleKey === "GUEST") return bad("غير مصرح", 403);
+  if (session.roleKey === "GUEST" || READ_ONLY_ROLES.includes(session.roleKey)) return bad("غير مصرح", 403);
   const rl = rateLimit(`msg:${session.userId}`, 60, 10 * 60_000);
   if (!rl.ok) return bad("عدد كبير من الرسائل. حاول لاحقاً.", 429);
   const b: any = await request.json().catch(() => null);
@@ -55,14 +55,12 @@ export async function POST(request: NextRequest) {
   // الأدوار الإدارية: ما لم يُحدَّد مستلمون يُراسَل مدير المدرسة ومنسق الجودة
   if (recipients.length === 0 && ["SUPER_ADMIN", "INSPECTOR"].includes(session.roleKey))
     recipients = allowed.filter((u) => ["SCHOOL_PRINCIPAL", "QUALITY_COORDINATOR"].includes(u.roleKey)).map((u) => u.id);
-  // الأدوار المدرسية: ما لم يُحدَّد مستلمون تُوجَّه المراسلة إلى الإدارة (استفسار)، وولي الأمر إلى مدير المدرسة
-  if (recipients.length === 0 && session.roleKey !== "PARENT") recipients = allowed.filter((u) => u.roleKey === "INSPECTOR").map((u) => u.id);
-  if (session.roleKey === "PARENT") recipients = allowed.map((u) => u.id);
+  // الأدوار المدرسية: ما لم يُحدَّد مستلمون تُوجَّه المراسلة إلى المفتش المسند (استفسار)
+  if (recipients.length === 0) recipients = allowed.filter((u) => u.roleKey === "INSPECTOR").map((u) => u.id);
   if (recipients.length === 0) return bad("لا يوجد مستلمون مسموحون لهذه المراسلة", 403);
 
-  const hasParent = recipients.some((id) => allowed.find((u) => u.id === id)?.roleKey === "PARENT");
   let kind = String(b.kind ?? "");
-  if (!KINDS[kind]) kind = session.roleKey === "PARENT" || hasParent ? "PARENT_CHANNEL" : ["SUPER_ADMIN", "INSPECTOR"].includes(session.roleKey) ? "OFFICIAL" : "INQUIRY";
+  if (!KINDS[kind]) kind = ["SUPER_ADMIN", "INSPECTOR"].includes(session.roleKey) ? "OFFICIAL" : "INQUIRY";
   if (kind === "OFFICIAL" && !["SUPER_ADMIN", "INSPECTOR"].includes(session.roleKey)) kind = "INQUIRY";
   const id = uuid();
   const now = nowISO();

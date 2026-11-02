@@ -15,6 +15,7 @@ const STATUS_AR: Record<string, string> = { DRAFT: "مسودة", UNDER_REVIEW: "
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getServerSession();
   if (!session) return NextResponse.json({ message: "غير مصدق" }, { status: 401 });
+  if (["GUEST", "TEACHER"].includes(session.roleKey)) return NextResponse.json({ message: "غير مصرح" }, { status: 403 });
   const rl = rateLimit(`export:${session.userId}`, 30, 10 * 60_000);
   if (!rl.ok) return NextResponse.json({ message: "عدد كبير من عمليات التصدير. حاول لاحقاً." }, { status: 429 });
 

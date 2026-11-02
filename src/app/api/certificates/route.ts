@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auditLog, getServerSession } from "@/lib/auth";
 import { exec, query, toJson, uuid, nowISO } from "@/lib/db/sqlite";
 import { certificateCode, draftCertificate } from "@/lib/certificates";
-import { canReview, normalizeYear } from "@/lib/self-assessment";
+import { canReview, canView, normalizeYear } from "@/lib/self-assessment";
 import { notify, schoolUsers } from "@/lib/notify";
 import { clientIp } from "@/lib/security";
 
@@ -18,7 +18,8 @@ export async function GET(request: NextRequest) {
   if (!session) return bad("غير مصادق", 401);
   const sp = request.nextUrl.searchParams;
   const schoolId = sp.get("schoolId") ?? "";
-  if (!schoolId || !(await canReview(session, schoolId))) return bad("غير مصرح", 403);
+  const viewer = session.roleKey === "GOVERNORATE_SUPERVISOR" && (await canView(session, schoolId));
+  if (!schoolId || !(viewer || (await canReview(session, schoolId)))) return bad("غير مصرح", 403);
   const year = normalizeYear(sp.get("year"));
   const draft = await draftCertificate(schoolId, year);
   const issued = await query<any>(

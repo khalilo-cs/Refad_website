@@ -8,9 +8,9 @@ import { arr, targets, userTargets } from "@/lib/announcements";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const READ_ROLES = ["SUPER_ADMIN", "INSPECTOR", "SCHOOL_PRINCIPAL", "QUALITY_COORDINATOR", "TEACHER", "PARENT"];
+const READ_ROLES = ["SUPER_ADMIN", "GOVERNORATE_SUPERVISOR", "INSPECTOR", "SCHOOL_PRINCIPAL", "QUALITY_COORDINATOR", "TEACHER"];
 const WRITE_ROLES = ["SUPER_ADMIN", "SCHOOL_PRINCIPAL"];
-const SCHOOL_AUDIENCE = ["TEACHER", "PARENT", "QUALITY_COORDINATOR"];
+const SCHOOL_AUDIENCE = ["TEACHER", "QUALITY_COORDINATOR"];
 
 const bad = (message: string, status = 400) => NextResponse.json({ message }, { status });
 /** GET /api/announcements — المنشورة الموجَّهة للمستخدم، والمسودات لصاحبها ومدير المنصة فقط. */
@@ -33,6 +33,7 @@ export async function GET() {
       if (session.roleKey === "SUPER_ADMIN") return true;
       if (r.created_by_id === session.userId) return true;
       if (!r.published_at) return false; // المسودة لا يراها غير صاحبها
+      if (session.roleKey === "GOVERNORATE_SUPERVISOR") return true; // مشرف المحافظة يطّلع على كل المنشور
       return targets(r, session.roleKey, t);
     })
     .map((r) => ({ ...r, read_count: r.created_by_id === session.userId || session.roleKey === "SUPER_ADMIN" ? r.read_count : undefined }));

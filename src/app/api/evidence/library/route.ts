@@ -24,7 +24,7 @@ const MANAGERS = ["SUPER_ADMIN", "QUALITY_COORDINATOR"];
 export async function GET(request: NextRequest) {
   const session = await getServerSession();
   if (!session) return NextResponse.json({ message: "غير مصدق" }, { status: 401 });
-  if (["PARENT", "GUEST"].includes(session.roleKey)) return NextResponse.json({ message: "غير مصرح" }, { status: 403 });
+  if (session.roleKey === "GUEST") return NextResponse.json({ message: "غير مصرح" }, { status: 403 });
   await ensureSeeded();
   const schoolId = request.nextUrl.searchParams.get("schoolId") || session.schoolId;
   if (schoolId && !await canAccessSchool(session, schoolId)) return NextResponse.json({ message: "خارج نطاق صلاحيتك" }, { status: 403 });
@@ -71,6 +71,9 @@ export async function PATCH(request: NextRequest) {
   const b = await request.json().catch(() => ({}));
   const row = await queryOne<any>("SELECT * FROM evidence_library_items WHERE id = ?", [String(b?.id ?? "")]);
   if (!row) return NextResponse.json({ message: "العنصر غير موجود" }, { status: 404 });
+  // المكتبة مشتركة بين كل المدارس: غير مدير النظام يعدّل ما أضافه هو فقط
+  if (session.roleKey !== "SUPER_ADMIN" && session.permissions?.all !== true && row.created_by_id !== session.userId)
+    return NextResponse.json({ message: "تعديل هذا العنصر من صلاحيات مدير النظام" }, { status: 403 });
   await exec("UPDATE evidence_library_items SET title = ?, description = ?, indicator_codes = ?, is_active = ? WHERE id = ?", [
     b.title ? String(b.title).slice(0, 200) : row.title,
     b.description !== undefined ? String(b.description).slice(0, 500) : row.description,

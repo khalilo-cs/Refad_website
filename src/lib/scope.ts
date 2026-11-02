@@ -20,38 +20,19 @@ const NONE: Clause = { sql: "1 = 0", params: [] };
 export async function schoolScope(user: ScopeUser, alias = "s"): Promise<Clause> {
   switch (user.roleKey) {
     case "SUPER_ADMIN":
+    case "GOVERNORATE_SUPERVISOR":
       return { sql: "1 = 1", params: [] };
-    case "INSPECTOR": {
-      const assigned = (await queryOne<{ n: number }>(
-        "SELECT COUNT(*) n FROM school_assignments WHERE user_id = ?",
-        [user.userId]
-      ))?.n ?? 0;
-      const parts = [
-        `${alias}.id IN (SELECT school_id FROM school_assignments WHERE user_id = ?)`,
-        `${alias}.id IN (SELECT school_id FROM visits WHERE inspector_id = ?)`,
-      ];
-      const params: unknown[] = [user.userId, user.userId];
-      // عند غياب أي إسناد صريح يرى المفتش مدارس مديريته
-      if (assigned === 0 && user.directorateId) {
-        parts.push(`${alias}.directorate_id = ?`);
-        params.push(user.directorateId);
-      }
-      return { sql: `(${parts.join(" OR ")})`, params };
-    }
+    case "INSPECTOR":
+      // المفتش يرى فقط المدارس التي أسندها إليه مدير النظام، ومدارس زياراته.
+      return {
+        sql: `(${alias}.id IN (SELECT school_id FROM school_assignments WHERE user_id = ?) OR ${alias}.id IN (SELECT school_id FROM visits WHERE inspector_id = ?))`,
+        params: [user.userId, user.userId],
+      };
     case "SCHOOL_PRINCIPAL":
     case "QUALITY_COORDINATOR":
     case "TEACHER":
       if (!user.schoolId) return NONE;
       return { sql: `${alias}.id = ?`, params: [user.schoolId] };
-    case "PARENT":
-      return {
-        sql: `${alias}.id IN (
-          SELECT st.school_id FROM students st
-          JOIN parent_student ps ON ps.student_id = st.id
-          JOIN parents p ON p.id = ps.parent_id
-          WHERE p.user_id = ?)`,
-        params: [user.userId],
-      };
     default:
       return NONE;
   }
@@ -83,3 +64,7 @@ export async function canAccessVisit(user: ScopeUser, visitId: string): Promise<
 export const EVALUATOR_ROLES = ["SUPER_ADMIN", "INSPECTOR"];
 /** الأدوار التي ترى كل شيء ضمن مدرستها (مدرسة). */
 export const SCHOOL_STAFF_ROLES = ["SCHOOL_PRINCIPAL", "QUALITY_COORDINATOR"];
+/** مشرفو المحافظة: يطّلعون على كل المدارس ولا يعدّلون شيئاً (يُفرض ذلك أيضاً في الوسيط). */
+export const READ_ONLY_ROLES = ["GOVERNORATE_SUPERVISOR"];
+/** من يرى لوحات المتابعة والتقارير على مستوى كل المدارس. */
+export const OVERSIGHT_ROLES = ["SUPER_ADMIN", "GOVERNORATE_SUPERVISOR"];

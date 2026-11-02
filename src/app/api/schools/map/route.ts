@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   const session = await getServerSession();
   if (!session) return NextResponse.json({ message: "غير مصدق" }, { status: 401 });
-  if (["PARENT", "GUEST", "TEACHER"].includes(session.roleKey)) return NextResponse.json({ message: "غير مصرح" }, { status: 403 });
+  if (["GUEST", "TEACHER"].includes(session.roleKey)) return NextResponse.json({ message: "غير مصرح" }, { status: 403 });
   const sc = await schoolScope(session, "s");
   const schools = await query<any>(
     `SELECT s.id, s.code, s.name, s.stage, s.type, s.latitude, s.longitude, s.status, d.id AS directorate_id, d.name AS directorate

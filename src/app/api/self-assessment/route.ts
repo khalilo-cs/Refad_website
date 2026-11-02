@@ -3,7 +3,7 @@ import { z } from "zod";
 import { getServerSession } from "@/lib/auth";
 import { exec, nowISO, query, queryOne, uuid } from "@/lib/db/sqlite";
 import {
-  buildTree, canFill, canView, currentAcademicYear, getAssessment, getOrCreateAssessment, isWeakScore, logEvent, normalizeYear,
+  buildTree, canFill, canReview, canView, currentAcademicYear, getAssessment, getOrCreateAssessment, isWeakScore, logEvent, normalizeYear,
   notifyReviewers, submitBlockers, VERIFICATION_METHODS,
 } from "@/lib/self-assessment";
 
@@ -42,7 +42,7 @@ export async function GET(request: NextRequest) {
   return NextResponse.json({
     school, year, years,
     assessment: assessment ? { id: assessment.id, status: assessment.status, submittedAt: assessment.submitted_at } : null,
-    canFill: fill, canReview: !fill,
+    canFill: fill, canReview: !fill && (await canReview(session, schoolId)),
     locked: assessment?.status === "SUBMITTED",
     scale, maxScore, criteria, summary, blockers: submitBlockers(summary),
     previous: previous ? { year: previous.year, percent: previous.percent, weak: previous.weak, verified: previous.verified, rated: previous.rated } : null,

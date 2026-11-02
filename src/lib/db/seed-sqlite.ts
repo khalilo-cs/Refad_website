@@ -43,9 +43,22 @@ export async function seedDatabase(opts: SeedOptions = {}): Promise<{ demoPasswo
       key: "SUPER_ADMIN",
       name: "مدير النظام",
       description:
-        "إدارة الحسابات والأدوار والمديريات والمدارس والمعايير والأوزان والإعدادات وسجلات التدقيق",
+        "رئاسة قسم الجودة والاعتماد المدرسي: إدارة الحسابات والأدوار، واختيار المفتشين ومشرفي المحافظة وإسناد المدارس، والمعايير والإعدادات، واعتماد الزيارات والتقارير والشهادات، وسجلات التدقيق",
       scope: "system",
       permissions: { all: true },
+    },
+    {
+      key: "GOVERNORATE_SUPERVISOR",
+      name: "مشرف المحافظة",
+      description:
+        "الاطلاع والمتابعة على مستوى المحافظة: يرى المدارس ونتائجها والزيارات والتقارير وخطط التحسين والترتيب دون أي تعديل",
+      scope: "governorate_read_only",
+      permissions: {
+        viewSchools: true,
+        trackIndicators: true,
+        viewAnalytics: true,
+        viewReports: true,
+      },
     },
     {
       key: "INSPECTOR",
@@ -78,9 +91,9 @@ export async function seedDatabase(opts: SeedOptions = {}): Promise<{ demoPasswo
     },
     {
       key: "QUALITY_COORDINATOR",
-      name: "مديرة قسم الجودة",
+      name: "منسق الجودة بالمدرسة",
       description:
-        "إدارة أدلة الجودة ومراجعتها ومتابعة المؤشرات وخطط التطوير ونسب اكتمال الشواهد",
+        "إدارة أدلة الجودة في مدرسته ومراجعتها ومتابعة المؤشرات وخطط التطوير ونسب اكتمال الشواهد",
       scope: "own_school",
       permissions: {
         manageEvidenceLibrary: true,
@@ -99,17 +112,6 @@ export async function seedDatabase(opts: SeedOptions = {}): Promise<{ demoPasswo
         viewOwnData: true,
         uploadAchievementFiles: true,
         viewFeedback: true,
-      },
-    },
-    {
-      key: "PARENT",
-      name: "ولي الأمر",
-      description:
-        "الاطلاع الآمن على بيانات أبنائه المصرح بها فقط، والتواصل مع المدرسة",
-      scope: "personal",
-      permissions: {
-        viewChildren: true,
-        communicateWithSchool: true,
       },
     },
     {
@@ -337,7 +339,7 @@ export async function seedDatabase(opts: SeedOptions = {}): Promise<{ demoPasswo
     },
     {
       key: "QUALITY_COORDINATOR",
-      name: "منسق جودة تجريبي",
+      name: "منسق الجودة التجريبي",
       email: "quality@rifad.demo",
       directorateId: null,
       schoolId,
@@ -350,9 +352,9 @@ export async function seedDatabase(opts: SeedOptions = {}): Promise<{ demoPasswo
       schoolId,
     },
     {
-      key: "PARENT",
-      name: "ولي أمر تجريبي",
-      email: "parent@rifad.demo",
+      key: "GOVERNORATE_SUPERVISOR",
+      name: "مشرف محافظة تجريبي",
+      email: "supervisor@rifad.demo",
       directorateId: null,
       schoolId: null,
     },
@@ -448,16 +450,6 @@ export async function seedDatabase(opts: SeedOptions = {}): Promise<{ demoPasswo
              responsible_id, due_date, success_indicator, status) VALUES (?,?,?,?,?,?,?,?,?,?,?)`, params: [uuid(), planId, w.eid, w.id, "قصور مكتشف في الزيارة التوضيحية", i === 0 ? "HIGH" : "MEDIUM",
           "إجراء تصحيحي توضيحي", principalId, iso(i === 0 ? -5 : 14).slice(0, 10), "رفع دليل جديد يثبت المعالجة", "IN_PROGRESS"] })));
     }
-  }
-
-  // طالب وولي أمر توضيحيان لربط حساب ولي الأمر (بيانات وهمية)
-  const parentUserId = createdUserIds["PARENT"];
-  if (parentUserId) {
-    const studentId = uuid();
-    const parentId = uuid();
-    await exec("INSERT INTO students (id, school_id, name, grade, section) VALUES (?,?,?,?,?)", [studentId, schoolId, "طالب توضيحي", "الصف الخامس", "أ"]);
-    await exec("INSERT INTO parents (id, name, user_id) VALUES (?,?,?)", [parentId, "ولي أمر تجريبي", parentUserId]);
-    await exec("INSERT INTO parent_student (id, parent_id, student_id) VALUES (?,?,?)", [uuid(), parentId, studentId]);
   }
 
   console.log("تم بذر البيانات الأولية والبيانات التوضيحية لقاعدة بيانات SQLite.");

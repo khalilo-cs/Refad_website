@@ -1,26 +1,31 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { clearAuthCookies, auditLog } from "@/lib/auth";
+import { clearAuthCookies, auditLog, verifyAccessToken, verifyRefreshToken } from "@/lib/auth";
+import { exec } from "@/lib/db/sqlite";
+import { clientIp } from "@/lib/security";
 
 export const runtime = "nodejs";
 
 export async function POST(request: NextRequest) {
   const store = await cookies();
-  const token = store.get("access_token")?.value;
-  try {
-    if (token) {
-      const payload = JSON.parse(Buffer.from(token.split(".")[1], "base64url").toString("utf8"));
+  const access = store.get("access_token")?.value;
+  const refresh = store.get("refresh_token")?.value;
+  // هوية موثّقة بالتوقيع فقط؛ إبطال كل الرموز حتى لا يصلح رمز مسروق بعد الخروج.
+  const userId = (access && verifyAccessToken(access)?.userId) || (refresh && verifyRefreshToken(refresh)?.userId) || null;
+  if (userId) {
+    try {
+      await exec("UPDATE users SET token_version = token_version + 1 WHERE id = ?", [userId]);
       await auditLog({
-        userId: payload.userId,
+        userId,
         action: "LOGOUT",
         entityType: "User",
-        entityId: payload.userId,
-        ipAddress: request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null,
+        entityId: userId,
+        ipAddress: clientIp(request),
         userAgent: request.headers.get("user-agent") ?? null,
       });
+    } catch {
+      // الخروج يكتمل بمسح الملفات حتى لو تعذّر التسجيل
     }
-  } catch {
-    // يُتجاهل خطأ فك التشفير عند تسجيل الخروج
   }
   await clearAuthCookies();
   return NextResponse.json({ message: "تم تسجيل الخروج بنجاح" });

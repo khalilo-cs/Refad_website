@@ -11,6 +11,7 @@ export const dynamic = "force-dynamic";
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getServerSession();
   if (!session) return NextResponse.json({ message: "غير مصادق" }, { status: 401 });
+  if (["GUEST", "TEACHER"].includes(session.roleKey)) return NextResponse.json({ message: "غير مصرح" }, { status: 403 });
   const { id } = await params;
   const row = await getReportRow(session, id);
   if (!row) return NextResponse.json({ message: "التقرير غير موجود" }, { status: 404 });

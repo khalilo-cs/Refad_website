@@ -6,7 +6,7 @@ import { clientIp } from "@/lib/security";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const ROLES = ["SUPER_ADMIN", "INSPECTOR"];
+const ROLES = ["SUPER_ADMIN", "GOVERNORATE_SUPERVISOR", "INSPECTOR"];
 
 /** GET /api/rankings[?directorateId=&format=csv] — ترتيب المدارس وفئات التكريم ضمن نطاق المستخدم. */
 export async function GET(request: NextRequest) {

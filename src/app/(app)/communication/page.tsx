@@ -18,22 +18,25 @@ export default function CommunicationPage() {
 
 function Inner() {
   const { user } = useSession();
-  const [tab, setTab] = useState<Tab>("messages");
+  const readOnly = user?.roleKey === "GOVERNORATE_SUPERVISOR";
+  const [tab, setTab] = useState<Tab>(readOnly ? "announcements" : "messages");
   const staff = !!user && ["SUPER_ADMIN", "INSPECTOR", "SCHOOL_PRINCIPAL", "QUALITY_COORDINATOR"].includes(user.roleKey);
-  const tabs: { key: Tab; label: string }[] = [
-    { key: "messages", label: "المراسلات" },
-    { key: "announcements", label: "الإعلانات والتعميمات" },
-    ...(staff ? [{ key: "meetings" as Tab, label: "الاجتماعات والمتابعات" }] : []),
-    { key: "materials", label: "المواد التعليمية" },
-  ];
+  const tabs: { key: Tab; label: string }[] = readOnly
+    ? [{ key: "announcements", label: "الإعلانات والتعميمات" }]
+    : [
+        { key: "messages", label: "المراسلات" },
+        { key: "announcements", label: "الإعلانات والتعميمات" },
+        ...(staff ? [{ key: "meetings" as Tab, label: "الاجتماعات والمتابعات" }] : []),
+        { key: "materials", label: "المواد التعليمية" },
+      ];
   return (
     <div className="space-y-5">
-      <PageHeader icon={Mail} title="مركز التواصل" subtitle="مراسلات رسمية وقناة آمنة مع أولياء الأمور، إعلانات وتعاميم، سجل اجتماعات، ومواد تعليمية مشتركة — لكل مدرسة مساحة خاصة." />
+      <PageHeader icon={Mail} title="مركز التواصل" subtitle="مراسلات رسمية بين الإدارة والمدارس، إعلانات وتعاميم، سجل اجتماعات، ومواد تعليمية مشتركة — لكل مدرسة مساحة خاصة." />
       <Tabs<Tab> tabs={tabs} value={tab} onChange={setTab} />
-      {tab === "messages" && <MessagesPanel />}
+      {tab === "messages" && !readOnly && <MessagesPanel />}
       {tab === "announcements" && <AnnouncementsPanel />}
       {tab === "meetings" && staff && <MeetingsPanel />}
-      {tab === "materials" && <MaterialsPanel />}
+      {tab === "materials" && !readOnly && <MaterialsPanel />}
     </div>
   );
 }

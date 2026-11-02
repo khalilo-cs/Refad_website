@@ -35,7 +35,7 @@ export async function GET(request: NextRequest) {
   const session = await getServerSession();
   if (!session) return NextResponse.json({ message: "غير مصدق" }, { status: 401 });
   const { allowed } = authorize(session, {
-    roles: ["SUPER_ADMIN", "INSPECTOR", "SCHOOL_PRINCIPAL", "QUALITY_COORDINATOR", "TEACHER", "PARENT"],
+    roles: ["SUPER_ADMIN", "GOVERNORATE_SUPERVISOR", "INSPECTOR", "SCHOOL_PRINCIPAL", "QUALITY_COORDINATOR", "TEACHER"],
   });
   if (!allowed) return NextResponse.json({ message: "غير مصرح" }, { status: 403 });
 

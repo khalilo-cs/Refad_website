@@ -30,12 +30,10 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     if (!session) return NextResponse.json({ message: "غير مصدق" }, { status: 401 });
     const su: ScopeUser = session;
     if (!await canAccessSchool(su, row.school_id)) return NextResponse.json({ message: "لا تملك صلاحية الوصول إلى هذا الملف" }, { status: 403 });
-    // المواد التعليمية المشتركة متاحة لمعلمي المدرسة وأولياء أمورها؛ غيرها لصاحبها فقط (المعلم) أو مرفوض (ولي الأمر)
+    // المواد التعليمية المشتركة متاحة لمعلمي المدرسة؛ غيرها لصاحبها فقط (المعلم)
     const sharedMat = await queryOne<{ audience: string }>("SELECT audience FROM shared_materials WHERE evidence_id = ?", [id]);
     if (session.roleKey === "TEACHER" && row.uploaded_by_id !== session.userId && !sharedMat)
       return NextResponse.json({ message: "لا تملك صلاحية الوصول إلى هذا الملف" }, { status: 403 });
-    if (session.roleKey === "PARENT" && !sharedMat)
-      return NextResponse.json({ message: "غير مصرح" }, { status: 403 });
     userId = session.userId;
   }
   if (!row.can_download && !sp.get("inline")) {

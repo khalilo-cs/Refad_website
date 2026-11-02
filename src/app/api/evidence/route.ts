@@ -36,7 +36,7 @@ function bad(message: string, status = 400) {
 export async function GET(request: Request) {
   const session = await getServerSession();
   if (!session) return bad("غير مصدق", 401);
-  const { allowed } = authorize(session, { roles: UPLOAD_ROLES });
+  const { allowed } = authorize(session, { roles: [...UPLOAD_ROLES, "GOVERNORATE_SUPERVISOR"] });
   if (!allowed) return bad("غير مصرح", 403);
 
   const sp = new URL(request.url).searchParams;
@@ -127,6 +127,8 @@ export async function POST(request: Request) {
   if (replaceId) {
     replacing = await queryOne<any>("SELECT * FROM evidence WHERE id = ?", [replaceId]);
     if (!replacing) return bad("الدليل المراد استبداله غير موجود", 404);
+    // لا يستبدل ملف شخص آخر إلا مدير النظام
+    if (replacing.uploaded_by_id !== session.userId && session.roleKey !== "SUPER_ADMIN") return bad("لا يمكنك استبدال ملف رفعه مستخدم آخر", 403);
     schoolId = replacing.school_id;
   }
   if (!schoolId) return bad("يجب تحديد المدرسة");
@@ -149,6 +151,10 @@ export async function POST(request: Request) {
     if (!v || v.school_id !== schoolId) return bad("الزيارة لا تخص هذه المدرسة");
   }
   if (indicatorId && !await queryOne("SELECT id FROM indicators WHERE id = ?", [indicatorId])) return bad("المؤشر غير موجود", 404);
+  // كل ربط يجب أن يخص المدرسة نفسها، فلا يُرفق دليل بإجراء أو تقييم مدرسة أخرى
+  if (evaluationId && !await queryOne("SELECT e.id FROM evaluations e JOIN visits v ON v.id = e.visit_id WHERE e.id = ? AND v.school_id = ?", [evaluationId, schoolId])) return bad("التقييم لا يخص هذه المدرسة");
+  if (actionId && !await queryOne("SELECT a.id FROM corrective_actions a JOIN improvement_plans p ON p.id = a.plan_id WHERE a.id = ? AND p.school_id = ?", [actionId, schoolId])) return bad("الإجراء التصحيحي لا يخص هذه المدرسة");
+  if (subCriterionId && !await queryOne("SELECT id FROM sub_criteria WHERE id = ?", [subCriterionId])) return bad("المعيار الفرعي غير موجود", 404);
   if (visitId && indicatorId && !evaluationId) {
     evaluationId = (await queryOne<{ id: string }>("SELECT id FROM evaluations WHERE visit_id = ? AND indicator_id = ?", [visitId, indicatorId]))?.id ?? null;
   }
@@ -213,7 +219,7 @@ export async function PATCH(request: Request) {
   const session = await getServerSession();
   if (!session) return bad("غير مصدق", 401);
   const { allowed } = authorize(session, { roles: REVIEW_ROLES, permission: "reviewEvidence" });
-  if (!allowed) return bad("مراجعة الأدلة متاحة للمفتش ومديرة قسم الجودة", 403);
+  if (!allowed) return bad("مراجعة الأدلة متاحة لمدير النظام والمفتش ومنسق الجودة بالمدرسة", 403);
 
   let body: any;
   try { body = await request.json(); } catch { return bad("صيغة الطلب غير صحيحة"); }

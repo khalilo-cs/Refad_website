@@ -44,7 +44,7 @@ export async function createReport(actor: Actor, p: CreateParams): Promise<{ id:
 
   let content: ReportContent;
   let schoolId: string | null = null;
-  let directorateId: string | null = p.directorateId ?? null;
+  const directorateId: string | null = p.directorateId ?? null;
   let visitId: string | null = null;
   let from = p.from ?? null, to = p.to ?? null;
 
@@ -113,7 +113,7 @@ export async function createReport(actor: Actor, p: CreateParams): Promise<{ id:
 
 /** شرط رؤية التقارير لمستخدم. */
 export async function reportScope(actor: Actor): Promise<{ sql: string; params: unknown[] }> {
-  if (actor.roleKey === "SUPER_ADMIN") return { sql: "1 = 1", params: [] };
+  if (actor.roleKey === "SUPER_ADMIN" || actor.roleKey === "GOVERNORATE_SUPERVISOR") return { sql: "1 = 1", params: [] };
   const sc = await schoolScope(actor, "rs");
   let sql = `(r.generated_by_id = ? OR (r.school_id IS NOT NULL AND r.school_id IN (SELECT rs.id FROM schools rs WHERE ${sc.sql}`;
   const params: unknown[] = [actor.userId, ...sc.params];

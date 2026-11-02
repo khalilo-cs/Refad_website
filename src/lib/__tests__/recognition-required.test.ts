@@ -97,8 +97,10 @@ describe("المؤشرات التي تستوجب خطة تحسين", () => {
     expect(after.body.total).toBe(before.body.total - 1);
   });
 
-  it("ولي الأمر لا يصل إلى القائمة", async () => {
-    await as(EMAILS.parent);
+  it("المعلم لا يصل إلى القائمة، ومشرف المحافظة يطّلع عليها", async () => {
+    await as(EMAILS.supervisor);
+    expect((await required.GET(req("/api/improvement/required"))).status).toBe(200);
+    await as(EMAILS.teacher);
     expect((await required.GET(req("/api/improvement/required"))).status).toBe(403);
   });
 

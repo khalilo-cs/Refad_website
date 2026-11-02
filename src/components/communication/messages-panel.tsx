@@ -7,7 +7,7 @@ import { EmptyState, Modal } from "@/components/ui";
 import { useSession, useToast } from "@/components/providers";
 import { fmtDate } from "@/lib/labels";
 
-const KIND_LABEL: Record<string, string> = { OFFICIAL: "رسمية", INQUIRY: "استفسار", PARENT_CHANNEL: "أولياء الأمور", GENERAL: "عامة" };
+const KIND_LABEL: Record<string, string> = { OFFICIAL: "رسمية", INQUIRY: "استفسار", PARENT_CHANNEL: "عامة", GENERAL: "عامة" };
 const KIND_TONE: Record<string, string> = { OFFICIAL: "badge-gold", INQUIRY: "badge-info", PARENT_CHANNEL: "badge-success", GENERAL: "badge-neutral" };
 
 export default function MessagesPanel() {
@@ -26,13 +26,13 @@ export default function MessagesPanel() {
   }, [kind, add]);
   useEffect(() => { void load(); const t = setInterval(load, 30_000); return () => clearInterval(t); }, [load]);
 
-  const canCompose = !!user && user.roleKey !== "GUEST";
+  const canCompose = !!user && !["GUEST", "GOVERNORATE_SUPERVISOR"].includes(user.roleKey);
   return (
     <div className="grid gap-4 lg:grid-cols-[340px_1fr]">
       <aside className="card flex max-h-[640px] flex-col overflow-hidden lg:order-2">
         <div className="flex items-center justify-between border-b border-gray-100 p-3">
           <div className="flex flex-wrap gap-1.5">
-            {[["", "الكل"], ["OFFICIAL", "رسمية"], ["INQUIRY", "استفسارات"], ["PARENT_CHANNEL", "أولياء الأمور"]].map(([k, l]) => (
+            {[["", "الكل"], ["OFFICIAL", "رسمية"], ["INQUIRY", "استفسارات"], ["GENERAL", "عامة"]].map(([k, l]) => (
               <button key={k} onClick={() => setKind(k)} className={`rounded-full border px-2.5 py-1 text-[11.5px] font-semibold transition ${kind === k ? "border-navy bg-navy text-white" : "border-gray-200 text-gray-600 hover:border-navy/40"}`}>{l}</button>
             ))}
           </div>
@@ -177,7 +177,6 @@ function ComposeModal({ open, onClose, onSent }: { open: boolean; onClose: () =>
       onSent(d.id);
     } catch (e: any) { add({ type: "error", message: e.message }); } finally { setBusy(false); }
   };
-  const isParent = user?.roleKey === "PARENT";
   const adminRole = ["SUPER_ADMIN", "INSPECTOR"].includes(user?.roleKey ?? "");
 
   return (
@@ -185,10 +184,10 @@ function ComposeModal({ open, onClose, onSent }: { open: boolean; onClose: () =>
       <div className="space-y-3">
         <div className="grid gap-3 sm:grid-cols-2">
           <div><label className="label">المدرسة</label><select className="input" value={f.schoolId ?? ""} onChange={(e) => setF({ ...f, schoolId: e.target.value, recipientIds: [] })}><option value="">اختر…</option>{schools.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</select></div>
-          <div><label className="label">نوع المراسلة</label><select className="input" value={f.kind ?? ""} onChange={(e) => setF({ ...f, kind: e.target.value })}><option value="">تلقائي</option>{adminRole && <option value="OFFICIAL">مراسلة رسمية</option>}<option value="INQUIRY">استفسار / رد</option><option value="PARENT_CHANNEL">قناة أولياء الأمور</option><option value="GENERAL">عام</option></select></div>
+          <div><label className="label">نوع المراسلة</label><select className="input" value={f.kind ?? ""} onChange={(e) => setF({ ...f, kind: e.target.value })}><option value="">تلقائي</option>{adminRole && <option value="OFFICIAL">مراسلة رسمية</option>}<option value="INQUIRY">استفسار / رد</option><option value="GENERAL">عام</option></select></div>
         </div>
-        {f.schoolId && !isParent && (
-          <div><label className="label">المستلمون {adminRole ? "(الافتراضي: مدير المدرسة ومديرة قسم الجودة)" : "(الافتراضي: الإدارة التعليمية)"}</label>
+        {f.schoolId && (
+          <div><label className="label">المستلمون {adminRole ? "(الافتراضي: مدير المدرسة ومنسق الجودة)" : "(الافتراضي: المفتش المسند لمدرستك)"}</label>
             <div className="max-h-40 space-y-1 overflow-y-auto rounded-xl border border-gray-200 p-2">
               {recipients.length === 0 && <p className="p-2 text-[12.5px] text-gray-400">لا مستلمين متاحين.</p>}
               {recipients.map((u) => (
@@ -197,7 +196,6 @@ function ComposeModal({ open, onClose, onSent }: { open: boolean; onClose: () =>
             </div>
           </div>
         )}
-        {isParent && f.schoolId && <p className="rounded-xl bg-turquoise-soft/50 px-3 py-2 text-[12.5px] text-emerald-deep">ستصل رسالتك إلى إدارة المدرسة فقط.</p>}
         <div><label className="label">العنوان</label><input className="input" maxLength={200} value={f.title ?? ""} onChange={(e) => setF({ ...f, title: e.target.value })} /></div>
         <div><label className="label">الرسالة</label><textarea className="input min-h-[110px]" maxLength={4000} value={f.body ?? ""} onChange={(e) => setF({ ...f, body: e.target.value })} /></div>
         <div className="flex justify-end gap-2 border-t border-gray-100 pt-3"><button className="btn btn-ghost btn-sm" onClick={onClose}>إلغاء</button><button className="btn btn-primary btn-sm" disabled={busy || !f.schoolId || (f.title ?? "").trim().length < 3 || !(f.body ?? "").trim()} onClick={submit}>{busy && <Loader2 className="h-3.5 w-3.5 animate-spin" />} إرسال</button></div>

@@ -44,7 +44,7 @@ export default function DashboardPage() {
   const [dirs, setDirs] = useState<any[]>([]);
   const [schools, setSchools] = useState<any[]>([]);
 
-  const staff = !!user && !["PARENT", "TEACHER", "GUEST"].includes(user.roleKey);
+  const staff = !!user && !["TEACHER", "GUEST"].includes(user.roleKey);
   const see = (href: string) => canSeeHref(user?.roleKey, (user as any)?.permissions, href);
 
   const load = useCallback(async (f: Filters) => {

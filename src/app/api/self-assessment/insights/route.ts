@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "@/lib/auth";
 import { query } from "@/lib/db/sqlite";
 import { schoolScope } from "@/lib/scope";
-import { normalizeYear, REVIEWER_ROLES, WEAK_MAX_SCORE } from "@/lib/self-assessment";
+import { normalizeYear, VIEWER_ROLES, WEAK_MAX_SCORE } from "@/lib/self-assessment";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -14,7 +14,7 @@ export const dynamic = "force-dynamic";
 export async function GET(request: NextRequest) {
   const session = await getServerSession();
   if (!session) return NextResponse.json({ message: "غير مصادق" }, { status: 401 });
-  if (!REVIEWER_ROLES.includes(session.roleKey) || session.mustChangePassword) return NextResponse.json({ message: "غير مصرح" }, { status: 403 });
+  if (!VIEWER_ROLES.includes(session.roleKey) || session.mustChangePassword) return NextResponse.json({ message: "غير مصرح" }, { status: 403 });
   const year = normalizeYear(request.nextUrl.searchParams.get("year"));
   const scope = await schoolScope(session, "s");
   const max = (await query<{ m: number }>("SELECT MAX(score) m FROM rating_scale WHERE is_active = 1"))[0]?.m || 3;
