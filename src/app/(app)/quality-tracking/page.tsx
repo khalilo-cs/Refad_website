@@ -85,7 +85,7 @@ export default function QualityTrackingPage() {
     ["لم تبدأ", t ? t.schools - t.started : undefined, "text-gray-600", "notStarted"],
     ["نقاط ضعف بلا خطة", t?.needsPlan, "text-danger", "needsPlan"],
     ["قيد المعالجة", t?.inProgress, "text-sky-700", ""],
-    ["تحسّن بانتظار اعتمادك", t?.improved, "text-emerald-700", "improved"],
+    [readOnly ? "تحسّن بانتظار الاعتماد" : "تحسّن بانتظار اعتمادك", t?.improved, "text-emerald-700", "improved"],
     ["تحسّن معتمد", t?.verified, "text-success", "verified"],
     ["خطط متأخرة", t?.overdue, "text-warning", "overdue"],
   ];

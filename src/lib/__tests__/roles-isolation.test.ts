@@ -66,7 +66,7 @@ describe("مشرف المحافظة: اطلاع كامل بلا تعديل", () 
   it("الوسيط يحجب أي طلب مغيِّر لحسابه ويسمح بالحساب والخروج", async () => {
     process.env.JWT_SECRET = process.env.JWT_SECRET || "x".repeat(40);
     const jwt = (await import("jsonwebtoken")).default;
-    const { middleware } = await import("@/middleware");
+    const { proxy: middleware } = await import("@/proxy");
     const token = jwt.sign({ userId: "sup", roleKey: "GOVERNORATE_SUPERVISOR" }, process.env.JWT_SECRET!, { issuer: "rifad", audience: "rifad-app" });
     const mk = (path: string, method: string) => new NextRequest(`http://localhost${path}`, { method, headers: { cookie: `access_token=${token}`, host: "localhost" } });
     expect(middleware(mk("/api/visits", "POST")).status).toBe(403);

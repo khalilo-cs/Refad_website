@@ -154,7 +154,7 @@ export default function DashboardPage() {
             <AlertTriangle className="h-4 w-4 shrink-0 text-warning" />
             {required.total} مؤشراً ضعيفاً في {required.schools} مدرسة يستوجب خطة تحسين ولم يُنشأ له إجراء بعد
           </span>
-          <span className="shrink-0 text-[12px] font-semibold text-turquoise">معالجة الآن</span>
+          <span className="shrink-0 text-[12px] font-semibold text-turquoise">{user?.roleKey === "GOVERNORATE_SUPERVISOR" ? "عرض التفاصيل" : "معالجة الآن"}</span>
         </Link>
       )}
 

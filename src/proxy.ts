@@ -51,7 +51,7 @@ function json(status: number, message: string) {
   return NextResponse.json({ message }, { status });
 }
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const isApi = pathname.startsWith("/api/");
 
@@ -122,8 +122,6 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
+  // يعمل proxy دائماً على Node.js، فيُقرأ JWT_SECRET من البيئة عند التشغيل لا وقت البناء.
   matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
-  // وقت التشغيل Node.js ضروري حتى يُقرأ JWT_SECRET من البيئة عند التشغيل،
-  // لا أن يُضمَّن قيمةً ثابتة وقت البناء (وهو ما يجعل الجلسات تفشل بعد النشر).
-  runtime: "nodejs",
 };

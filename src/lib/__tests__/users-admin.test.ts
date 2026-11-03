@@ -153,7 +153,7 @@ describe("إلزام تغيير كلمة المرور على الخادم", () =
   it("الوسيط يحجب واجهات غير الحساب ويسمح بالإعدادات", async () => {
     process.env.JWT_SECRET = process.env.JWT_SECRET || "x".repeat(40);
     const jwt = (await import("jsonwebtoken")).default;
-    const { middleware } = await import("@/middleware");
+    const { proxy: middleware } = await import("@/proxy");
     const token = jwt.sign({ userId: "u1", mustChangePassword: true }, process.env.JWT_SECRET!, { issuer: "rifad", audience: "rifad-app" });
     const mk = (path: string) => new NextRequest(`http://localhost${path}`, { headers: { cookie: `access_token=${token}` } });
     const api = middleware(mk("/api/schools"));
